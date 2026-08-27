@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { CATEGORIES, KEYWORDS, type Kind } from "@/lib/types";
+import LocationPickerMap from "../_components/LocationPickerMap";
 
 export default function AddRestaurantPage() {
   const router = useRouter();
@@ -22,7 +23,16 @@ export default function AddRestaurantPage() {
   const [revisit, setRevisit] = useState(false);
   const [review, setReview] = useState("");
   const [photo, setPhoto] = useState<File | null>(null);
+  const [lat, setLat] = useState<number | null>(null);
+  const [lng, setLng] = useState<number | null>(null);
 
+  const handleLocationChange = useCallback(
+    (nextLat: number, nextLng: number) => {
+      setLat(nextLat);
+      setLng(nextLng);
+    },
+    []
+  );
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -52,6 +62,12 @@ export default function AddRestaurantPage() {
     setLoading(true);
     setErrorMessage("");
 
+    if (lat === null || lng === null) {
+      setErrorMessage("지도에서 가게 위치를 선택하세요.");
+      setLoading(false);
+      return;
+    }
+
     try {
       const photo_url = photo ? await uploadPhoto(photo) : null;
 
@@ -68,6 +84,8 @@ export default function AddRestaurantPage() {
         keywords,
         revisit,
         visited_at: visitedAt || null,
+        lat,
+        lng,
         photo_url,
       });
 
@@ -83,37 +101,18 @@ export default function AddRestaurantPage() {
 
   return (
     <main className="flex h-screen">
-      {/* left: location picker — same plate as the search map */}
+      {/* left: real location picker */}
       <div className="relative flex-1 overflow-hidden bg-map">
-        <div
-          className="absolute inset-0 opacity-70"
-          style={{
-            backgroundImage:
-              "linear-gradient(var(--color-map-grid) 1px, transparent 1px), linear-gradient(90deg, var(--color-map-grid) 1px, transparent 1px)",
-            backgroundSize: "56px 56px",
-          }}
-        />
-        <div className="absolute -left-[6%] top-[22%] h-11 w-[112%] -rotate-7 bg-map-road" />
-        <div className="absolute -left-[6%] top-[64%] h-[30px] w-[112%] rotate-4 bg-map-road" />
-        <div className="absolute left-[34%] -top-[10%] h-[120%] w-[34px] rotate-9 bg-map-road" />
-        <div className="absolute left-[8%] top-[74%] h-[22%] w-[30%] rounded-[14px] bg-map-park" />
+        <LocationPickerMap onChange={handleLocationChange} />
 
-        <div className="absolute left-[46%] top-[48%] -translate-x-1/2 -translate-y-full rounded-[14px_14px_14px_3px] bg-brick px-3.75 pt-2.5 pb-2.25 text-[#fdf9f3] shadow-[0_10px_24px_rgba(180,85,45,0.3)]">
-          <span className="block text-[13px] font-medium whitespace-nowrap">
-            {name || "위치 미지정"}
-          </span>
-          <span className="block font-mono text-[11px] opacity-70">
-            37.5665, 126.9780
-          </span>
-        </div>
-
-        <div className="absolute inset-x-0 top-0 flex items-center gap-5 p-8">
+        <div className="absolute inset-x-0 top-0 z-[1000] flex items-center gap-5 p-8">
           <Link
             href="/"
             className="pr-1.5 font-serif text-[21px] font-bold tracking-[0.02em] whitespace-nowrap hover:text-brick"
           >
             오늘의 식탁
           </Link>
+
           <div className="flex h-12 flex-1 items-center gap-3 rounded-[26px] border border-line bg-card px-4.5 shadow-[0_6px_18px_rgba(28,26,23,0.07)]">
             <svg
               width="16"
@@ -126,20 +125,22 @@ export default function AddRestaurantPage() {
               <circle cx="7" cy="7" r="4.6" />
               <path d="M10.5 10.5L14 14" />
             </svg>
+
             <input
               value={address}
               onChange={(e) => setAddress(e.target.value)}
-              placeholder="주소를 검색해 위치를 지정하세요"
+              placeholder="주소를 입력하고 지도에서 위치를 클릭하세요"
               className="flex-1 bg-transparent text-sm outline-none placeholder:text-[#b3ada1]"
             />
           </div>
         </div>
 
-        <div className="absolute bottom-7 left-8 rounded-[20px] border border-line bg-card/90 px-4 py-2.5 text-xs text-muted">
-          지도를 클릭해 핀 위치를 조정할 수 있습니다
+        <div className="absolute bottom-7 left-8 z-[1000] rounded-[20px] border border-line bg-card/90 px-4 py-2.5 text-xs text-muted">
+          {lat !== null && lng !== null
+            ? `선택 위치: ${lat.toFixed(6)}, ${lng.toFixed(6)}`
+            : "지도를 클릭해 가게 위치를 지정하세요"}
         </div>
       </div>
-
       {/* right: form */}
       <aside className="flex w-[560px] shrink-0 flex-col border-l border-line bg-paper">
         <div className="flex items-center justify-between px-8 pt-5.5">

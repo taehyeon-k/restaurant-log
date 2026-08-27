@@ -56,7 +56,7 @@ export default async function Home({
         selected={selected}
         mapOverlay={
           <>
-            <div className="absolute inset-x-0 top-0 flex items-center gap-5 p-8">
+            <div className="absolute inset-x-0 top-0 z-[1000] flex items-center gap-5 p-8">
               <Link
                 href="/"
                 className="pr-1.5 font-serif text-[21px] font-bold tracking-[0.02em] whitespace-nowrap hover:text-brick"
@@ -66,7 +66,7 @@ export default async function Home({
               <SearchBar defaultValue={q} />
             </div>
 
-            <div className="absolute bottom-7 left-8 flex items-center gap-4 rounded-[20px] border border-line bg-card/90 px-4 py-2.5 text-xs text-muted">
+            <div className="absolute bottom-7 left-8 z-[1000] flex items-center gap-4 rounded-[20px] border border-line bg-card/90 px-4 py-2.5 text-xs text-muted">
               <span className="flex items-center gap-2">
                 <span className="size-2.5 rounded-full bg-brick" />
                 재방문 의사 있음
