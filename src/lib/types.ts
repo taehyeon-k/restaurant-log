@@ -48,3 +48,20 @@ export const won = (n: number | null) =>
 
 export const shortDate = (d: string | null) =>
   d == null ? "" : d.slice(5).replace("-", ".");
+
+/** 카테고리별 핀 색. 종이 팔레트 안에서 서로 구분되는 톤으로 골랐습니다. */
+export const CATEGORY_COLORS: Record<string, string> = {
+  한식: "#b4552d",
+  중식: "#9a4a52",
+  일식: "#5f7a8a",
+  양식: "#7a6a9a",
+  아시안: "#6f8455",
+  분식: "#c07a2e",
+  커피: "#7a5c42",
+  디저트: "#b06a86",
+  베이커리: "#a8853f",
+  차: "#4f7a6a",
+};
+
+export const pinColor = (category: string | null) =>
+  (category && CATEGORY_COLORS[category]) || "#8a8377";
