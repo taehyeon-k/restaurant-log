@@ -37,7 +37,7 @@ export default function AddressSearch({
       } finally {
         setBusy(false);
       }
-    }, 600); // Nominatim 초당 1회 제한
+    }, 250); // Nominatim 초당 1회 제한
 
     return () => {
       clearTimeout(t);
