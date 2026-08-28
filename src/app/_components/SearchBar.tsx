@@ -1,20 +1,36 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useSearchState } from "@/lib/useSearchState";
 
 export default function SearchBar({ defaultValue }: { defaultValue: string }) {
   const { set, reset } = useSearchState();
   const [value, setValue] = useState(defaultValue);
+  const [, startTransition] = useTransition();
 
-  useEffect(() => setValue(defaultValue), [defaultValue]);
+  // 내가 마지막으로 URL 에 보낸 값. 서버가 이걸 그대로 돌려줘도 입력창은 건드리지 않습니다.
+  const sent = useRef(defaultValue);
 
-  // Debounced so typing doesn't fire a query per keystroke.
+  // 뒤로가기·초기화처럼 바깥에서 바뀐 경우에만 입력창을 맞춥니다.
   useEffect(() => {
-    if (value === defaultValue) return;
-    const t = setTimeout(() => set("q", value.trim() || null), 250);
+    if (defaultValue !== sent.current) {
+      sent.current = defaultValue;
+      setValue(defaultValue);
+    }
+  }, [defaultValue]);
+
+  // 타자가 멎으면 검색. 입력 자체는 절대 막지 않습니다.
+  useEffect(() => {
+    const trimmed = value.trim();
+    if (trimmed === sent.current) return;
+
+    const t = setTimeout(() => {
+      sent.current = trimmed;
+      startTransition(() => set("q", trimmed || null));
+    }, 300);
+
     return () => clearTimeout(t);
-  }, [value, defaultValue, set]);
+  }, [value, set]);
 
   return (
     <div className="flex h-12 flex-1 items-center gap-3 rounded-[26px] border border-line bg-card px-4.5 shadow-[0_6px_18px_rgba(28,26,23,0.07)]">
@@ -37,6 +53,7 @@ export default function SearchBar({ defaultValue }: { defaultValue: string }) {
       />
       <button
         onClick={() => {
+          sent.current = "";
           setValue("");
           reset();
         }}
