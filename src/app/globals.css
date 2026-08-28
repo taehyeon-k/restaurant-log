@@ -48,10 +48,10 @@ body {
 /* OSM 기본 타일을 앱 배경(#e7e3d8)에 맞춰 눕힙니다.
    saturate 값만 조절하면 됩니다 — 0.3 은 거의 흑백, 0.8 은 원본에 가까움. */
 .paper-tiles {
-  filter: sepia(0.32) saturate(0.5) brightness(1.07) contrast(0.9)
+  .paper-tiles {
+  filter: sepia(0.22) saturate(0.6) brightness(1.18) contrast(0.95)
     hue-rotate(-8deg);
 }
-
 .leaflet-container {
   background: var(--color-map);
   font-family: inherit;
