@@ -59,6 +59,7 @@ export default async function Home({
       <Workspace
         rows={rows}
         selected={selected}
+        q={q}
         mapOverlay={
           <>
             <div className="absolute inset-x-0 top-0 z-[1000] flex items-center gap-5 p-8">
