@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { CATEGORIES, KEYWORDS, type Kind } from "@/lib/types";
 import LocationPickerMap from "../_components/LocationPickerMap";
-
+import AddressSearch from "../_components/AddressSearch";
 export default function AddRestaurantPage() {
   const router = useRouter();
 
@@ -103,8 +103,10 @@ export default function AddRestaurantPage() {
     <main className="flex h-screen">
       {/* left: real location picker */}
       <div className="relative flex-1 overflow-hidden bg-map">
-        <LocationPickerMap onChange={handleLocationChange} />
-
+      <LocationPickerMap
+          center={lat !== null && lng !== null ? { lat, lng } : null}
+          onChange={handleLocationChange}
+        />
         <div className="absolute inset-x-0 top-0 z-[1000] flex items-center gap-5 p-8">
           <Link
             href="/"
@@ -113,26 +115,15 @@ export default function AddRestaurantPage() {
             오늘의 식탁
           </Link>
 
-          <div className="flex h-12 flex-1 items-center gap-3 rounded-[26px] border border-line bg-card px-4.5 shadow-[0_6px_18px_rgba(28,26,23,0.07)]">
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 16 16"
-              fill="none"
-              stroke="var(--color-faint)"
-              strokeWidth="1.6"
-            >
-              <circle cx="7" cy="7" r="4.6" />
-              <path d="M10.5 10.5L14 14" />
-            </svg>
-
-            <input
-              value={address}
-              onChange={(e) => setAddress(e.target.value)}
-              placeholder="주소를 입력하고 지도에서 위치를 클릭하세요"
-              className="flex-1 bg-transparent text-sm outline-none placeholder:text-[#b3ada1]"
-            />
-          </div>
+           <AddressSearch
+            value={address}
+            onChange={setAddress}
+            onPick={(p) => {
+              setLat(p.lat);
+              setLng(p.lng);
+              if (p.region && !region) setRegion(p.region);
+            }}
+          />
         </div>
 
         <div className="absolute bottom-7 left-8 z-[1000] rounded-[20px] border border-line bg-card/90 px-4 py-2.5 text-xs text-muted">
