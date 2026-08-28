@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import type { CircleMarker, Map as LeafletMap } from "leaflet";
 import { pinColor, type Restaurant } from "@/lib/types";
+import { forwardGeocode } from "@/lib/geocode";
 import { useHover } from "./Workspace";
 
 type Placed = Restaurant & { lat: number; lng: number };
@@ -25,9 +26,11 @@ function styleFor(row: Restaurant, active: boolean) {
 export default function MapPane({
   rows,
   selectedId,
+  q,
 }: {
   rows: Restaurant[];
   selectedId: number | null;
+  q: string;
 }) {
   const router = useRouter();
   const { hover, setHover } = useHover();
@@ -157,7 +160,7 @@ export default function MapPane({
     }
   }, [hover, selectedId, rows]);
 
-  // 4. 화면 잡기 — 결과 집합이 바뀔 때만.
+  // 4. 화면 잡기.
   const lastFit = useRef("");
 
   useEffect(() => {
@@ -172,7 +175,25 @@ export default function MapPane({
     }
 
     const visible = placed(rows);
-    if (!visible.length) return;
+
+    // 기록이 없는 지역을 검색했으면, 검색어를 지명으로 보고 그쪽으로 이동합니다.
+    if (!visible.length) {
+      const query = q.trim();
+      if (query.length < 2) return;
+
+      let cancelled = false;
+      forwardGeocode(query)
+        .then((places) => {
+          if (cancelled || !places.length) return;
+          lastFit.current = "";
+          map.flyTo([places[0].lat, places[0].lng], 14, { duration: 0.8 });
+        })
+        .catch(() => {});
+
+      return () => {
+        cancelled = true;
+      };
+    }
 
     const key = visible.map((r) => r.id).join(",");
     if (key === lastFit.current) return;
@@ -187,7 +208,7 @@ export default function MapPane({
       L.latLngBounds(visible.map((r) => [r.lat, r.lng] as [number, number])),
       { paddingTopLeft: [40, 120], paddingBottomRight: [40, 40], maxZoom: 15 }
     );
-  }, [rows, selectedId]);
+  }, [rows, selectedId, q]);
 
   return <div ref={containerRef} className="absolute inset-0" />;
 }
