@@ -43,15 +43,52 @@ body {
   border-radius: 4px;
 }
 
-.restaurant-map-tooltip {
-  border: 1px solid var(--color-line) !important;
-  border-radius: 10px !important;
-  background: var(--color-card) !important;
-  color: var(--color-ink) !important;
-  box-shadow: 0 4px 12px rgba(28, 26, 23, 0.12) !important;
-  padding: 6px 9px !important;
+/* ── 지도 ─────────────────────────────────────────── */
+
+/* OSM 기본 타일을 앱 배경(#e7e3d8)에 맞춰 눕힙니다.
+   saturate 값만 조절하면 됩니다 — 0.3 은 거의 흑백, 0.8 은 원본에 가까움. */
+.paper-tiles {
+  filter: sepia(0.32) saturate(0.5) brightness(1.07) contrast(0.9)
+    hue-rotate(-8deg);
 }
 
-.leaflet-tooltip-top.restaurant-map-tooltip::before {
-  border-top-color: var(--color-card) !important;
+.leaflet-container {
+  background: var(--color-map);
+  font-family: inherit;
+}
+
+/* 핀 이름표 — 목록 카드와 같은 종이 판 모양 */
+.restaurant-map-tooltip {
+  border: 1px solid var(--color-line) !important;
+  border-radius: 14px 14px 14px 3px !important;
+  background: var(--color-card) !important;
+  color: var(--color-ink) !important;
+  box-shadow: 0 4px 12px rgba(28, 26, 23, 0.09) !important;
+  padding: 7px 12px 6px !important;
+  font-family: inherit !important;
+  font-size: 13px !important;
+  line-height: 1.25 !important;
+  white-space: nowrap !important;
+}
+
+.restaurant-map-tooltip::before {
+  display: none !important;
+}
+
+/* 줌 버튼과 저작권 표시 */
+.leaflet-control-zoom a {
+  border-color: var(--color-line) !important;
+  background: var(--color-card) !important;
+  color: var(--color-muted) !important;
+}
+
+.leaflet-control-zoom a:hover {
+  background: var(--color-brick-soft) !important;
+  color: var(--color-brick) !important;
+}
+
+.leaflet-control-attribution {
+  background: rgba(251, 250, 246, 0.8) !important;
+  font-size: 10px !important;
+  color: var(--color-faint) !important;
 }
