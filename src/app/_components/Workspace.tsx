@@ -21,11 +21,13 @@ export const useHover = () => useContext(HoverContext);
 export default function Workspace({
   rows,
   selected,
+  q,
   mapOverlay,
   asideHeader,
 }: {
   rows: Restaurant[];
   selected: Restaurant | null;
+  q: string;
   mapOverlay: React.ReactNode;
   asideHeader: React.ReactNode;
 }) {
@@ -34,7 +36,7 @@ export default function Workspace({
   return (
     <HoverContext.Provider value={{ hover, setHover }}>
       <div className="relative flex-1 overflow-hidden bg-map">
-        <MapPane rows={rows} selectedId={selected?.id ?? null} />
+        <MapPane rows={rows} selectedId={selected?.id ?? null} q={q} />
         {mapOverlay}
       </div>
 
