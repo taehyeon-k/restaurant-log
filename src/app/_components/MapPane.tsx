@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import type { CircleMarker, Map as LeafletMap } from "leaflet";
-import type { Restaurant } from "@/lib/types";
+import { pinColor, type Restaurant } from "@/lib/types";
 import { useHover } from "./Workspace";
 
 type Placed = Restaurant & { lat: number; lng: number };
@@ -12,13 +12,13 @@ const placed = (rows: Restaurant[]) =>
   rows.filter((r): r is Placed => r.lat !== null && r.lng !== null);
 
 function styleFor(row: Restaurant, active: boolean) {
-  const base = row.revisit ? "#b4552d" : "#a9a297";
+  const base = pinColor(row.category);
   return {
     radius: active ? 11 : 9,
     weight: active ? 3 : 2,
-    color: active ? "#8f3f20" : base,
-    fillColor: active ? "#b4552d" : base,
-    fillOpacity: 0.92,
+    color: active ? "#3d3833" : base,
+    fillColor: base,
+    fillOpacity: row.revisit ? 0.95 : 0.45,
   };
 }
 
