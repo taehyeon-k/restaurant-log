@@ -1,16 +1,118 @@
-import { notFound } from "next/navigation";
-import { getRestaurant } from "@/lib/queries";
-import RecordForm from "@/app/_components/RecordForm";
+import { redirect } from "next/navigation";
+import Link from "next/link";
+import { getFacets, getRestaurant, searchRestaurants } from "@/lib/queries";
+import { CATEGORY_COLORS, type Kind, type Sort } from "@/lib/types";
+import KindTabs from "./_components/KindTabs";
+import SearchBar from "./_components/SearchBar";
+import FilterPanel from "./_components/FilterPanel";
+import SortRow from "./_components/SortRow";
+import Workspace from "./_components/Workspace";
 
-export default async function EditRestaurantPage({
-  params,
+const toArray = (v: string | string[] | undefined) =>
+  v == null ? [] : Array.isArray(v) ? v : [v];
+
+export default async function Home({
+  searchParams,
 }: {
-  params: Promise<{ id: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { id } = await params;
-  const place = await getRestaurant(Number(id));
+  const sp = await searchParams;
 
-  if (!place) notFound();
+  const kind: Kind = sp.kind === "cafe" ? "cafe" : "restaurant";
+  const sort: Sort =
+    sp.sort === "rating" || sp.sort === "price" ? sp.sort : "recent";
+  const q = typeof sp.q === "string" ? sp.q : "";
+  const categories = toArray(sp.category);
+  const regions = toArray(sp.region);
+  const keywords = toArray(sp.keyword);
+  const revisitOnly = sp.revisit === "1";
 
-  return <RecordForm initial={place} />;
+  const [rows, facets] = await Promise.all([
+    searchRestaurants({ kind, q, categories, regions, keywords, revisitOnly, sort }),
+    getFacets(kind),
+  ]);
+
+  const selectedId = typeof sp.id === "string" ? Number(sp.id) : null;
+  const selected =
+    selectedId != null && !Number.isNaN(selectedId)
+      ? await getRestaurant(selectedId)
+      : null;
+
+  // A stale ?id (deleted row) shouldn't leave the detail pane empty.
+  if (selectedId != null && selected == null) {
+    const keep = new URLSearchParams(
+      Object.entries(sp).flatMap(([k, v]) =>
+        k === "id" ? [] : toArray(v).map((val) => [k, val] as [string, string])
+      )
+    );
+    const qs = keep.toString();
+    redirect(qs ? `/?${qs}` : "/");
+  }
+
+  // 이 종류에 실제로 쓰인 카테고리만 범례에 보여줍니다.
+  const legend = Object.entries(CATEGORY_COLORS).filter(([label]) =>
+    facets.categories.includes(label)
+  );
+
+  return (
+    <main className="flex h-screen">
+      <Workspace
+        rows={rows}
+        selected={selected}
+        mapOverlay={
+          <>
+            <div className="absolute inset-x-0 top-0 z-[1000] flex items-center gap-5 p-8">
+              <Link
+                href="/"
+                className="pr-1.5 font-serif text-[21px] font-bold tracking-[0.02em] whitespace-nowrap hover:text-brick"
+              >
+                오늘의 식탁
+              </Link>
+              <SearchBar defaultValue={q} />
+            </div>
+
+            {legend.length > 0 && (
+              <div className="absolute bottom-7 left-8 z-[1000] flex max-w-[520px] flex-wrap items-center gap-x-3.5 gap-y-2 rounded-[20px] border border-line bg-card/90 px-4 py-2.5 text-xs text-muted">
+                {legend.map(([label, color]) => (
+                  <span key={label} className="flex items-center gap-1.5">
+                    <span
+                      className="size-2.5 rounded-full"
+                      style={{ background: color }}
+                    />
+                    {label}
+                  </span>
+                ))}
+                <span className="flex items-center gap-1.5 border-l border-line pl-3.5">
+                  <span className="size-2.5 rounded-full bg-[#8a8377] opacity-45" />
+                  한 번만
+                </span>
+              </div>
+            )}
+          </>
+        }
+        asideHeader={
+          selected ? null : (
+            <>
+              <div className="flex items-center justify-between px-8 pt-5.5">
+                <Link
+                  href="/add"
+                  className="border-b border-[#e2c9bb] text-[13px] text-brick"
+                >
+                  + 기록 추가
+                </Link>
+                <KindTabs kind={kind} />
+              </div>
+
+              <FilterPanel
+                facets={facets}
+                selected={{ categories, regions, keywords, revisitOnly }}
+              />
+
+              <SortRow count={rows.length} sort={sort} />
+            </>
+          )
+        }
+      />
+    </main>
+  );
 }
