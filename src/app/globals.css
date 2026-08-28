@@ -48,7 +48,7 @@ body {
 /* OSM 기본 타일을 앱 배경(#e7e3d8)에 맞춰 눕힙니다.
    너무 어두우면 brightness 를 올리세요. */
 .paper-tiles {
-  filter: sepia(0.22) saturate(0.7) brightness(1.18) contrast(0.95)
+  filter: sepia(0.22) saturate(0.6) brightness(1.08) contrast(0.95)
     hue-rotate(-8deg);
 }
 
