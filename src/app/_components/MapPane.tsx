@@ -160,15 +160,22 @@ export default function MapPane({
     }
   }, [hover, selectedId, rows]);
 
-  // 4. 화면 잡기.
+   // 4. 화면 잡기 + 검색한 지역 표시.
   const lastFit = useRef("");
+  const ghostRef = useRef<CircleMarker | null>(null);
 
   useEffect(() => {
     const L = leafletRef.current;
     const map = mapRef.current;
     if (!L || !map) return;
 
+    const clearGhost = () => {
+      ghostRef.current?.remove();
+      ghostRef.current = null;
+    };
+
     if (selectedId !== null) {
+      clearGhost();
       const target = placed(rows).find((r) => r.id === selectedId);
       if (target) map.flyTo([target.lat, target.lng], 15, { duration: 0.7 });
       return;
@@ -176,17 +183,53 @@ export default function MapPane({
 
     const visible = placed(rows);
 
-    // 기록이 없는 지역을 검색했으면, 검색어를 지명으로 보고 그쪽으로 이동합니다.
+    // 기록이 없는 지역을 검색했으면, 검색어를 지명으로 보고 그쪽에 표시합니다.
     if (!visible.length) {
       const query = q.trim();
-      if (query.length < 2) return;
+      if (query.length < 2) {
+        clearGhost();
+        return;
+      }
 
       let cancelled = false;
+
       forwardGeocode(query)
         .then((places) => {
-          if (cancelled || !places.length) return;
+          if (cancelled || !places.length || !mapRef.current) return;
+
+          const hit = places[0];
+          clearGhost();
           lastFit.current = "";
-          map.flyTo([places[0].lat, places[0].lng], 14, { duration: 0.8 });
+
+          const ghost = L.circleMarker([hit.lat, hit.lng], {
+            radius: 10,
+            weight: 2,
+            dashArray: "3 3",
+            color: "#8a8377",
+            fillColor: "#8a8377",
+            fillOpacity: 0.15,
+          }).addTo(map);
+
+          const label = document.createElement("div");
+          const title = document.createElement("div");
+          title.textContent = hit.name || query;
+          title.style.fontWeight = "600";
+          title.style.whiteSpace = "nowrap";
+          const note = document.createElement("div");
+          note.textContent = "기록 없음";
+          note.style.fontSize = "11px";
+          note.style.opacity = "0.6";
+          label.append(title, note);
+
+          ghost.bindTooltip(label, {
+            permanent: true,
+            direction: "top",
+            offset: [0, -10],
+            className: "restaurant-map-tooltip",
+          });
+
+          ghostRef.current = ghost;
+          map.flyTo([hit.lat, hit.lng], 15, { duration: 0.8 });
         })
         .catch(() => {});
 
@@ -194,6 +237,8 @@ export default function MapPane({
         cancelled = true;
       };
     }
+
+    clearGhost();
 
     const key = visible.map((r) => r.id).join(",");
     if (key === lastFit.current) return;
@@ -209,6 +254,3 @@ export default function MapPane({
       { paddingTopLeft: [40, 120], paddingBottomRight: [40, 40], maxZoom: 15 }
     );
   }, [rows, selectedId, q]);
-
-  return <div ref={containerRef} className="absolute inset-0" />;
-}
