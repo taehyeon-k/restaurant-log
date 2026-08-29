@@ -2,13 +2,10 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { stars, won, type Restaurant } from "@/lib/types";
+import { stars, type Restaurant } from "@/lib/types";
+import { feltLabel, feltLevel } from "@/lib/price";
 import PriceLevel from "./PriceLevel";
 
-          import {
-            feltLabel,
-            feltLevel,
-          } from "@/lib/price";
 export default function DetailPane({ place }: { place: Restaurant }) {
   const params = useSearchParams();
 
