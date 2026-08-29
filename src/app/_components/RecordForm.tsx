@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import {
   CATEGORIES,
@@ -12,17 +12,9 @@ import {
   type Restaurant,
 } from "@/lib/types";
 import { FELT_PRICE } from "@/lib/price";
+import { reverseGeocode } from "@/lib/geocode";
 import LocationPickerMap from "./LocationPickerMap";
 import AddressSearch from "./AddressSearch";
-import Image from "next/image";
-<Image
-  src="/piggy.png"
-  alt=""
-  width={24}
-  height={24}
-  className="object-contain"
-/>
-
 
 /** 예전 기록은 menu 문자열만 있으니 이름만 채워 넣습니다. */
 const initialMenus = (initial?: Restaurant): MenuItem[] => {
@@ -40,13 +32,20 @@ export default function RecordForm({ initial }: { initial?: Restaurant }) {
   const router = useRouter();
   const editing = Boolean(initial);
 
+  // 지도 검색에서 넘어온 값 (새 기록일 때만)
+  const sp = useSearchParams();
+  const presetName = initial ? "" : sp.get("name") ?? "";
+  const presetAddress = initial ? "" : sp.get("address") ?? "";
+  const presetLat = initial || !sp.get("lat") ? null : Number(sp.get("lat"));
+  const presetLng = initial || !sp.get("lng") ? null : Number(sp.get("lng"));
+
   const [kind, setKind] = useState<Kind>(initial?.kind ?? "restaurant");
-  const [name, setName] = useState(initial?.name ?? "");
+  const [name, setName] = useState(initial?.name ?? presetName);
   const [category, setCategory] = useState(
     initial?.category ?? CATEGORIES.restaurant[0]
   );
   const [region, setRegion] = useState(initial?.region ?? "");
-  const [address, setAddress] = useState(initial?.address ?? "");
+  const [address, setAddress] = useState(initial?.address ?? presetAddress);
   const [rating, setRating] = useState(Math.floor(initial?.rating ?? 0));
   const [menus, setMenus] = useState<MenuItem[]>(initialMenus(initial));
   const [priceLevel, setPriceLevel] = useState(initial?.price_level ?? 0);
@@ -55,15 +54,36 @@ export default function RecordForm({ initial }: { initial?: Restaurant }) {
   const [revisit, setRevisit] = useState(initial?.revisit ?? false);
   const [review, setReview] = useState(initial?.review ?? "");
   const [photo, setPhoto] = useState<File | null>(null);
-  const [lat, setLat] = useState<number | null>(initial?.lat ?? null);
-  const [lng, setLng] = useState<number | null>(initial?.lng ?? null);
+  const [lat, setLat] = useState<number | null>(initial?.lat ?? presetLat);
+  const [lng, setLng] = useState<number | null>(initial?.lng ?? presetLng);
 
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
-  const handleLocationChange = useCallback((la: number, ln: number) => {
+  // 넘어온 좌표로 지역 칸을 한 번 채웁니다.
+  const presetDone = useRef(false);
+
+  useEffect(() => {
+    if (presetDone.current || presetLat === null || presetLng === null) return;
+    presetDone.current = true;
+
+    reverseGeocode(presetLat, presetLng)
+      .then((hit) => {
+        if (hit?.region) setRegion(hit.region);
+      })
+      .catch(() => {});
+  }, [presetLat, presetLng]);
+
+  // 지도를 클릭하거나 핀을 옮기면 주소와 지역을 되찾아옵니다.
+  const handleLocationChange = useCallback(async (la: number, ln: number) => {
     setLat(la);
     setLng(ln);
+
+    const hit = await reverseGeocode(la, ln).catch(() => null);
+    if (!hit) return;
+
+    setAddress(hit.address);
+    if (hit.region) setRegion(hit.region);
   }, []);
 
   function switchKind(next: Kind) {
@@ -187,7 +207,7 @@ export default function RecordForm({ initial }: { initial?: Restaurant }) {
         <div className="absolute inset-x-0 top-0 z-[1000] flex items-center gap-5 p-8">
           <Link
             href="/"
-             className="pr-1.5 font-serif text-[22px] font-bold tracking-[0.14em] whitespace-nowrap hover:text-brick"
+            className="pr-1.5 font-serif text-[22px] font-bold tracking-[0.14em] whitespace-nowrap hover:text-brick"
           >
             DINARY
           </Link>
@@ -198,7 +218,7 @@ export default function RecordForm({ initial }: { initial?: Restaurant }) {
             onPick={(p) => {
               setLat(p.lat);
               setLng(p.lng);
-              if (p.region && !region) setRegion(p.region);
+              if (p.region) setRegion(p.region);
             }}
           />
         </div>
@@ -269,14 +289,35 @@ export default function RecordForm({ initial }: { initial?: Restaurant }) {
               </select>
             </Field>
             <Field label="REGION">
-              <input
-                value={region}
-                onChange={(e) => setRegion(e.target.value)}
-                placeholder="중구"
-                className={inputClass}
-              />
+              <div
+                className={`${inputClass} flex items-center justify-between gap-2 ${
+                  region ? "" : "text-[#b3ada1]"
+                }`}
+              >
+                <span className="truncate">
+                  {region || "위치를 정하면 채워집니다"}
+                </span>
+                {region && (
+                  <button
+                    type="button"
+                    onClick={() => setRegion("")}
+                    className="shrink-0 cursor-pointer font-mono text-[11px] text-faint hover:text-brick"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
             </Field>
           </div>
+
+          <Field label="ADDRESS">
+            <input
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              placeholder="위치를 정하면 채워집니다"
+              className={inputClass}
+            />
+          </Field>
 
           <Field label="RATING">
             <div className="flex items-center gap-3.5">
@@ -314,12 +355,13 @@ export default function RecordForm({ initial }: { initial?: Restaurant }) {
                       filter: n <= priceLevel ? "none" : "grayscale(1)",
                       opacity: n <= priceLevel ? 1 : 0.35,
                     }}
-                    className={`size-8.5 cursor-pointer rounded-[3px] border text-base leading-none transition-all ${
+                    className={`grid size-8.5 cursor-pointer place-items-center rounded-[3px] border transition-all ${
                       n <= priceLevel
                         ? "border-brick bg-brick-soft"
                         : "border-line bg-card hover:border-[#cdc6b8]"
                     }`}
                   >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src="/piggy.png"
                       alt=""
@@ -329,9 +371,7 @@ export default function RecordForm({ initial }: { initial?: Restaurant }) {
                 ))}
               </div>
               <span className="text-[13px] text-muted">
-                {priceLevel
-                ? FELT_PRICE[priceLevel - 1]
-                : "선택 안 함"}
+                {priceLevel ? FELT_PRICE[priceLevel - 1] : "선택 안 함"}
               </span>
             </div>
           </Field>
