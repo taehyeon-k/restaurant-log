@@ -4,14 +4,27 @@ import { useCallback, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { CATEGORIES, KEYWORDS, type Kind, type Restaurant } from "@/lib/types";
+import {
+  CATEGORIES,
+  KEYWORDS,
+  type Kind,
+  type MenuItem,
+  type Restaurant,
+} from "@/lib/types";
+import { PRICE_HINTS } from "./PriceLevel";
 import LocationPickerMap from "./LocationPickerMap";
 import AddressSearch from "./AddressSearch";
 
-/** "평양냉면, 편육" ↔ ["평양냉면", "편육"] */
-const splitMenu = (v: string | null) => {
-  const parts = (v ?? "").split(",").map((s) => s.trim()).filter(Boolean);
-  return parts.length ? parts : [""];
+/** 예전 기록은 menu 문자열만 있으니 이름만 채워 넣습니다. */
+const initialMenus = (initial?: Restaurant): MenuItem[] => {
+  if (initial?.menus?.length) return initial.menus;
+  const names = (initial?.menu ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return names.length
+    ? names.map((name) => ({ name, price: null }))
+    : [{ name: "", price: null }];
 };
 
 export default function RecordForm({ initial }: { initial?: Restaurant }) {
@@ -26,10 +39,8 @@ export default function RecordForm({ initial }: { initial?: Restaurant }) {
   const [region, setRegion] = useState(initial?.region ?? "");
   const [address, setAddress] = useState(initial?.address ?? "");
   const [rating, setRating] = useState(Math.floor(initial?.rating ?? 0));
-  const [menus, setMenus] = useState<string[]>(splitMenu(initial?.menu ?? null));
-  const [priceRange, setPriceRange] = useState(
-    initial?.price_range?.toString() ?? ""
-  );
+  const [menus, setMenus] = useState<MenuItem[]>(initialMenus(initial));
+  const [priceLevel, setPriceLevel] = useState(initial?.price_level ?? 0);
   const [keywords, setKeywords] = useState<string[]>(initial?.keywords ?? []);
   const [visitedAt, setVisitedAt] = useState(initial?.visited_at ?? "");
   const [revisit, setRevisit] = useState(initial?.revisit ?? false);
@@ -55,11 +66,15 @@ export default function RecordForm({ initial }: { initial?: Restaurant }) {
     setKeywords((p) => (p.includes(k) ? p.filter((v) => v !== k) : [...p, k]));
   }
 
-  const setMenuAt = (i: number, v: string) =>
-    setMenus((p) => p.map((m, idx) => (idx === i ? v : m)));
-  const addMenu = () => setMenus((p) => [...p, ""]);
+  const setMenuAt = (i: number, patch: Partial<MenuItem>) =>
+    setMenus((p) => p.map((m, idx) => (idx === i ? { ...m, ...patch } : m)));
+  const addMenu = () => setMenus((p) => [...p, { name: "", price: null }]);
   const removeMenu = (i: number) =>
-    setMenus((p) => (p.length === 1 ? [""] : p.filter((_, idx) => idx !== i)));
+    setMenus((p) =>
+      p.length === 1
+        ? [{ name: "", price: null }]
+        : p.filter((_, idx) => idx !== i)
+    );
 
   async function uploadPhoto(file: File) {
     const path = `${Date.now()}-${file.name.replace(/[^\w.-]/g, "_")}`;
@@ -87,6 +102,14 @@ export default function RecordForm({ initial }: { initial?: Restaurant }) {
         ? await uploadPhoto(photo)
         : initial?.photo_url ?? null;
 
+      const cleanMenus = menus
+        .map((m) => ({ name: m.name.trim(), price: m.price }))
+        .filter((m) => m.name);
+
+      const prices = cleanMenus
+        .map((m) => m.price)
+        .filter((p): p is number => typeof p === "number" && p > 0);
+
       const payload = {
         kind,
         name,
@@ -94,8 +117,12 @@ export default function RecordForm({ initial }: { initial?: Restaurant }) {
         region: region || null,
         address: address || null,
         rating: rating || null,
-        menu: menus.map((m) => m.trim()).filter(Boolean).join(", ") || null,
-        price_range: priceRange ? Number(priceRange) : null,
+        menus: cleanMenus,
+        menu: cleanMenus.map((m) => m.name).join(", ") || null,
+        price_level: priceLevel || null,
+        price_range: prices.length
+          ? Math.round(prices.reduce((a, b) => a + b, 0) / prices.length)
+          : null,
         review: review || null,
         keywords,
         revisit,
@@ -266,15 +293,54 @@ export default function RecordForm({ initial }: { initial?: Restaurant }) {
             </div>
           </Field>
 
+          <Field label="PRICE">
+            <div className="flex items-center gap-3.5">
+              <div className="flex gap-1">
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => setPriceLevel(n === priceLevel ? 0 : n)}
+                    style={{
+                      filter: n <= priceLevel ? "none" : "grayscale(1)",
+                      opacity: n <= priceLevel ? 1 : 0.35,
+                    }}
+                    className={`size-8.5 cursor-pointer rounded-[3px] border text-base leading-none transition-all ${
+                      n <= priceLevel
+                        ? "border-brick bg-brick-soft"
+                        : "border-line bg-card hover:border-[#cdc6b8]"
+                    }`}
+                  >
+                    🐷
+                  </button>
+                ))}
+              </div>
+              <span className="text-[13px] text-muted">
+                {priceLevel ? PRICE_HINTS[priceLevel] : "선택 안 함"}
+              </span>
+            </div>
+          </Field>
+
           <Field label="MENU">
             <div className="flex flex-col gap-2">
               {menus.map((m, i) => (
                 <div key={i} className="flex items-center gap-2">
                   <input
-                    value={m}
-                    onChange={(e) => setMenuAt(i, e.target.value)}
+                    value={m.name}
+                    onChange={(e) => setMenuAt(i, { name: e.target.value })}
                     placeholder={i === 0 ? "평양냉면" : "메뉴 이름"}
                     className={`${inputClass} min-w-0 flex-1`}
+                  />
+                  <input
+                    type="number"
+                    value={m.price ?? ""}
+                    onChange={(e) =>
+                      setMenuAt(i, {
+                        price: e.target.value ? Number(e.target.value) : null,
+                      })
+                    }
+                    placeholder="가격"
+                    className={`${inputClass} w-28 shrink-0 font-mono`}
                   />
                   <button
                     type="button"
@@ -296,25 +362,14 @@ export default function RecordForm({ initial }: { initial?: Restaurant }) {
             </div>
           </Field>
 
-          <div className="grid grid-cols-2 gap-3.5">
-            <Field label="PRICE">
-              <input
-                type="number"
-                value={priceRange}
-                onChange={(e) => setPriceRange(e.target.value)}
-                placeholder="12000"
-                className={`${inputClass} font-mono`}
-              />
-            </Field>
-            <Field label="VISITED AT">
-              <input
-                type="date"
-                value={visitedAt}
-                onChange={(e) => setVisitedAt(e.target.value)}
-                className={`${inputClass} font-mono`}
-              />
-            </Field>
-          </div>
+          <Field label="VISITED AT">
+            <input
+              type="date"
+              value={visitedAt}
+              onChange={(e) => setVisitedAt(e.target.value)}
+              className={`${inputClass} font-mono`}
+            />
+          </Field>
 
           <Field label="KEYWORDS">
             <div className="flex flex-wrap gap-1.75">
