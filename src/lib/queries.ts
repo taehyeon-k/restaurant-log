@@ -36,7 +36,7 @@ export async function searchRestaurants(f: SearchFilters) {
   if (f.sort === "rating") {
     query = query.order("rating", { ascending: false, nullsFirst: false });
   } else if (f.sort === "price") {
-    query = query.order("price_range", { ascending: true, nullsFirst: false });
+    query = query.order("price_level", { ascending: true, nullsFirst: false });
   } else {
     query = query.order("visited_at", { ascending: false, nullsFirst: false });
   }
