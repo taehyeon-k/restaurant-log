@@ -1,31 +1,45 @@
-export const PRICE_HINTS = [
-  "",
-  "가볍게",
-  "부담 없이",
-  "보통",
-  "특별한 날",
-  "큰맘 먹고",
-];
+import {
+  feltLevel,
+  priceTitle,
+  type PriceRow,
+} from "@/lib/price";
 
 export default function PriceLevel({
-  level,
-  size = 14,
+  row,
+  size = 16,
 }: {
-  level: number | null;
+  row: PriceRow;
   size?: number;
 }) {
-  if (!level) return <span className="text-[13px] text-[#a8a196]">—</span>;
+  const level = feltLevel(row);
+
+  if (!level) {
+    return (
+      <span className="text-[13px] text-[#a8a196]">
+        —
+      </span>
+    );
+  }
 
   return (
     <span
-      className="inline-flex items-center gap-0.5"
-      title={PRICE_HINTS[level]}
-      aria-label={`가격 ${level}단계`}
+      className="flex items-center gap-0.5"
+      title={priceTitle(row)}
+      aria-label={`체감 가격 ${level} / 5`}
     >
-      {Array.from({ length: level }, (_, i) => (
-        <span key={i} style={{ fontSize: size, lineHeight: 1 }}>
-          🐷
-        </span>
+      {[1, 2, 3, 4, 5].map((n) => (
+        <img
+          key={n}
+          src="/piggy.png"
+          alt=""
+          width={size}
+          height={size}
+          className={`block shrink-0 object-contain ${
+            n <= level
+              ? "opacity-100"
+              : "opacity-30 grayscale-[0.85]"
+          }`}
+        />
       ))}
     </span>
   );
