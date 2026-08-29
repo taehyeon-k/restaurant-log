@@ -30,15 +30,7 @@ const gu = (address?: string) => address?.split(" ")[1] ?? null;
 export async function GET(req: Request) {
   const sp = new URL(req.url).searchParams;
 
-  // 진단용: /api/geocode?debug=1
-  if (sp.get("debug")) {
-    return NextResponse.json({
-      keyPresent: Boolean(RAW),
-      keyLength: RAW?.length ?? 0,
-      trimmedLength: KEY?.length ?? 0,
-      startsWith: KEY?.slice(0, 4) ?? null,
-    });
-  }
+
 
   if (!KEY) {
     return NextResponse.json(
