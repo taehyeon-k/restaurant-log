@@ -57,6 +57,11 @@ body {
   font-family: inherit;
 }
 
+.restaurant-map-pin {
+  background: transparent !important;
+  border: none !important;
+}
+
 /* 핀 이름표 — 목록 카드와 같은 종이 판 모양 */
 .restaurant-map-tooltip {
   border: 1px solid var(--color-line) !important;
