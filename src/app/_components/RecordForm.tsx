@@ -15,6 +15,7 @@ import { FELT_PRICE } from "@/lib/price";
 import { reverseGeocode } from "@/lib/geocode";
 import LocationPickerMap from "./LocationPickerMap";
 import AddressSearch from "./AddressSearch";
+import RegionSelect from "./RegionSelect";
 
 /** 예전 기록은 menu 문자열만 있으니 이름만 채워 넣습니다. */
 const initialMenus = (initial?: Restaurant): MenuItem[] => {
@@ -274,7 +275,7 @@ export default function RecordForm({ initial }: { initial?: Restaurant }) {
             />
           </Field>
 
-          <div className="grid grid-cols-2 gap-3.5">
+      
             <Field label="CATEGORY">
               <select
                 value={category}
@@ -288,26 +289,23 @@ export default function RecordForm({ initial }: { initial?: Restaurant }) {
                 ))}
               </select>
             </Field>
-            <Field label="REGION">
-              <div
-                className={`${inputClass} flex items-center justify-between gap-2 ${
-                  region ? "" : "text-[#b3ada1]"
-                }`}
-              >
-                <span className="truncate">
-                  {region || "위치를 정하면 채워집니다"}
-                </span>
-                {region && (
-                  <button
-                    type="button"
-                    onClick={() => setRegion("")}
-                    className="shrink-0 cursor-pointer font-mono text-[11px] text-faint hover:text-brick"
-                  >
-                    ×
-                  </button>
-                )}
-              </div>
-            </Field>
+             <Field label="CATEGORY">
+            <select
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              className={`${inputClass} w-1/2`}
+            >
+              {CATEGORIES[kind].map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </Field>
+
+          <Field label="REGION">
+            <RegionSelect value={region} onChange={setRegion} />
+          </Field>
           </div>
 
           <Field label="ADDRESS">
