@@ -13,37 +13,48 @@ const HoverContext = createContext<{
 
 export const useHover = () => useContext(HoverContext);
 
-/**
- * Owns the one piece of state that isn't URL-worthy: which row/pin is hovered.
- * The map and the result list both read it, so they live under the same client
- * root. `mapOverlay` and `asideHeader` are server-rendered nodes passed through.
- */
+/** 지도 검색창에서 고른 장소. 기록이 아니라 지도 위 임시 표시입니다. */
+export type PickedPlace = {
+  name: string;
+  address: string;
+  lat: number;
+  lng: number;
+} | null;
+
+const PlaceContext = createContext<{
+  place: PickedPlace;
+  setPlace: (p: PickedPlace) => void;
+}>({ place: null, setPlace: () => {} });
+
+export const usePlace = () => useContext(PlaceContext);
+
 export default function Workspace({
   rows,
   selected,
-  q,
   mapOverlay,
   asideHeader,
 }: {
   rows: Restaurant[];
   selected: Restaurant | null;
-  q: string;
   mapOverlay: React.ReactNode;
   asideHeader: React.ReactNode;
 }) {
   const [hover, setHover] = useState<number | null>(null);
+  const [place, setPlace] = useState<PickedPlace>(null);
 
   return (
     <HoverContext.Provider value={{ hover, setHover }}>
-      <div className="relative flex-1 overflow-hidden bg-map">
-        <MapPane rows={rows} selectedId={selected?.id ?? null} q={q} />
-        {mapOverlay}
-      </div>
+      <PlaceContext.Provider value={{ place, setPlace }}>
+        <div className="relative flex-1 overflow-hidden bg-map">
+          <MapPane rows={rows} selectedId={selected?.id ?? null} />
+          {mapOverlay}
+        </div>
 
-      <aside className="flex w-[560px] shrink-0 flex-col border-l border-line bg-paper">
-        {asideHeader}
-        {selected ? <DetailPane place={selected} /> : <ResultList rows={rows} />}
-      </aside>
+        <aside className="flex w-[560px] shrink-0 flex-col border-l border-line bg-paper">
+          {asideHeader}
+          {selected ? <DetailPane place={selected} /> : <ResultList rows={rows} />}
+        </aside>
+      </PlaceContext.Provider>
     </HoverContext.Provider>
   );
 }
