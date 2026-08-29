@@ -24,8 +24,16 @@ async function kakao(path: string, params: Record<string, string>) {
   return res.json();
 }
 
-/** "서울 마포구 동교로 46길" → "마포구" */
-const gu = (address?: string) => address?.split(" ")[1] ?? null;
+/** "서울 마포구 동교로 46길" → "서울 마포구" (성남처럼 시 안에 구가 있으면 셋까지) */
+const gu = (address?: string) => {
+  const t = (address ?? "").split(" ").filter(Boolean);
+  if (t.length < 2) return null;
+
+  if (t.length >= 3 && /시$/.test(t[1]) && /구$/.test(t[2])) {
+    return `${t[0]} ${t[1]} ${t[2]}`;
+  }
+  return `${t[0]} ${t[1]}`;
+};
 
 export async function GET(req: Request) {
   const sp = new URL(req.url).searchParams;
