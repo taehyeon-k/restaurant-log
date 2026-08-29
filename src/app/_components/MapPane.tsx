@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import type { Marker as LeafletMarker, Map as LeafletMap } from "leaflet";
 import { applyActive,ghostIcon, pinIcon } from "./mapPin";
-import { pinColor, type Restaurant } from "@/lib/types";
+import { type Restaurant } from "@/lib/types";
 import { forwardGeocode } from "@/lib/geocode";
 import { useHover } from "./Workspace";
 
