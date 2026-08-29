@@ -1,5 +1,6 @@
 export type Kind = "restaurant" | "cafe";
 export type Sort = "recent" | "rating" | "price";
+export type MenuItem = { name: string; price: number | null };
 
 export type Restaurant = {
   id: number;
@@ -11,6 +12,8 @@ export type Restaurant = {
   address: string | null;
   rating: number | null;
   menu: string | null;
+  menus: MenuItem[];
+  price_level: number | null;
   price_range: number | null;
   review: string | null;
   revisit: boolean;
