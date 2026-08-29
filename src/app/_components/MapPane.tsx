@@ -2,41 +2,33 @@
 
 import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import type { CircleMarker, Map as LeafletMap } from "leaflet";
+import type { Marker as LeafletMarker, Map as LeafletMap } from "leaflet";
+import { applyActive,ghostIcon, pinIcon } from "./mapPin";
 import { pinColor, type Restaurant } from "@/lib/types";
-import { useHover, usePlace } from "./Workspace";
+import { forwardGeocode } from "@/lib/geocode";
+import { useHover } from "./Workspace";
 
 type Placed = Restaurant & { lat: number; lng: number };
 
 const placed = (rows: Restaurant[]) =>
   rows.filter((r): r is Placed => r.lat !== null && r.lng !== null);
 
-function styleFor(row: Restaurant, active: boolean) {
-  const base = pinColor(row.category);
-  return {
-    radius: active ? 11 : 9,
-    weight: active ? 3 : 2,
-    color: active ? "#3d3833" : base,
-    fillColor: base,
-    fillOpacity: row.revisit ? 0.95 : 0.45,
-  };
-}
-
 export default function MapPane({
   rows,
   selectedId,
+  q,
 }: {
   rows: Restaurant[];
   selectedId: number | null;
+  q: string;
 }) {
   const router = useRouter();
   const { hover, setHover } = useHover();
-  const { place } = usePlace();
 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<LeafletMap | null>(null);
   const leafletRef = useRef<typeof import("leaflet") | null>(null);
-  const markerRefs = useRef<Map<number, CircleMarker>>(new Map());
+  const markerRefs = useRef<Map<number, LeafletMarker>>(new Map());
   const readyRef = useRef(false);
   const syncRef = useRef<(() => void) | null>(null);
 
@@ -105,12 +97,17 @@ export default function MapPane({
 
         if (existing) {
           existing.setLatLng([r.lat, r.lng]);
-          existing.setStyle(styleFor(r, hover === r.id || selectedId === r.id));
+          existing.setIcon(pinIcon(L, r));
+          applyActive(existing, hover === r.id || selectedId === r.id);
           continue;
         }
 
-        const marker = L.circleMarker([r.lat, r.lng], styleFor(r, false)).addTo(map);
+        const marker = L.marker([r.lat, r.lng], {
+            icon: pinIcon(L, r),
+            riseOnHover: true,
+        }).addTo(map);
 
+        
         const label = document.createElement("div");
         const name = document.createElement("div");
         name.textContent = r.name;
@@ -152,72 +149,88 @@ export default function MapPane({
       const row = rowById.get(id);
       if (!row) continue;
 
-      const active = hover === id || selectedId === id;
-      marker.setStyle(styleFor(row, active));
-      if (active) marker.bringToFront();
+      applyActive(marker, hover === id || selectedId === id);
     }
   }, [hover, selectedId, rows]);
 
-  // 4. 지도 검색으로 고른 장소 — 점선 핀 + 이동.
-  const ghostRef = useRef<CircleMarker | null>(null);
+   // 4. 화면 잡기 + 검색한 지역 표시.
+  const lastFit = useRef("");
+  const ghostRef = useRef<LeafletMarker | null>(null);
+
 
   useEffect(() => {
     const L = leafletRef.current;
     const map = mapRef.current;
     if (!L || !map) return;
 
-    ghostRef.current?.remove();
-    ghostRef.current = null;
-
-    if (!place) return;
-
-    const ghost = L.circleMarker([place.lat, place.lng], {
-      radius: 10,
-      weight: 2,
-      dashArray: "3 3",
-      color: "#3d3833",
-      fillColor: "#8a8377",
-      fillOpacity: 0.2,
-    }).addTo(map);
-
-    const label = document.createElement("div");
-    const title = document.createElement("div");
-    title.textContent = place.name;
-    title.style.fontWeight = "600";
-    title.style.whiteSpace = "nowrap";
-    const note = document.createElement("div");
-    note.textContent = "기록 없음";
-    note.style.fontSize = "11px";
-    note.style.opacity = "0.6";
-    label.append(title, note);
-
-    ghost.bindTooltip(label, {
-      permanent: true,
-      direction: "top",
-      offset: [0, -10],
-      className: "restaurant-map-tooltip",
-    });
-
-    ghostRef.current = ghost;
-    map.flyTo([place.lat, place.lng], 16, { duration: 0.8 });
-  }, [place]);
-
-  // 5. 화면 잡기 — 장소를 고른 동안에는 건드리지 않습니다.
-  const lastFit = useRef("");
-
-  useEffect(() => {
-    const L = leafletRef.current;
-    const map = mapRef.current;
-    if (!L || !map || place) return;
+    const clearGhost = () => {
+      ghostRef.current?.remove();
+      ghostRef.current = null;
+    };
 
     if (selectedId !== null) {
+      clearGhost();
       const target = placed(rows).find((r) => r.id === selectedId);
       if (target) map.flyTo([target.lat, target.lng], 15, { duration: 0.7 });
       return;
     }
 
     const visible = placed(rows);
-    if (!visible.length) return;
+
+    // 기록이 없는 지역을 검색했으면, 검색어를 지명으로 보고 그쪽에 표시합니다.
+    if (!visible.length) {
+      const query = q.trim();
+      if (query.length < 2) {
+        clearGhost();
+        return;
+      }
+
+      let cancelled = false;
+
+      forwardGeocode(query)
+        .then((places) => {
+          if (cancelled || !places.length || !mapRef.current) return;
+
+          const hit = places[0];
+          clearGhost();
+          lastFit.current = "";
+
+          const ghost = L.marker([hit.lat, hit.lng], {
+            icon: ghostIcon(L),
+            interactive: false,
+          }).addTo(map);
+
+          
+
+          const label = document.createElement("div");
+          const title = document.createElement("div");
+          title.textContent = hit.name || query;
+          title.style.fontWeight = "600";
+          title.style.whiteSpace = "nowrap";
+          const note = document.createElement("div");
+          note.textContent = "기록 없음";
+          note.style.fontSize = "11px";
+          note.style.opacity = "0.6";
+          label.append(title, note);
+
+          ghost.bindTooltip(label, {
+            permanent: true,
+            direction: "top",
+            offset: [0, 0],        // ← [0, -10] 에서 변경
+            className: "restaurant-map-tooltip",
+          });
+
+          ghostRef.current = ghost;
+          map.flyTo([hit.lat, hit.lng], 15, { duration: 0.8 });
+        })
+        .catch(() => {});
+
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    clearGhost();
 
     const key = visible.map((r) => r.id).join(",");
     if (key === lastFit.current) return;
@@ -232,7 +245,6 @@ export default function MapPane({
       L.latLngBounds(visible.map((r) => [r.lat, r.lng] as [number, number])),
       { paddingTopLeft: [40, 120], paddingBottomRight: [40, 40], maxZoom: 15 }
     );
-  }, [rows, selectedId, place]);
-
+  }, [rows, selectedId, q]);
   return <div ref={containerRef} className="absolute inset-0" />;
 }
