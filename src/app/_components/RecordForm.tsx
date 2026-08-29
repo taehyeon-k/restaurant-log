@@ -178,9 +178,9 @@ export default function RecordForm({ initial }: { initial?: Restaurant }) {
         <div className="absolute inset-x-0 top-0 z-[1000] flex items-center gap-5 p-8">
           <Link
             href="/"
-            className="pr-1.5 font-serif text-[21px] font-bold tracking-[0.02em] whitespace-nowrap hover:text-brick"
+             className="pr-1.5 font-serif text-[22px] font-bold tracking-[0.14em] whitespace-nowrap hover:text-brick"
           >
-            오늘의 식탁
+            DINARY
           </Link>
 
           <AddressSearch
