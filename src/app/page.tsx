@@ -77,7 +77,7 @@ export default async function Home({
                 {legend.map(([label, color]) => (
                   <span key={label} className="flex items-center gap-1.5">
                     <span
-                      className="size-2.5 rounded-full"
+                      className="size-2.5 rotate-[-45deg] rounded-[50%_50%_50%_0]"
                       style={{ background: color }}
                     />
                     {label}
