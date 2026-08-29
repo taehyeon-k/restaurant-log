@@ -3,6 +3,20 @@ import {
   priceTitle,
   type PriceRow,
 } from "@/lib/price";
+import Image from "next/image";
+
+<Image
+  key={n}
+  src="/piggy.png"
+  alt=""
+  width={size}
+  height={size}
+  className={`block shrink-0 object-contain ${
+    n <= level
+      ? "opacity-100"
+      : "opacity-30 grayscale-[0.85]"
+  }`}
+/>
 
 export default function PriceLevel({
   row,
