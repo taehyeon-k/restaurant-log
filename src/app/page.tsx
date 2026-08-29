@@ -69,7 +69,7 @@ export default async function Home({
               >
                 DINARY
               </Link>
-              <PlaceSearch />
+              <PlaceSearch rows={rows} />
             </div>
 
             {legend.length > 0 && (
