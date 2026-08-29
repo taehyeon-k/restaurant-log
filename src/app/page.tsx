@@ -4,6 +4,7 @@ import { getFacets, getRestaurant, searchRestaurants } from "@/lib/queries";
 import { CATEGORY_COLORS, type Kind, type Sort } from "@/lib/types";
 import KindTabs from "./_components/KindTabs";
 import SearchBar from "./_components/SearchBar";
+import PlaceSearch from "./_components/PlaceSearch";
 import FilterPanel from "./_components/FilterPanel";
 import SortRow from "./_components/SortRow";
 import Workspace from "./_components/Workspace";
@@ -59,17 +60,16 @@ export default async function Home({
       <Workspace
         rows={rows}
         selected={selected}
-        q={q}
         mapOverlay={
           <>
-            <div className="absolute inset-x-0 top-0 z-[1000] flex items-center gap-5 p-8">
+            <div className="absolute inset-x-0 top-0 z-[1000] flex items-start gap-5 p-8">
               <Link
                 href="/"
-                className="pr-1.5 font-serif text-[21px] font-bold tracking-[0.02em] whitespace-nowrap hover:text-brick"
+                className="pt-3 pr-1.5 font-serif text-[21px] font-bold tracking-[0.02em] whitespace-nowrap hover:text-brick"
               >
                 오늘의 식탁
               </Link>
-              <SearchBar defaultValue={q} />
+              <PlaceSearch />
             </div>
 
             {legend.length > 0 && (
@@ -94,13 +94,16 @@ export default async function Home({
         asideHeader={
           selected ? null : (
             <>
-              <div className="flex items-center justify-between px-8 pt-5.5">
+              <div className="flex items-center gap-3.5 px-8 pt-5.5">
                 <Link
                   href="/add"
-                  className="border-b border-[#e2c9bb] text-[13px] text-brick"
+                  className="shrink-0 border-b border-[#e2c9bb] text-[13px] whitespace-nowrap text-brick"
                 >
                   + 기록 추가
                 </Link>
+
+                <SearchBar defaultValue={q} />
+
                 <KindTabs kind={kind} />
               </div>
 
