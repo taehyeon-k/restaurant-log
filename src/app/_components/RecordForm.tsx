@@ -306,7 +306,6 @@ export default function RecordForm({ initial }: { initial?: Restaurant }) {
           <Field label="REGION">
             <RegionSelect value={region} onChange={setRegion} />
           </Field>
-          </div>
 
           <Field label="ADDRESS">
             <input
