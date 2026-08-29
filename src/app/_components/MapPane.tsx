@@ -254,3 +254,5 @@ export default function MapPane({
       { paddingTopLeft: [40, 120], paddingBottomRight: [40, 40], maxZoom: 15 }
     );
   }, [rows, selectedId, q]);
+  return <div ref={containerRef} className="absolute inset-0" />;
+}
