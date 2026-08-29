@@ -2,7 +2,12 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { shortDate, stars, won, type Restaurant } from "@/lib/types";
+import {
+  shortDate,
+  stars,
+  type Restaurant,
+} from "@/lib/types";
+import PriceLevel from "./PriceLevel";
 import { useHover } from "./Workspace";
 
 export default function ResultList({ rows }: { rows: Restaurant[] }) {
@@ -78,9 +83,7 @@ export default function ResultList({ rows }: { rows: Restaurant[] }) {
                 <Divider />
                 <span className="text-muted">{r.region}</span>
                 <Divider />
-                <span className="font-mono text-xs text-muted">
-                  {won(r.price_range)}
-                </span>
+                <PriceLevel row={r} />
               </div>
 
               <div className="truncate text-[13px] leading-relaxed text-muted">
