@@ -65,7 +65,7 @@ export async function GET(req: Request) {
           {
             name: doc.road_address?.building_name || "",
             address,
-            region: doc.address?.region_2depth_name ?? gu(address),
+            region: gu(address),
             lat: Number(lat),
             lng: Number(lng),
           },
@@ -89,7 +89,7 @@ export async function GET(req: Request) {
       places.push({
         name: d.road_address?.building_name || "",
         address,
-        region: d.address?.region_2depth_name ?? gu(address),
+        region: gu(address),
         lat: Number(d.y),
         lng: Number(d.x),
       });
@@ -100,7 +100,7 @@ export async function GET(req: Request) {
       places.push({
         name: d.place_name,
         address,
-        region: gu(d.address_name),
+        region: gu(d.road_address_name || d.address_name),
         lat: Number(d.y),
         lng: Number(d.x),
       });
