@@ -158,7 +158,7 @@ export default function MapPane({
     }
   }, [hover, selectedId, rows]);
 
-  // 4. 지도 검색으로 고른 장소 — 점선 핀 + 이동.
+   // 4. 지도 검색으로 고른 장소 — 라벨을 눌러 바로 기록 추가.
   const ghostRef = useRef<CircleMarker | null>(null);
 
   useEffect(() => {
@@ -171,6 +171,13 @@ export default function MapPane({
 
     if (!place) return;
 
+    const href = `/add?${new URLSearchParams({
+      name: place.name,
+      address: place.address,
+      lat: String(place.lat),
+      lng: String(place.lng),
+    })}`;
+
     const ghost = L.circleMarker([place.lat, place.lng], {
       radius: 10,
       weight: 2,
@@ -181,27 +188,38 @@ export default function MapPane({
     }).addTo(map);
 
     const label = document.createElement("div");
+    label.style.cursor = "pointer";
+
     const title = document.createElement("div");
     title.textContent = place.name;
     title.style.fontWeight = "600";
     title.style.whiteSpace = "nowrap";
-    const note = document.createElement("div");
-    note.textContent = "기록 없음";
-    note.style.fontSize = "11px";
-    note.style.opacity = "0.6";
-    label.append(title, note);
+
+    const cta = document.createElement("div");
+    cta.textContent = "+ 기록 추가";
+    cta.style.fontSize = "11px";
+    cta.style.color = "#b4552d";
+    cta.style.marginTop = "1px";
+
+    label.append(title, cta);
+    label.addEventListener("dblclick", (e) => {
+      e.stopPropagation();
+      handlers.current.router.push(href);
+    });
 
     ghost.bindTooltip(label, {
       permanent: true,
+      interactive: true,
       direction: "top",
       offset: [0, -10],
       className: "restaurant-map-tooltip",
     });
 
+    ghost.on("dblclick", () => handlers.current.router.push(href));
+
     ghostRef.current = ghost;
     map.flyTo([place.lat, place.lng], 16, { duration: 0.8 });
   }, [place]);
-
   // 5. 화면 잡기 — 장소를 고른 동안에는 건드리지 않습니다.
   const lastFit = useRef("");
 
