@@ -122,7 +122,7 @@ export default function MapPane({
         marker.bindTooltip(label, {
           permanent: true,
           direction: "top",
-          offset: [0, -10],
+          offset: [0, 0],
           className: "restaurant-map-tooltip",
         });
 
