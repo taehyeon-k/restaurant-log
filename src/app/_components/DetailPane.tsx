@@ -3,7 +3,12 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { stars, won, type Restaurant } from "@/lib/types";
+import PriceLevel from "./PriceLevel";
 
+          import {
+            feltLabel,
+            feltLevel,
+          } from "@/lib/price";
 export default function DetailPane({ place }: { place: Restaurant }) {
   const params = useSearchParams();
 
@@ -44,7 +49,11 @@ export default function DetailPane({ place }: { place: Restaurant }) {
           <Divider />
           <span>{place.category}</span>
           <Divider />
-          <span className="font-mono text-[13px]">{won(place.price_range)}</span>
+          <PriceLevel row={place} size={18} />
+
+          <span className="text-[13px] text-muted">
+            {feltLabel(feltLevel(place))}
+          </span>
         </div>
 
         <div className="mt-6 h-75 border border-line bg-[#eae5da]">
