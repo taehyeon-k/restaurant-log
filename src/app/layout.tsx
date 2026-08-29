@@ -21,7 +21,7 @@ const jetbrains = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "오늘의 식탁",
+  title: "DINARY",
   description: "다녀온 맛집과 카페를 지도에 기록합니다",
 };
 
