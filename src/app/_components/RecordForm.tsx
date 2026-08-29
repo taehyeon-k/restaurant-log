@@ -14,6 +14,15 @@ import {
 import { FELT_PRICE } from "@/lib/price";
 import LocationPickerMap from "./LocationPickerMap";
 import AddressSearch from "./AddressSearch";
+import Image from "next/image";
+<Image
+  src="/piggy.png"
+  alt=""
+  width={24}
+  height={24}
+  className="object-contain"
+/>
+
 
 /** 예전 기록은 menu 문자열만 있으니 이름만 채워 넣습니다. */
 const initialMenus = (initial?: Restaurant): MenuItem[] => {
