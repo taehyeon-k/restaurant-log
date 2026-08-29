@@ -11,7 +11,7 @@ import {
   type MenuItem,
   type Restaurant,
 } from "@/lib/types";
-import { PRICE_HINTS } from "./PriceLevel";
+import { FELT_PRICE } from "@/lib/price";
 import LocationPickerMap from "./LocationPickerMap";
 import AddressSearch from "./AddressSearch";
 
@@ -311,12 +311,18 @@ export default function RecordForm({ initial }: { initial?: Restaurant }) {
                         : "border-line bg-card hover:border-[#cdc6b8]"
                     }`}
                   >
-                    🐷
+                    <img
+                      src="/piggy.png"
+                      alt=""
+                      className="size-6 object-contain"
+                    />
                   </button>
                 ))}
               </div>
               <span className="text-[13px] text-muted">
-                {priceLevel ? PRICE_HINTS[priceLevel] : "선택 안 함"}
+                {priceLevel
+                ? FELT_PRICE[priceLevel - 1]
+                : "선택 안 함"}
               </span>
             </div>
           </Field>
