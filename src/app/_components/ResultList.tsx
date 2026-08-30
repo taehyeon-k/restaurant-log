@@ -2,12 +2,9 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import {
-  shortDate,
-  stars,
-  type Restaurant,
-} from "@/lib/types";
+import { shortDate, type Restaurant } from "@/lib/types";
 import PriceLevel from "./PriceLevel";
+import Stars from "./Stars";
 import { useHover } from "./Workspace";
 
 export default function ResultList({ rows }: { rows: Restaurant[] }) {
@@ -72,9 +69,7 @@ export default function ResultList({ rows }: { rows: Restaurant[] }) {
               </div>
 
               <div className="flex items-center gap-2.5 text-[13px] text-[#4a453d]">
-                <span className="tracking-[0.14em] text-brick">
-                  {stars(r.rating)}
-                </span>
+                <Stars rating={r.rating} size={13} />
                 <span className="font-mono text-xs">
                   {r.rating?.toFixed(1) ?? "—"}
                 </span>
