@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { stars, type Restaurant } from "@/lib/types";
+import { Stars, type Restaurant } from "@/lib/types";
 import { feltLabel, feltLevel } from "@/lib/price";
 import PriceLevel from "./PriceLevel";
 
