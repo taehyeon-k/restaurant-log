@@ -37,9 +37,7 @@ export default function DetailPane({ place }: { place: Restaurant }) {
         </h1>
 
         <div className="mt-3.5 flex items-center gap-3.5 text-sm text-[#4a453d]">
-          <span className="text-base tracking-[0.18em] text-brick">
-            {stars(place.rating)}
-          </span>
+          <Stars rating={place.rating} size={16} />
           <span className="font-mono text-[13px]">
             {place.rating?.toFixed(1) ?? "—"}
           </span>
