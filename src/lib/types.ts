@@ -41,11 +41,6 @@ export const KEYWORDS = [
   "기념일",
 ];
 
-export const stars = (rating: number | null) => {
-  const filled = Math.floor(rating ?? 0);
-  return "★".repeat(filled) + "☆".repeat(5 - filled);
-};
-
 export const won = (n: number | null) =>
   n == null ? "—" : "₩" + n.toLocaleString("ko-KR");
 
