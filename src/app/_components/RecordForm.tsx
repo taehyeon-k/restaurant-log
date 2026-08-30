@@ -47,7 +47,7 @@ export default function RecordForm({ initial }: { initial?: Restaurant }) {
   );
   const [region, setRegion] = useState(initial?.region ?? "");
   const [address, setAddress] = useState(initial?.address ?? presetAddress);
-  const [rating, setRating] = useState(Math.floor(initial?.rating ?? 0));
+  const [rating, setRating] = useState(initial?.rating ?? 0);
   const [menus, setMenus] = useState<MenuItem[]>(initialMenus(initial));
   const [priceLevel, setPriceLevel] = useState(initial?.price_level ?? 0);
   const [keywords, setKeywords] = useState<string[]>(initial?.keywords ?? []);
@@ -318,21 +318,40 @@ export default function RecordForm({ initial }: { initial?: Restaurant }) {
 
           <Field label="RATING">
             <div className="flex items-center gap-3.5">
-              <div className="flex gap-1">
-                {[1, 2, 3, 4, 5].map((n) => (
-                  <button
-                    key={n}
-                    type="button"
-                    onClick={() => setRating(n === rating ? 0 : n)}
-                    className={`size-8.5 cursor-pointer rounded-[3px] border text-base transition-all ${
-                      n <= rating
-                        ? "border-brick bg-brick text-[#fdf9f3]"
-                        : "border-line bg-card text-[#cdc6b8] hover:border-[#cdc6b8]"
-                    }`}
-                  >
-                    ★
-                  </button>
-                ))}
+              {/* 별 하나의 왼쪽 절반 = n-0.5, 오른쪽 절반 = n. 같은 값을 다시 누르면 해제. */}
+              <div className="flex gap-0.5">
+                {[1, 2, 3, 4, 5].map((n) => {
+                  const fill = Math.max(0, Math.min(1, rating - (n - 1)));
+                  const pick = (v: number) => () =>
+                    setRating(v === rating ? 0 : v);
+
+                  return (
+                    <div
+                      key={n}
+                      className="relative size-7.5 text-[28px] leading-7.5"
+                    >
+                      <span className="absolute inset-0 text-[#dcd6ca]">★</span>
+                      <span
+                        className="absolute top-0 left-0 overflow-hidden whitespace-nowrap text-brick"
+                        style={{ width: `${fill * 100}%` }}
+                      >
+                        ★
+                      </span>
+                      <button
+                        type="button"
+                        onClick={pick(n - 0.5)}
+                        aria-label={`${n - 0.5}점`}
+                        className="absolute top-0 left-0 h-full w-1/2 cursor-pointer"
+                      />
+                      <button
+                        type="button"
+                        onClick={pick(n)}
+                        aria-label={`${n}점`}
+                        className="absolute top-0 right-0 h-full w-1/2 cursor-pointer"
+                      />
+                    </div>
+                  );
+                })}
               </div>
               <span className="font-mono text-[13px] text-muted">
                 {rating ? `${rating.toFixed(1)} / 5.0` : "별점 없음"}
