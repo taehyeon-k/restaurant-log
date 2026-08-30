@@ -1,24 +1,28 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import type { CircleMarker, Map as LeafletMap } from "leaflet";
+import type { Map as LeafletMap, Marker } from "leaflet";
+import { pinIcon } from "./mapPin";
 
 export default function LocationPickerMap({
   center,
+  category,
+  revisit,
   onChange,
 }: {
   center: { lat: number; lng: number } | null;
+  category: string | null;
+  revisit: boolean;
   onChange: (lat: number, lng: number) => void;
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<LeafletMap | null>(null);
   const leafletRef = useRef<typeof import("leaflet") | null>(null);
-  const markerRef = useRef<CircleMarker | null>(null);
+  const markerRef = useRef<Marker | null>(null);
 
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
 
-  // 지도 생성 — 한 번만.
   useEffect(() => {
     if (!containerRef.current) return;
 
@@ -28,10 +32,9 @@ export default function LocationPickerMap({
       const L = await import("leaflet");
       if (cancelled || !containerRef.current || mapRef.current) return;
 
-      const map = L.map(containerRef.current, { zoomControl: false }).setView(
-        [37.5665, 126.978],
-        13
-      );
+      const map = L.map(containerRef.current, {
+        zoomControl: false,
+      }).setView([37.5665, 126.978], 13);
 
       L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
         maxZoom: 19,
@@ -59,10 +62,10 @@ export default function LocationPickerMap({
     };
   }, []);
 
-  // 선택 위치가 바뀌면 핀을 옮기고 그쪽으로 이동.
   useEffect(() => {
     const L = leafletRef.current;
     const map = mapRef.current;
+
     if (!L || !map) return;
 
     if (!center) {
@@ -71,21 +74,28 @@ export default function LocationPickerMap({
       return;
     }
 
+    const icon = pinIcon(L, {
+      category,
+      revisit,
+    });
+
     if (markerRef.current) {
       markerRef.current.setLatLng([center.lat, center.lng]);
+      markerRef.current.setIcon(icon);
     } else {
-      markerRef.current = L.circleMarker([center.lat, center.lng], {
-        radius: 10,
-        weight: 3,
-        color: "#8f3f20",
-        fillColor: "#b4552d",
-        fillOpacity: 1,
+      markerRef.current = L.marker([center.lat, center.lng], {
+        icon,
       }).addTo(map);
     }
 
-    if (map.getZoom() < 15) map.flyTo([center.lat, center.lng], 16, { duration: 0.7 });
-    else map.panTo([center.lat, center.lng]);
-  }, [center]);
+    if (map.getZoom() < 15) {
+      map.flyTo([center.lat, center.lng], 16, {
+        duration: 0.7,
+      });
+    } else {
+      map.panTo([center.lat, center.lng]);
+    }
+  }, [center, category, revisit]);
 
   return <div ref={containerRef} className="absolute inset-0" />;
 }
