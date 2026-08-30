@@ -359,35 +359,33 @@ export default function RecordForm({ initial }: { initial?: Restaurant }) {
             </div>
           </Field>
 
-          <Field label="PRICE">
+          <Field label="FELT PRICE 체감 가격">
             <div className="flex items-center gap-3.5">
-              <div className="flex gap-1">
+              {/* 검색 목록과 같은 척도. 고른 칸까지만 색이 들어옵니다. */}
+              <div className="flex gap-2">
                 {[1, 2, 3, 4, 5].map((n) => (
                   <button
                     key={n}
                     type="button"
                     onClick={() => setPriceLevel(n === priceLevel ? 0 : n)}
-                    style={{
-                      filter: n <= priceLevel ? "none" : "grayscale(1)",
-                      opacity: n <= priceLevel ? 1 : 0.35,
-                    }}
-                    className={`grid size-8.5 cursor-pointer place-items-center rounded-[3px] border transition-all ${
-                      n <= priceLevel
-                        ? "border-brick bg-brick-soft"
-                        : "border-line bg-card hover:border-[#cdc6b8]"
-                    }`}
+                    aria-label={`${n}단계 · ${FELT_PRICE[n - 1]}`}
+                    className="size-8.5 cursor-pointer border-none bg-transparent p-0 leading-none"
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src="/piggy.png"
                       alt=""
-                      className="size-6 object-contain"
+                      className={`block size-8.5 object-contain transition-[opacity,filter] duration-150 ${
+                        n <= priceLevel
+                          ? "opacity-100"
+                          : "opacity-30 grayscale-[0.85]"
+                      }`}
                     />
                   </button>
                 ))}
               </div>
-              <span className="text-[13px] text-muted">
-                {priceLevel ? FELT_PRICE[priceLevel - 1] : "선택 안 함"}
+              <span className="text-[13.5px] text-[#4a453d]">
+                {priceLevel ? FELT_PRICE[priceLevel - 1] : "아직 고르지 않음"}
               </span>
             </div>
           </Field>
