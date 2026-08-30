@@ -202,6 +202,8 @@ export default function RecordForm({ initial }: { initial?: Restaurant }) {
       <div className="relative flex-1 overflow-hidden bg-map">
         <LocationPickerMap
           center={lat !== null && lng !== null ? { lat, lng } : null}
+          category={category}
+          revisit={revisit}
           onChange={handleLocationChange}
         />
 
