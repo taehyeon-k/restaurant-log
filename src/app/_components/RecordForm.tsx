@@ -273,23 +273,9 @@ export default function RecordForm({ initial }: { initial?: Restaurant }) {
               placeholder="가게 이름"
               className={inputClass}
             />
-          </Field>
-
-      
-            <Field label="CATEGORY">
-              <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                className={inputClass}
-              >
-                {CATEGORIES[kind].map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
             </Field>
-             <Field label="CATEGORY">
+          
+            <Field label="CATEGORY">
             <select
               value={category}
               onChange={(e) => setCategory(e.target.value)}
