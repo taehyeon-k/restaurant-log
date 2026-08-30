@@ -2,25 +2,15 @@
 
 import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import type { CircleMarker, Map as LeafletMap } from "leaflet";
-import { pinColor, type Restaurant } from "@/lib/types";
+import type { Map as LeafletMap, Marker } from "leaflet";
+import type { Restaurant } from "@/lib/types";
+import { pinIcon, ghostIcon, applyActive } from "./mapPin";
 import { useHover, usePlace } from "./Workspace";
 
 type Placed = Restaurant & { lat: number; lng: number };
 
 const placed = (rows: Restaurant[]) =>
   rows.filter((r): r is Placed => r.lat !== null && r.lng !== null);
-
-function styleFor(row: Restaurant, active: boolean) {
-  const base = pinColor(row.category);
-  return {
-    radius: active ? 11 : 9,
-    weight: active ? 3 : 2,
-    color: active ? "#3d3833" : base,
-    fillColor: base,
-    fillOpacity: row.revisit ? 0.95 : 0.45,
-  };
-}
 
 export default function MapPane({
   rows,
@@ -36,7 +26,7 @@ export default function MapPane({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<LeafletMap | null>(null);
   const leafletRef = useRef<typeof import("leaflet") | null>(null);
-  const markerRefs = useRef<Map<number, CircleMarker>>(new Map());
+  const markerRefs = useRef<Map<number, Marker>>(new Map());
   const readyRef = useRef(false);
   const syncRef = useRef<(() => void) | null>(null);
 
@@ -101,15 +91,20 @@ export default function MapPane({
       }
 
       for (const r of visible) {
+        const active = hover === r.id || selectedId === r.id;
         const existing = markerRefs.current.get(r.id);
 
         if (existing) {
           existing.setLatLng([r.lat, r.lng]);
-          existing.setStyle(styleFor(r, hover === r.id || selectedId === r.id));
+          existing.setIcon(pinIcon(L, r)); // 카테고리·재방문이 바뀌었을 수 있으니 다시 그립니다.
+          applyActive(existing, active);
           continue;
         }
 
-        const marker = L.circleMarker([r.lat, r.lng], styleFor(r, false)).addTo(map);
+        const marker = L.marker([r.lat, r.lng], {
+          icon: pinIcon(L, r),
+          riseOnHover: true,
+        }).addTo(map);
 
         const label = document.createElement("div");
         const name = document.createElement("div");
@@ -122,10 +117,11 @@ export default function MapPane({
         rating.style.opacity = "0.65";
         label.append(name, rating);
 
+        // 핀 아이콘이 tooltipAnchor 를 들고 있으므로 offset 은 0.
         marker.bindTooltip(label, {
           permanent: true,
           direction: "top",
-          offset: [0, -10],
+          offset: [0, 0],
           className: "restaurant-map-tooltip",
         });
 
@@ -135,6 +131,7 @@ export default function MapPane({
         marker.on("mouseover", () => handlers.current.setHover(r.id));
         marker.on("mouseout", () => handlers.current.setHover(null));
 
+        applyActive(marker, active);
         markerRefs.current.set(r.id, marker);
       }
     };
@@ -144,22 +141,17 @@ export default function MapPane({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rows]);
 
-  // 3. 호버·선택은 다시 칠하기만.
+  // 3. 호버·선택은 크기만 키웁니다 — 아이콘을 갈아끼우지 않아 전환이 이어집니다.
   useEffect(() => {
-    const rowById = new Map(rows.map((r) => [r.id, r]));
-
     for (const [id, marker] of markerRefs.current) {
-      const row = rowById.get(id);
-      if (!row) continue;
-
       const active = hover === id || selectedId === id;
-      marker.setStyle(styleFor(row, active));
-      if (active) marker.bringToFront();
+      applyActive(marker, active);
+      marker.setZIndexOffset(active ? 1000 : 0);
     }
   }, [hover, selectedId, rows]);
 
-   // 4. 지도 검색으로 고른 장소 — 라벨을 눌러 바로 기록 추가.
-  const ghostRef = useRef<CircleMarker | null>(null);
+  // 4. 지도 검색으로 고른 장소 — 라벨을 눌러 바로 기록 추가.
+  const ghostRef = useRef<Marker | null>(null);
 
   useEffect(() => {
     const L = leafletRef.current;
@@ -178,13 +170,9 @@ export default function MapPane({
       lng: String(place.lng),
     })}`;
 
-    const ghost = L.circleMarker([place.lat, place.lng], {
-      radius: 10,
-      weight: 2,
-      dashArray: "3 3",
-      color: "#3d3833",
-      fillColor: "#8a8377",
-      fillOpacity: 0.2,
+    const ghost = L.marker([place.lat, place.lng], {
+      icon: ghostIcon(L),
+      zIndexOffset: 1200,
     }).addTo(map);
 
     const label = document.createElement("div");
@@ -211,7 +199,7 @@ export default function MapPane({
       permanent: true,
       interactive: true,
       direction: "top",
-      offset: [0, -10],
+      offset: [0, 0],
       className: "restaurant-map-tooltip",
     });
 
@@ -220,6 +208,7 @@ export default function MapPane({
     ghostRef.current = ghost;
     map.flyTo([place.lat, place.lng], 16, { duration: 0.8 });
   }, [place]);
+
   // 5. 화면 잡기 — 장소를 고른 동안에는 건드리지 않습니다.
   const lastFit = useRef("");
 
