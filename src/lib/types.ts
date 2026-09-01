@@ -25,20 +25,19 @@ export type Restaurant = {
 };
 
 export const CATEGORIES: Record<Kind, string[]> = {
-  restaurant: ["한식", "중식", "일식", "양식", "아시안", "분식"],
+  restaurant: ["양식", "한식", "일식", "중식", "아시안", "분식"],
   cafe: ["커피", "디저트", "베이커리", "차"],
 };
 
+
 export const KEYWORDS = [
   "데이트",
+  "혼밥",
+  "회식",
+  "모임",
   "가성비",
   "분위기",
-  "혼밥",
-  "작업",
-  "회식",
   "노포",
-  "줄서는곳",
-  "기념일",
 ];
 
 export const won = (n: number | null) =>
