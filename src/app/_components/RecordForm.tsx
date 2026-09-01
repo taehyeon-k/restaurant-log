@@ -1,6 +1,4 @@
 "use client";
-
-import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
@@ -46,7 +44,7 @@ export default function RecordForm({ initial }: { initial?: Restaurant }) {
     initial?.category ?? CATEGORIES.restaurant[0]
   );
   const [region, setRegion] = useState(initial?.region ?? "");
-  / 직접 고른 적이 있으면 자동 입력이 덮어쓰지 않습니다.
+  // 직접 고른 적이 있으면 자동 입력이 덮어쓰지 않습니다.
   const [regionTouched, setRegionTouched] = useState(Boolean(initial?.region));
   const [address, setAddress] = useState(initial?.address ?? presetAddress);
   const [rating, setRating] = useState(initial?.rating ?? 0);
@@ -63,7 +61,6 @@ export default function RecordForm({ initial }: { initial?: Restaurant }) {
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
-  // 넘어온 좌표로 지역 칸을 한 번 채웁니다.
   // 주소가 어디서 채워지든(장소 검색·지도 클릭·직접 입력) 지역이 따라옵니다.
 useEffect(() => {
   if (regionTouched) return;
