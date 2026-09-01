@@ -44,3 +44,54 @@ export const ALL_REGIONS: string[] = Object.entries(REGIONS).flatMap(
     });
   }
 );
+const SIDO_ALIAS: Record<string, string> = {
+  서울특별시: "서울",
+  부산광역시: "부산",
+  대구광역시: "대구",
+  인천광역시: "인천",
+  광주광역시: "광주",
+  대전광역시: "대전",
+  울산광역시: "울산",
+  세종특별자치시: "세종",
+  경기도: "경기",
+  강원특별자치도: "강원",
+  강원도: "강원",
+  충청북도: "충북",
+  충청남도: "충남",
+  전북특별자치도: "전북",
+  전라북도: "전북",
+  전라남도: "전남",
+  경상북도: "경북",
+  경상남도: "경남",
+  제주특별자치도: "제주",
+  세종: ["조치원읍","연기면","연동면","부강면","금남면","장군면","연서면","전의면","전동면","소정면","한솔동","새롬동","나성동","다정동","도담동","어진동","해밀동","아름동","종촌동","고운동","보람동","대평동","소담동","반곡동","집현동","합강동","산울동","다솜동"],
+};
+
+/**
+ * 주소 문자열에서 지역 칸에 넣을 값을 뽑습니다.
+ * "서울 마포구 와우산로 29길 8"      → "서울 마포구"
+ * "경기도 성남시 분당구 판교로 235"  → "경기 성남시 분당구"
+ * "세종특별자치시 한솔동 …"          → "세종 한솔동"
+ * 못 알아보면 빈 문자열 — 그때만 직접 고르면 됩니다.
+ */
+export function regionFromAddress(address: string | null | undefined): string {
+  const parts = (address ?? "").trim().split(/\s+/).filter(Boolean);
+  if (parts.length < 2) return "";
+
+  const sido = SIDO_ALIAS[parts[0]] ?? parts[0];
+  const list = REGIONS[sido];
+  if (!list) return "";
+
+  // 세종처럼 구·군 없이 읍·면·동이 바로 붙는 곳
+  if (!list.length) return sido;
+
+  const si = parts[1];
+  if (!list.includes(si)) return "";
+
+  const gu = SUB_GU[si];
+  if (gu && parts[2] && gu.includes(parts[2])) {
+    return `${sido} ${si} ${parts[2]}`;
+  }
+
+  return `${sido} ${si}`;
+}
