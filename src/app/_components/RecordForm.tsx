@@ -16,7 +16,7 @@ import { reverseGeocode } from "@/lib/geocode";
 import LocationPickerMap from "./LocationPickerMap";
 import AddressSearch from "./AddressSearch";
 import RegionSelect from "./RegionSelect";
-
+import { regionFromAddress } from "@/lib/regions";
 /** 예전 기록은 menu 문자열만 있으니 이름만 채워 넣습니다. */
 const initialMenus = (initial?: Restaurant): MenuItem[] => {
   if (initial?.menus?.length) return initial.menus;
@@ -46,6 +46,8 @@ export default function RecordForm({ initial }: { initial?: Restaurant }) {
     initial?.category ?? CATEGORIES.restaurant[0]
   );
   const [region, setRegion] = useState(initial?.region ?? "");
+  / 직접 고른 적이 있으면 자동 입력이 덮어쓰지 않습니다.
+  const [regionTouched, setRegionTouched] = useState(Boolean(initial?.region));
   const [address, setAddress] = useState(initial?.address ?? presetAddress);
   const [rating, setRating] = useState(initial?.rating ?? 0);
   const [menus, setMenus] = useState<MenuItem[]>(initialMenus(initial));
@@ -62,19 +64,12 @@ export default function RecordForm({ initial }: { initial?: Restaurant }) {
   const [errorMessage, setErrorMessage] = useState("");
 
   // 넘어온 좌표로 지역 칸을 한 번 채웁니다.
-  const presetDone = useRef(false);
-
-  useEffect(() => {
-    if (presetDone.current || presetLat === null || presetLng === null) return;
-    presetDone.current = true;
-
-    reverseGeocode(presetLat, presetLng)
-      .then((hit) => {
-        if (hit?.region) setRegion(hit.region);
-      })
-      .catch(() => {});
-  }, [presetLat, presetLng]);
-
+  // 주소가 어디서 채워지든(장소 검색·지도 클릭·직접 입력) 지역이 따라옵니다.
+useEffect(() => {
+  if (regionTouched) return;
+  const derived = regionFromAddress(address);
+  if (derived && derived !== region) setRegion(derived);
+}, [address, region, regionTouched]);
   // 지도를 클릭하거나 핀을 옮기면 주소와 지역을 되찾아옵니다.
   const handleLocationChange = useCallback(async (la: number, ln: number) => {
     setLat(la);
@@ -84,7 +79,7 @@ export default function RecordForm({ initial }: { initial?: Restaurant }) {
     if (!hit) return;
 
     setAddress(hit.address);
-    if (hit.region) setRegion(hit.region);
+  
   }, []);
 
   function switchKind(next: Kind) {
@@ -221,7 +216,7 @@ export default function RecordForm({ initial }: { initial?: Restaurant }) {
             onPick={(p) => {
               setLat(p.lat);
               setLng(p.lng);
-              if (p.region) setRegion(p.region);
+              
             }}
           />
         </div>
@@ -292,8 +287,41 @@ export default function RecordForm({ initial }: { initial?: Restaurant }) {
           </Field>
 
           <Field label="REGION">
-            <RegionSelect value={region} onChange={setRegion} />
-          </Field>
+  {!regionTouched && region ? (
+    <div className="flex items-center justify-between gap-3 rounded-[3px] border border-line bg-card px-3.5 py-3 text-sm">
+      <span>{region}</span>
+      <button
+        type="button"
+        onClick={() => setRegionTouched(true)}
+        className="cursor-pointer font-mono text-[11px] tracking-[0.08em] text-faint hover:text-brick"
+      >
+        직접 고르기
+      </button>
+    </div>
+  ) : (
+    <div className="flex flex-col gap-2">
+      <RegionSelect
+        value={region}
+        onChange={(v) => {
+          setRegionTouched(true);
+          setRegion(v);
+        }}
+      />
+      {regionFromAddress(address) && (
+        <button
+          type="button"
+          onClick={() => {
+            setRegionTouched(false);
+            setRegion(regionFromAddress(address));
+          }}
+          className="cursor-pointer self-start font-mono text-[11px] tracking-[0.08em] text-faint hover:text-brick"
+        >
+          주소 기준으로 다시 채우기
+        </button>
+      )}
+    </div>
+  )}
+</Field>
 
           <Field label="ADDRESS">
             <input
