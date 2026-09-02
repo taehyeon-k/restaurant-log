@@ -1,7 +1,8 @@
 import { supabase } from "@/lib/supabase";
-import type { Kind, Restaurant, Sort } from "@/lib/types";
+import type { Bbox, Kind, Restaurant, Sort } from "@/lib/types";
 
 export type SearchFilters = {
+  bbox?: Bbox | null;
   kind: Kind;
   q?: string;
   categories?: string[];
@@ -33,6 +34,14 @@ export async function searchRestaurants(f: SearchFilters) {
   if (f.keywords?.length) query = query.overlaps("keywords", f.keywords);
   if (f.revisitOnly) query = query.eq("revisit", true);
 
+  if (f.bbox) {
+    query = query
+      .gte("lat", f.bbox.s)
+      .lte("lat", f.bbox.n)
+      .gte("lng", f.bbox.w)
+      .lte("lng", f.bbox.e);
+  }
+
   if (f.sort === "rating") {
     query = query.order("rating", { ascending: false, nullsFirst: false });
   } else if (f.sort === "price") {
@@ -49,11 +58,21 @@ export async function searchRestaurants(f: SearchFilters) {
 }
 
 /** Distinct chip options for one kind — drives the CATEGORY / REGION / KEYWORD rows. */
-export async function getFacets(kind: Kind) {
-  const { data, error } = await supabase
+export async function getFacets(kind: Kind, bbox?: Bbox | null) {
+  let query = supabase
     .from("restaurants")
     .select("category, region, keywords")
     .eq("kind", kind);
+
+  if (bbox) {
+    query = query
+      .gte("lat", bbox.s)
+      .lte("lat", bbox.n)
+      .gte("lng", bbox.w)
+      .lte("lng", bbox.e);
+  }
+
+  const { data, error } = await query;
 
   if (error) throw new Error(error.message);
 

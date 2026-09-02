@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getFacets, getRestaurant, searchRestaurants } from "@/lib/queries";
-import { CATEGORY_COLORS, type Kind, type Sort } from "@/lib/types";
+import { CATEGORY_COLORS, parseBbox, type Kind, type Sort } from "@/lib/types";
 import KindTabs from "./_components/KindTabs";
 import SearchBar from "./_components/SearchBar";
 import PlaceSearch from "./_components/PlaceSearch";
@@ -27,10 +27,11 @@ export default async function Home({
   const regions = toArray(sp.region);
   const keywords = toArray(sp.keyword);
   const revisitOnly = sp.revisit === "1";
+  const bbox = parseBbox(typeof sp.bbox === "string" ? sp.bbox : undefined);
 
   const [rows, facets] = await Promise.all([
-    searchRestaurants({ kind, q, categories, regions, keywords, revisitOnly, sort }),
-    getFacets(kind),
+    searchRestaurants({ kind, q, categories, regions, keywords, revisitOnly, sort, bbox }),
+    getFacets(kind, bbox),
   ]);
 
   const selectedId = typeof sp.id === "string" ? Number(sp.id) : null;
@@ -54,6 +55,13 @@ export default async function Home({
   const legend = Object.entries(CATEGORY_COLORS).filter(([label]) =>
     facets.categories.includes(label)
   );
+
+  const clearBbox = new URLSearchParams(
+    Object.entries(sp).flatMap(([k, v]) =>
+      k === "bbox" || k === "id" ? [] : toArray(v).map((val) => [k, val] as [string, string])
+    )
+  );
+  const clearBboxHref = clearBbox.toString() ? `/?${clearBbox}` : "/";
 
   return (
     <main className="flex h-screen">
@@ -111,6 +119,17 @@ export default async function Home({
                 facets={facets}
                 selected={{ categories, regions, keywords, revisitOnly }}
               />
+
+              {bbox && (
+                <div className="flex items-center gap-2.5 px-8 pt-3.5">
+                  <span className="flex items-center gap-2 rounded-[20px] border border-[#e2c9bb] bg-brick-soft px-3.5 py-1.75 text-[12.5px] text-brick">
+                    지도 범위로 보는 중
+                    <Link href={clearBboxHref} scroll={false} className="font-mono text-[13px] leading-none text-brick">
+                      ×
+                    </Link>
+                  </span>
+                </div>
+              )}
 
               <SortRow count={rows.length} sort={sort} />
             </>

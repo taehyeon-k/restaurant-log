@@ -29,6 +29,14 @@ export const CATEGORIES: Record<Kind, string[]> = {
   cafe: ["커피", "디저트", "베이커리", "차"],
 };
 
+export type Bbox = { s: number; n: number; w: number; e: number };
+
+/** "37.51,126.90,37.60,127.02" → bbox. 못 읽으면 null. */
+export const parseBbox = (v: string | undefined): Bbox | null => {
+  const n = (v ?? "").split(",").map(Number);
+  if (n.length !== 4 || n.some(Number.isNaN)) return null;
+  return { s: n[0], w: n[1], n: n[2], e: n[3] };
+};
 
 export const KEYWORDS = [
   "데이트",

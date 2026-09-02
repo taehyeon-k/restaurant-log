@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { useSearchState } from "@/lib/useSearchState";
 import { useRouter } from "next/navigation";
 import type { Map as LeafletMap, Marker } from "leaflet";
 import type { Restaurant } from "@/lib/types";
@@ -22,6 +23,8 @@ export default function MapPane({
   const router = useRouter();
   const { hover, setHover } = useHover();
   const { place } = usePlace();
+  const { set } = useSearchState();
+
 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<LeafletMap | null>(null);
@@ -241,5 +244,28 @@ export default function MapPane({
     );
   }, [rows, selectedId, place]);
 
-  return <div ref={containerRef} className="absolute inset-0" />;
+  const searchHere = () => {
+    const map = mapRef.current;
+    if (!map) return;
+    const b = map.getBounds();
+    set(
+      "bbox",
+      [b.getSouth(), b.getWest(), b.getNorth(), b.getEast()]
+        .map((n) => n.toFixed(5))
+        .join(",")
+    );
+  };
+
+  return (
+    <>
+      <div ref={containerRef} className="absolute inset-0" />
+      <button
+        onClick={searchHere}
+        className="absolute top-27 left-8 z-[1000] flex cursor-pointer items-center gap-1.75 rounded-[20px] border border-line bg-card px-3.75 py-2 text-[12.5px] whitespace-nowrap text-[#4a453d] shadow-[0_4px_12px_rgba(28,26,23,0.07)] hover:border-brick hover:text-brick"
+      >
+        이 지역에서 다시 검색
+      </button>
+    </>
+  );
+
 }

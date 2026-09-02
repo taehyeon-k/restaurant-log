@@ -57,7 +57,6 @@ export default function FilterPanel({
     <div className="flex flex-col gap-3.5 border-b border-line px-8 pt-5 pb-4.5">
       <ChipRow label="CATEGORY" param="category" options={facets.categories} />
       <ChipRow label="KEYWORD" param="keyword" options={facets.keywords} />
-      <ChipRow label="REGION" param="region" options={facets.regions} />
 
       <label className="flex cursor-pointer items-center gap-2.25 text-[13px] text-[#4a453d]">
         <input
