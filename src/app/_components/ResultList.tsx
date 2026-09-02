@@ -88,6 +88,10 @@ export default function ResultList({ rows }: { rows: Restaurant[] }) {
                   {r.region}
                 </span>
               </div>
+              <div className="truncate text-[13px] leading-relaxed text-muted">
+                {[r.menu, r.review].filter(Boolean).join(" · ")}
+              </div>
+
               <div className="flex flex-wrap items-center gap-1.5">
                 {r.keywords.map((k) => (
                   <span
