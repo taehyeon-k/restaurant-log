@@ -68,23 +68,26 @@ export default function ResultList({ rows }: { rows: Restaurant[] }) {
                 </span>
               </div>
 
-              <div className="flex items-center gap-2.5 text-[13px] text-[#4a453d]">
+              <div className="flex min-w-0 items-center gap-2.5 text-[13px] text-[#4a453d]">
                 <Stars rating={r.rating} size={13} />
                 <span className="font-mono text-xs">
                   {r.rating?.toFixed(1) ?? "—"}
                 </span>
-                <Divider />
-                <span>{r.category}</span>
-                <Divider />
-                <span className="text-muted">{r.region}</span>
-                <Divider />
                 <PriceLevel row={r} />
+                <Divider />
+                <span className="whitespace-nowrap">{r.category}</span>
+                <Divider />
+                <span
+                  className="whitespace-nowrap text-muted"
+                  style={
+                    (r.region?.length ?? 0) >= 4
+                      ? { fontSize: "11.5px", letterSpacing: "-0.02em" }
+                      : undefined
+                  }
+                >
+                  {r.region}
+                </span>
               </div>
-
-              <div className="truncate text-[13px] leading-relaxed text-muted">
-                {[r.menu, r.review].filter(Boolean).join(" · ")}
-              </div>
-
               <div className="flex flex-wrap items-center gap-1.5">
                 {r.keywords.map((k) => (
                   <span
