@@ -4,7 +4,6 @@ import { useEffect, useRef } from "react";
 import { useSearchState } from "@/lib/useSearchState";
 import { useRouter } from "next/navigation";
 import type { Map as LeafletMap, Marker } from "leaflet";
-import type { Restaurant } from "@/lib/types";
 import type { Place } from "@/lib/places";
 import { pinIcon, ghostIcon, applyActive } from "./mapPin";
 import { useHover, usePlace } from "./Workspace";
