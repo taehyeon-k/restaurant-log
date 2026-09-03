@@ -36,6 +36,13 @@ export default function RecordPane({
     router.refresh();
   }
 
+ const addHref = `/add?${new URLSearchParams({
+    name: record.name,
+    address: record.address ?? "",
+    lat: String(record.lat ?? ""),
+    lng: String(record.lng ?? ""),
+  })}`;
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex items-center justify-between gap-3 px-8 pt-5.5">
@@ -147,7 +154,16 @@ export default function RecordPane({
           )}
         </Section>
 
-        <div className="mt-8 flex gap-2.5">
+        <div className="mt-8 flex flex-col gap-2.5">
+          <Link
+            href={addHref}
+            className="flex h-12.5 items-center justify-center rounded-[25px] border border-[#e2c9bb] bg-brick-soft text-sm font-medium whitespace-nowrap text-brick transition-colors hover:border-brick"
+          >
+            + 이 가게에 새 방문 기록
+          </Link>
+        </div>
+
+        <div className="mt-2.5 flex gap-2.5">
           <Link
             href={`/restaurant/${record.id}/edit`}
             className="flex h-12.5 flex-1 items-center justify-center rounded-[25px] bg-ink text-sm font-medium whitespace-nowrap text-paper transition-colors hover:bg-brick"
