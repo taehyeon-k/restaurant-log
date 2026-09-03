@@ -24,6 +24,7 @@ export type Restaurant = {
   photo_url: string | null;
   photo_urls: string[];
  cover_index: number;
+  place_key: string | null;
 };
 
 export const CATEGORIES: Record<Kind, string[]> = {
