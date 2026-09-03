@@ -129,7 +129,12 @@ function PlaceCard({ place }: { place: Place }) {
           {open && (
             <div className="mt-3.5 flex flex-col gap-3.5 border-t border-line-soft px-0.5 pt-4">
               {place.visits.map((v) => (
-                <div key={v.id} className="flex gap-3.5">
+                <Link
+                  key={v.id}
+                  href={`/?rid=${v.id}`}
+                  scroll={false}
+                  className="-mx-1.5 flex gap-3.5 rounded-[3px] px-1.5 py-1 transition-colors hover:bg-brick-soft"
+                >
                   <span className="w-18 shrink-0 font-mono text-[11px] tracking-[0.06em] text-[#a8a196]">
                     {v.visited_at?.replaceAll("-", ".")}
                   </span>
@@ -145,7 +150,7 @@ function PlaceCard({ place }: { place: Place }) {
                       {v.review}
                     </div>
                   </div>
-                </div>
+                </Link>
               ))}
             </div>
           )}
