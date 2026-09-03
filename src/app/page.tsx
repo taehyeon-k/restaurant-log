@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getFacets, getRestaurant, searchRestaurants } from "@/lib/queries";
 import { CATEGORY_COLORS, parseBbox, type Kind, type Sort } from "@/lib/types";
+import { groupPlaces } from "@/lib/places";
 import KindTabs from "./_components/KindTabs";
 import SearchBar from "./_components/SearchBar";
 import PlaceSearch from "./_components/PlaceSearch";
@@ -33,7 +34,7 @@ export default async function Home({
     searchRestaurants({ kind, q, categories, regions, keywords, revisitOnly, sort, bbox }),
     getFacets(kind, bbox),
   ]);
-
+  const places = groupPlaces(rows);
   const selectedId = typeof sp.id === "string" ? Number(sp.id) : null;
   const selected =
     selectedId != null && !Number.isNaN(selectedId)
@@ -65,9 +66,14 @@ export default async function Home({
 
   return (
     <main className="flex h-screen">
-      <Workspace
-        rows={rows}
+       <Workspace
+        places={places}
         selected={selected}
+        selectedKey={
+          selected
+            ? places.find((p) => p.visits.some((v) => v.id === selected.id))?.key ?? null
+            : null
+        }
         mapOverlay={
           <>
             <div className="absolute inset-x-0 top-0 z-[1000] flex items-start gap-5 p-8">
@@ -131,7 +137,7 @@ export default async function Home({
                 </div>
               )}
 
-              <SortRow count={rows.length} sort={sort} />
+              <SortRow count={places.length} sort={sort} />
             </>
           )
         }
