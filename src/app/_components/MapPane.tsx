@@ -130,7 +130,12 @@ export default function MapPane({
         });
 
         marker.on("click", () =>
-          handlers.current.router.push(`/?id=${r.latest.id}`, { scroll: false })
+          handlers.current.router.push(
+            r.visits.length === 1
+              ? `/?rid=${r.visits[0].id}`
+              : `/?place=${encodeURIComponent(r.key)}`,
+            { scroll: false }
+          )
         );
         marker.on("mouseover", () => handlers.current.setHover(r.key));
         marker.on("mouseout", () => handlers.current.setHover(null));
