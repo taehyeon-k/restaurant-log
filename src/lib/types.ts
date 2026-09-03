@@ -22,6 +22,8 @@ export type Restaurant = {
   lat: number | null;
   lng: number | null;
   photo_url: string | null;
+  photo_urls: string[];
+ cover_index: number;
 };
 
 export const CATEGORIES: Record<Kind, string[]> = {
@@ -70,3 +72,14 @@ export const CATEGORY_COLORS: Record<string, string> = {
 
 export const pinColor = (category: string | null) =>
   (category && CATEGORY_COLORS[category]) || "#8a8377";
+
+/** 그 기록의 대표사진 주소. 없으면 null. */
+export const coverPhoto = (r: {
+  photo_urls?: string[];
+  cover_index?: number;
+  photo_url?: string | null;
+}) => {
+  const list = r.photo_urls ?? [];
+  if (list.length) return list[Math.min(r.cover_index ?? 0, list.length - 1)];
+  return r.photo_url ?? null;
+};
