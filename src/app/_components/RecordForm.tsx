@@ -141,7 +141,12 @@ useEffect(() => {
         address: address || null,
         rating: rating || null,
         menus: cleanMenus,
-        menu: cleanMenus.map((m) => m.name).join(", ") || null,
+        menu:
+          cleanMenus
+           .map((m) =>
+            m.price ? `${m.name} ${m.price.toLocaleString("ko-KR")}원` : m.name
+            )
+           .join(", ") || null,
         price_level: priceLevel || null,
         price_range: prices.length
           ? Math.round(prices.reduce((a, b) => a + b, 0) / prices.length)
