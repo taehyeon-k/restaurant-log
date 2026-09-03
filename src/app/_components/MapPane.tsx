@@ -5,20 +5,21 @@ import { useSearchState } from "@/lib/useSearchState";
 import { useRouter } from "next/navigation";
 import type { Map as LeafletMap, Marker } from "leaflet";
 import type { Restaurant } from "@/lib/types";
+import type { Place } from "@/lib/places";
 import { pinIcon, ghostIcon, applyActive } from "./mapPin";
 import { useHover, usePlace } from "./Workspace";
 
-type Placed = Restaurant & { lat: number; lng: number };
+type Placed = Place & { lat: number; lng: number };
 
-const placed = (rows: Restaurant[]) =>
-  rows.filter((r): r is Placed => r.lat !== null && r.lng !== null);
+const placed = (places: Place[]) =>
+  places.filter((r): r is Placed => r.lat !== null && r.lng !== null);
 
 export default function MapPane({
-  rows,
-  selectedId,
+  places,
+  selectedKey,
 }: {
-  rows: Restaurant[];
-  selectedId: number | null;
+  places: Place[];
+  selectedKey: string | null;
 }) {
   const router = useRouter();
   const { hover, setHover } = useHover();
@@ -29,7 +30,7 @@ export default function MapPane({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<LeafletMap | null>(null);
   const leafletRef = useRef<typeof import("leaflet") | null>(null);
-  const markerRefs = useRef<Map<number, Marker>>(new Map());
+  const markerRefs = useRef<Map<string, Marker>>(new Map());
   const readyRef = useRef(false);
   const syncRef = useRef<(() => void) | null>(null);
 
@@ -83,29 +84,29 @@ export default function MapPane({
       const map = mapRef.current;
       if (!L || !map) return;
 
-      const visible = placed(rows);
-      const next = new Set(visible.map((r) => r.id));
+       const visible = placed(places);
+      const next = new Set(visible.map((r) => r.key));
 
-      for (const [id, marker] of markerRefs.current) {
-        if (!next.has(id)) {
+      for (const [key, marker] of markerRefs.current) {
+        if (!next.has(key)) {
           marker.remove();
           markerRefs.current.delete(id);
         }
       }
 
       for (const r of visible) {
-        const active = hover === r.id || selectedId === r.id;
-        const existing = markerRefs.current.get(r.id);
+        const active = hover === r.key || selectedKey === r.key;
+        const existing = markerRefs.current.get(r.key);
 
         if (existing) {
           existing.setLatLng([r.lat, r.lng]);
-          existing.setIcon(pinIcon(L, r)); // 카테고리·재방문이 바뀌었을 수 있으니 다시 그립니다.
+          existing.setIcon(pinIcon(L, r.latest)); // 카테고리·재방문이 바뀌었을 수 있으니 다시 그립니다.
           applyActive(existing, active);
           continue;
         }
 
         const marker = L.marker([r.lat, r.lng], {
-          icon: pinIcon(L, r),
+          icon: pinIcon(L, r.latest),
           riseOnHover: true,
         }).addTo(map);
 
@@ -129,13 +130,13 @@ export default function MapPane({
         });
 
         marker.on("click", () =>
-          handlers.current.router.push(`/?id=${r.id}`, { scroll: false })
+          handlers.current.router.push(`/?id=${r.latest.id}`, { scroll: false })
         );
-        marker.on("mouseover", () => handlers.current.setHover(r.id));
+        marker.on("mouseover", () => handlers.current.setHover(r.key));
         marker.on("mouseout", () => handlers.current.setHover(null));
 
         applyActive(marker, active);
-        markerRefs.current.set(r.id, marker);
+        markerRefs.current.set(r.key, marker);
       }
     };
 
@@ -146,12 +147,12 @@ export default function MapPane({
 
   // 3. 호버·선택은 크기만 키웁니다 — 아이콘을 갈아끼우지 않아 전환이 이어집니다.
   useEffect(() => {
-    for (const [id, marker] of markerRefs.current) {
-      const active = hover === id || selectedId === id;
+    for (const [key, marker] of markerRefs.current) {
+      const active = hover === key || selectedKey === key;
       applyActive(marker, active);
       marker.setZIndexOffset(active ? 1000 : 0);
     }
-  }, [hover, selectedId, rows]);
+  }, [hover, selectedKey, places]);
 
   // 4. 지도 검색으로 고른 장소 — 라벨을 눌러 바로 기록 추가.
   const ghostRef = useRef<Marker | null>(null);
@@ -220,16 +221,16 @@ export default function MapPane({
     const map = mapRef.current;
     if (!L || !map || place) return;
 
-    if (selectedId !== null) {
-      const target = placed(rows).find((r) => r.id === selectedId);
+     if (selectedKey !== null) {
+      const target = placed(places).find((r) => r.key === selectedKey);
       if (target) map.flyTo([target.lat, target.lng], 15, { duration: 0.7 });
       return;
     }
 
-    const visible = placed(rows);
+    const visible = placed(places);
     if (!visible.length) return;
 
-    const key = visible.map((r) => r.id).join(",");
+    const key = visible.map((r) => r.key).join(",");
     if (key === lastFit.current) return;
     lastFit.current = key;
 
@@ -242,7 +243,7 @@ export default function MapPane({
       L.latLngBounds(visible.map((r) => [r.lat, r.lng] as [number, number])),
       { paddingTopLeft: [40, 120], paddingBottomRight: [40, 40], maxZoom: 15 }
     );
-  }, [rows, selectedId, place]);
+  }, [places, selectedKey, place]);
 
   const searchHere = () => {
     const map = mapRef.current;
