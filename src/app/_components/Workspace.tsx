@@ -70,3 +70,4 @@ export default function Workspace({
       </PlaceContext.Provider>
     </HoverContext.Provider>
   );
+}
