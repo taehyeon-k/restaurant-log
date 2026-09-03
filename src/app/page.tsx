@@ -35,23 +35,34 @@ export default async function Home({
     getFacets(kind, bbox),
   ]);
   const places = groupPlaces(rows);
-  const selectedId = typeof sp.id === "string" ? Number(sp.id) : null;
-  const selected =
-    selectedId != null && !Number.isNaN(selectedId)
-      ? await getRestaurant(selectedId)
+   // ?rid=기록번호 → 기록 하나 / ?place=키 → 가게 화면. 옛 ?id= 도 그대로 받습니다.
+  const ridParam = typeof sp.rid === "string" ? sp.rid : typeof sp.id === "string" ? sp.id : null;
+  const recordId = ridParam != null ? Number(ridParam) : null;
+
+  const record =
+    recordId != null && !Number.isNaN(recordId)
+      ? await getRestaurant(recordId)
       : null;
 
-  // A stale ?id (deleted row) shouldn't leave the detail pane empty.
-  if (selectedId != null && selected == null) {
+  // 지워진 기록 번호가 주소에 남아 있으면 빈 창이 뜨지 않게 되돌립니다.
+  if (recordId != null && record == null) {
     const keep = new URLSearchParams(
       Object.entries(sp).flatMap(([k, v]) =>
-        k === "id" ? [] : toArray(v).map((val) => [k, val] as [string, string])
+        k === "id" || k === "rid"
+          ? []
+          : toArray(v).map((val) => [k, val] as [string, string])
       )
     );
     const qs = keep.toString();
     redirect(qs ? `/?${qs}` : "/");
   }
 
+  const placeKey = typeof sp.place === "string" ? sp.place : null;
+
+  const selectedPlace =
+    (placeKey != null ? places.find((p) => p.key === placeKey) : null) ??
+    (record ? places.find((p) => p.visits.some((v) => v.id === record.id)) : null) ??
+    null;
   // 이 종류에 실제로 쓰인 카테고리만 범례에 보여줍니다.
   const legend = Object.entries(CATEGORY_COLORS).filter(([label]) =>
     facets.categories.includes(label)
