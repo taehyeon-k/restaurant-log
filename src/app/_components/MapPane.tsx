@@ -46,10 +46,10 @@ export default function MapPane({
       const L = await import("leaflet");
       if (cancelled || !containerRef.current || mapRef.current) return;
 
-      const map = L.map(containerRef.current, { zoomControl: false }).setView(
-        [37.5665, 126.978],
-        12
-      );
+      const map = L.map(containerRef.current, {
+  zoomControl: false,
+  keyboard: false,
+}).setView([37.5665, 126.978], 12);
 
       L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
         maxZoom: 19,
