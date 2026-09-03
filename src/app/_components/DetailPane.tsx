@@ -75,7 +75,7 @@ export default function DetailPane({ place }: { place: Restaurant }) {
 
         {place.review && (
           <Section label="내가 남긴 메모">
-            <p className="font-serif text-[17px] leading-[1.95] text-[#2e2a25] text-pretty">
+            <p className="font-serif text-[17px] leading-[1.95] text-[#2e2a25] whitespace-pre-wrap break-words">
               {place.review}
             </p>
             <div className="font-mono text-[11px] tracking-[0.08em] text-[#a8a196]">
