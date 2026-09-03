@@ -69,7 +69,7 @@ export default function PlacePane({ place }: { place: Place }) {
                 : undefined
             }
           >
-               서울 {place.region}
+         서울 {place.region}
           </span>
         </div>
 
