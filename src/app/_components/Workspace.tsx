@@ -5,7 +5,8 @@ import type { Restaurant } from "@/lib/types";
 import type { Place } from "@/lib/places";
 import MapPane from "./MapPane";
 import ResultList from "./ResultList";
-import DetailPane from "./DetailPane";
+import PlacePane from "./PlacePane";
+import RecordPane from "./RecordPane";
 
 const HoverContext = createContext<{
   hover: string | null;
@@ -31,13 +32,15 @@ export const usePlace = () => useContext(PlaceContext);
 
 export default function Workspace({
   places,
-  selected,
+  record,
+  selectedPlace,
   selectedKey,
   mapOverlay,
   asideHeader,
 }: {
   places: Place[];
-  selected: Restaurant | null;
+  record: Restaurant | null;
+  selectedPlace: Place | null;
   selectedKey: string | null;
   mapOverlay: React.ReactNode;
   asideHeader: React.ReactNode;
@@ -55,9 +58,15 @@ export default function Workspace({
 
         <aside className="flex w-[560px] shrink-0 flex-col border-l border-line bg-paper">
           {asideHeader}
-          {selected ? <DetailPane place={selected} /> : <ResultList places={places} />}
+
+          {record ? (
+            <RecordPane record={record} place={selectedPlace} />
+          ) : selectedPlace ? (
+            <PlacePane place={selectedPlace} />
+          ) : (
+            <ResultList places={places} />
+          )}
         </aside>
       </PlaceContext.Provider>
     </HoverContext.Provider>
   );
-}
