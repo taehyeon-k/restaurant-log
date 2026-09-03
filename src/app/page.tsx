@@ -79,12 +79,9 @@ export default async function Home({
     <main className="flex h-screen">
        <Workspace
         places={places}
-        selected={selected}
-        selectedKey={
-          selected
-            ? places.find((p) => p.visits.some((v) => v.id === selected.id))?.key ?? null
-            : null
-        }
+        record={record}
+        selectedPlace={selectedPlace}
+        selectedKey={selectedPlace?.key ?? null}
         mapOverlay={
           <>
             <div className="absolute inset-x-0 top-0 z-[1000] flex items-start gap-5 p-8">
@@ -117,7 +114,7 @@ export default async function Home({
           </>
         }
         asideHeader={
-          selected ? null : (
+          record || selectedPlace ? null : (
             <>
               <div className="flex items-center gap-3.5 px-8 pt-5.5">
                 <Link
