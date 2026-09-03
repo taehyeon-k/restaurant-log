@@ -101,7 +101,7 @@ function PlaceCard({ place }: { place: Place }) {
               </span>
             </div>
 
-            <div className="truncate text-[13px] leading-relaxed text-muted">
+            <div className="line-clamp-3 text-[13px] leading-relaxed text-pretty text-muted">
               {[place.latest.menu, place.latest.review].filter(Boolean).join(" · ")}
             </div>
 
