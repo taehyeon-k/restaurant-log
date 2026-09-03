@@ -55,7 +55,15 @@ export default function RecordForm({ initial }: { initial?: Restaurant }) {
   const [visitedAt, setVisitedAt] = useState(initial?.visited_at ?? "");
   const [revisit, setRevisit] = useState(initial?.revisit ?? false);
   const [review, setReview] = useState(initial?.review ?? "");
-  const [photo, setPhoto] = useState<File | null>(null);
+  const [photos, setPhotos] = useState<string[]>(
+  initial?.photo_urls?.length
+    ? initial.photo_urls
+    : initial?.photo_url
+      ? [initial.photo_url]
+      : []
+);
+const [cover, setCover] = useState(initial?.cover_index ?? 0);
+const [uploading, setUploading] = useState(false);
   const [lat, setLat] = useState<number | null>(initial?.lat ?? presetLat);
   const [lng, setLng] = useState<number | null>(initial?.lng ?? presetLng);
 
@@ -121,10 +129,7 @@ useEffect(() => {
     }
 
     try {
-      const photo_url = photo
-        ? await uploadPhoto(photo)
-        : initial?.photo_url ?? null;
-
+     
       const cleanMenus = menus
         .map((m) => ({ name: m.name.trim(), price: m.price }))
         .filter((m) => m.name);
@@ -157,7 +162,9 @@ useEffect(() => {
         visited_at: visitedAt || null,
         lat,
         lng,
-        photo_url,
+        photo_url: photos[cover] ?? null,   // 예전 칸도 대표사진으로 채워둡니다
+        photo_urls: photos,
+        cover_index: Math.min(cover, Math.max(0, photos.length - 1)),
       };
 
       const { error } = initial
@@ -478,38 +485,75 @@ useEffect(() => {
             </div>
           </Field>
 
-          <Field label="PHOTO">
-            <label className="flex h-37.5 cursor-pointer items-center justify-center overflow-hidden border border-dashed border-[#cdc6b8] bg-card text-[13px] text-[#a8a196] hover:border-brick hover:text-brick">
-              {photo ? (
-                photo.name
-              ) : initial?.photo_url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={initial.photo_url}
-                  alt=""
-                  className="size-full object-cover"
-                />
-              ) : (
-                "사진을 선택하세요"
-              )}
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(e) => setPhoto(e.target.files?.[0] ?? null)}
-                className="hidden"
-              />
-            </label>
-          </Field>
+          <Field label="PHOTO 최대 5장">
+  <div className="grid grid-cols-3 gap-2.5">
+    {photos.map((url, i) => (
+      <div
+        key={url}
+        className={`relative h-26 ${i === cover ? "border-[1.5px] border-brick" : "border border-[#ded8cb]"}`}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={url} alt="" className="size-full object-cover" />
 
-          <label className="flex cursor-pointer items-center gap-2.25 text-sm text-[#4a453d]">
-            <input
-              type="checkbox"
-              checked={revisit}
-              onChange={(e) => setRevisit(e.target.checked)}
-              className="size-4 accent-brick"
-            />
-            다시 갈 것 같다
-          </label>
+        {i === cover ? (
+          <span className="absolute top-1.5 left-1.5 bg-ink px-1.75 py-0.75 text-[10px] text-paper">
+            대표
+          </span>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setCover(i)}
+            className="absolute top-1.5 left-1.5 cursor-pointer border border-[#cdc6b8] bg-card/90 px-1.75 py-0.75 text-[10px] text-[#4a453d] hover:border-brick hover:text-brick"
+          >
+            대표로
+          </button>
+        )}
+
+        <button
+          type="button"
+          onClick={() => {
+            const next = photos.filter((_, k) => k !== i);
+            setPhotos(next);
+            if (cover >= next.length) setCover(0);
+          }}
+          aria-label="사진 삭제"
+          className="absolute top-1.5 right-1.5 size-5 cursor-pointer border border-[#cdc6b8] bg-card/90 text-xs text-muted hover:border-[#9a4a52] hover:text-[#9a4a52]"
+        >
+          ×
+        </button>
+      </div>
+    ))}
+
+    {photos.length < 5 && (
+      <label className="flex h-26 cursor-pointer flex-col items-center justify-center gap-1 border border-dashed border-[#cdc6b8] text-[12px] text-[#a8a196] hover:border-brick hover:text-brick">
+        <span className="text-lg leading-none">+</span>
+        <span>{uploading ? "올리는 중…" : "사진 추가"}</span>
+        <input
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={async (e) => {
+            const file = e.target.files?.[0];
+            if (!file) return;
+            setUploading(true);
+            try {
+              const url = await uploadPhoto(file);
+              setPhotos((p) => [...p, url].slice(0, 5));
+            } catch (err) {
+              setErrorMessage(
+                err instanceof Error ? err.message : "사진 업로드 실패"
+              );
+            }
+            setUploading(false);
+          }}
+        />
+      </label>
+    )}
+  </div>
+  <p className="text-[12px] text-[#a8a196]">
+    대표 사진은 목록과 기록 화면에 크게 표시됩니다.
+  </p>
+</Field>
 
           <Field label="REVIEW">
             <textarea
