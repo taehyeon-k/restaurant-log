@@ -90,7 +90,7 @@ export default function MapPane({
       for (const [key, marker] of markerRefs.current) {
         if (!next.has(key)) {
           marker.remove();
-          markerRefs.current.delete(id);
+          markerRefs.current.delete(key);
         }
       }
 
@@ -148,7 +148,7 @@ export default function MapPane({
     syncRef.current = sync;
     if (readyRef.current) sync();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rows]);
+  }, [places]);
 
   // 3. 호버·선택은 크기만 키웁니다 — 아이콘을 갈아끼우지 않아 전환이 이어집니다.
   useEffect(() => {
