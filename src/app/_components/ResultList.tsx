@@ -36,8 +36,10 @@ function PlaceCard({ place }: { place: Place }) {
   const params = useSearchParams();
   const [open, setOpen] = useState(false);
 
-  const next = new URLSearchParams(params.toString());
-  next.set("id", String(place.latest.id));
+   const next = new URLSearchParams(params.toString());
+  next.delete("id");
+  if (place.visits.length === 1) next.set("rid", String(place.visits[0].id));
+  else next.set("place", place.key);
   const href = `/?${next}`;
 
   const cover = coverPhoto(place.latest);
