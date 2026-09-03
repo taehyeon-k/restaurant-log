@@ -2,13 +2,14 @@
 
 import { createContext, useContext, useState } from "react";
 import type { Restaurant } from "@/lib/types";
+import type { Place } from "@/lib/places";
 import MapPane from "./MapPane";
 import ResultList from "./ResultList";
 import DetailPane from "./DetailPane";
 
 const HoverContext = createContext<{
-  hover: number | null;
-  setHover: (id: number | null) => void;
+  hover: string | null;
+  setHover: (key: string | null) => void;
 }>({ hover: null, setHover: () => {} });
 
 export const useHover = () => useContext(HoverContext);
@@ -29,30 +30,32 @@ const PlaceContext = createContext<{
 export const usePlace = () => useContext(PlaceContext);
 
 export default function Workspace({
-  rows,
+  places,
   selected,
+  selectedKey,
   mapOverlay,
   asideHeader,
 }: {
-  rows: Restaurant[];
+  places: Place[];
   selected: Restaurant | null;
+  selectedKey: string | null;
   mapOverlay: React.ReactNode;
   asideHeader: React.ReactNode;
 }) {
-  const [hover, setHover] = useState<number | null>(null);
+  const [hover, setHover] = useState<string | null>(null);
   const [place, setPlace] = useState<PickedPlace>(null);
 
   return (
     <HoverContext.Provider value={{ hover, setHover }}>
       <PlaceContext.Provider value={{ place, setPlace }}>
         <div className="relative flex-1 overflow-hidden bg-map">
-          <MapPane rows={rows} selectedId={selected?.id ?? null} />
+          <MapPane places={places} selectedKey={selectedKey} />
           {mapOverlay}
         </div>
 
         <aside className="flex w-[560px] shrink-0 flex-col border-l border-line bg-paper">
           {asideHeader}
-          {selected ? <DetailPane place={selected} /> : <ResultList rows={rows} />}
+          {selected ? <DetailPane place={selected} /> : <ResultList places={places} />}
         </aside>
       </PlaceContext.Provider>
     </HoverContext.Provider>
