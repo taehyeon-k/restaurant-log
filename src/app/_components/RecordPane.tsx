@@ -89,7 +89,7 @@ export default function RecordPane({
                 : undefined
             }
           >
-            서울 {record.region}
+           {record.region}
           </span>
         </div>
 
