@@ -111,23 +111,14 @@ export default function PlacePane({ place }: { place: Place }) {
           <div className="eyebrow">내가 남긴 기록</div>
 
           {place.visits.map((v) => {
-            const cover = coverPhoto(v);
+            
             return (
               <div
                 key={v.id}
                 className="rounded-[4px] border border-line-soft p-4 transition-all hover:border-[#cdc6b8] hover:bg-card hover:shadow-[0_6px_16px_rgba(28,26,23,0.07)]"
               >
                 <div className="flex gap-4">
-                  <Link href={`/?rid=${v.id}`} scroll={false} className="shrink-0">
-                    {cover ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={cover} alt="" className="size-23 border border-[#ded8cb] object-cover" />
-                    ) : (
-                      <div className="flex size-23 items-center justify-center border border-[#ded8cb] bg-[#eae5da] font-mono text-[10px] tracking-[0.1em] text-[#a8a196]">
-                        PHOTO
-                      </div>
-                    )}
-                  </Link>
+                  
 
                   <div className="flex min-w-0 flex-1 flex-col gap-1.75">
                     <div className="flex items-center gap-3">
@@ -158,7 +149,7 @@ export default function PlacePane({ place }: { place: Place }) {
 
                     <Link href={`/?rid=${v.id}`} scroll={false} className="flex flex-col gap-1.75">
                       <span className="truncate text-[13px] text-faint">{v.menu}</span>
-                      <span className="line-clamp-2 font-serif text-[15px] leading-[1.7] text-[#2e2a25]">
+                      <span className="line-clamp-3 font-serif text-[15px] leading-[1.7] text-[#2e2a25]">
                         {v.review}
                       </span>
                       <span className="text-[12px] text-brick">상세히 보기 →</span>
