@@ -144,6 +144,7 @@ useEffect(() => {
         category: category || null,
         region: region || null,
         address: address || null,
+        place_key: `${name}|${address ?? ""}`.toLowerCase(),
         rating: rating || null,
         menus: cleanMenus,
         menu:
