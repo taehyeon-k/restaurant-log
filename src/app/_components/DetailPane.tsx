@@ -52,11 +52,11 @@ export default function DetailPane({ place }: { place: Restaurant }) {
           </span>
         </div>
 
-        <div className="mt-6 h-75 border border-line bg-[#eae5da]">
-          {place.photo_url ? (
+                <div className="mt-6 h-75 border border-line bg-[#eae5da]">
+          {coverPhoto(place) ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
-              src={place.photo_url}
+              src={coverPhoto(place)!}
               alt={place.name}
               className="size-full object-cover"
             />
@@ -66,6 +66,24 @@ export default function DetailPane({ place }: { place: Restaurant }) {
             </div>
           )}
         </div>
+
+        {place.photo_urls.length > 1 && (
+          <div className="mt-2.5 flex gap-2">
+            {place.photo_urls.map((url, i) => (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                key={url}
+                src={url}
+                alt=""
+                className={`size-15 shrink-0 object-cover ${
+                  i === place.cover_index
+                    ? "border-[1.5px] border-brick"
+                    : "border border-[#ded8cb]"
+                }`}
+              />
+            ))}
+          </div>
+        )}
 
         {place.menu && (
           <Section label="메뉴">
