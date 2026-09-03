@@ -177,7 +177,8 @@ useEffect(() => {
 
       if (error) throw new Error(error.message);
 
-      router.push(initial ? `/?id=${initial.id}` : `/?kind=${kind}`);
+      router.push(initial ? `/?rid=${initial.id}` : `/?kind=${kind}`);
+
       router.refresh();
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : "저장에 실패했습니다");
@@ -242,7 +243,7 @@ useEffect(() => {
       <aside className="flex w-[560px] shrink-0 flex-col border-l border-line bg-paper">
         <div className="flex items-center justify-between px-8 pt-5.5">
           <Link
-            href={initial ? `/?id=${initial.id}` : "/"}
+            href={initial ? `/?rid=${initial.id}` : "/"}
             className="text-[13px] text-faint hover:text-brick"
           >
             ← {initial ? "기록으로" : "검색으로"}
@@ -576,7 +577,7 @@ useEffect(() => {
               {loading ? "저장 중…" : editing ? "저장" : "기록 저장"}
             </button>
             <Link
-              href={initial ? `/?id=${initial.id}` : "/"}
+              href={initial ? `/?rid=${initial.id}` : "/"}
               className="flex h-12.5 w-32 items-center justify-center rounded-[25px] border border-[#cdc6b8] text-sm"
             >
               취소
