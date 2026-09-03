@@ -34,6 +34,7 @@ export default function LocationPickerMap({
 
       const map = L.map(containerRef.current, {
         zoomControl: false,
+        keyboard: false,
       }).setView([37.5665, 126.978], 13);
 
       L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
