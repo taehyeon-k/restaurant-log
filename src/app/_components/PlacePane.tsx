@@ -149,7 +149,7 @@ export default function PlacePane({ place }: { place: Place }) {
 
                     <Link href={`/?rid=${v.id}`} scroll={false} className="flex flex-col gap-1.75">
                       <span className="truncate text-[13px] text-faint">{v.menu}</span>
-                      <span className="line-clamp-3 font-serif text-[15px] leading-[1.7] text-[#2e2a25]">
+                      <span className="line-clamp-3 font-serif text-[13.5px] leading-[1.75] whitespace-pre-wrap break-words text-[#4a453d]">
                         {v.review}
                       </span>
                       <span className="text-[12px] text-brick">상세히 보기 →</span>
