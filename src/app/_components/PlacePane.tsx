@@ -27,6 +27,16 @@ export default function PlacePane({ place }: { place: Place }) {
     lng: String(place.lng ?? ""),
   })}`;
 
+  // 기록마다 대표사진을 먼저 한 장씩, 자리가 남으면 나머지 사진으로 최대 5장.
+  const gallery = useMemo(() => {
+    const covers = place.visits.map((v) => coverPhoto(v)).filter((u): u is string => !!u);
+    const rest = place.visits.flatMap((v) => v.photo_urls ?? []);
+    return [...new Set([...covers, ...rest])].slice(0, 5);
+  }, [place]);
+
+  const [shown, setShown] = useState(0);
+  const big = gallery[Math.min(shown, Math.max(0, gallery.length - 1))];
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex items-center justify-between px-8 pt-5.5">
@@ -59,9 +69,41 @@ export default function PlacePane({ place }: { place: Place }) {
                 : undefined
             }
           >
-            서울 {place.region}
+               서울 {place.region}
           </span>
         </div>
+
+        {gallery.length > 0 && (
+          <div className="mt-6 flex flex-col gap-2.5">
+            <div className="h-75 border border-line bg-[#eae5da]">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={big} alt={place.name} className="size-full object-cover" />
+            </div>
+
+            {gallery.length > 1 && (
+              <div className="flex items-center gap-2">
+                {gallery.map((url, i) => (
+                  <button
+                    key={url}
+                    type="button"
+                    onClick={() => setShown(i)}
+                    className={`size-15 shrink-0 cursor-pointer overflow-hidden p-0 ${
+                      i === shown
+                        ? "border-[1.5px] border-brick"
+                        : "border border-[#ded8cb] opacity-75 hover:opacity-100"
+                    }`}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={url} alt="" className="size-full object-cover" />
+                  </button>
+                ))}
+                <span className="ml-1 text-[12px] text-[#a8a196]">
+                  기록 사진 {gallery.length}장
+                </span>
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="mt-7.5 flex flex-col gap-3">
           <div className="eyebrow">내가 남긴 기록</div>
