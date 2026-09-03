@@ -101,7 +101,7 @@ function PlaceCard({ place }: { place: Place }) {
               </span>
             </div>
 
-            <div className="line-clamp-3 text-[13px] leading-relaxed text-pretty text-muted">
+            <div className="truncate text-[13px] leading-relaxed text-muted">
               {[place.latest.menu, place.latest.review].filter(Boolean).join(" · ")}
             </div>
 
@@ -146,7 +146,7 @@ function PlaceCard({ place }: { place: Place }) {
                       </span>
                       <span className="truncate text-[12px] text-faint">{v.menu}</span>
                     </div>
-                    <div className="font-serif text-[13.5px] leading-[1.75] whitespace-pre-wrap text-[#4a453d]">
+                    <div className="line-clamp-3 font-serif text-[13.5px] leading-[1.75] whitespace-pre-wrap break-words text-[#4a453d]">
                       {v.review}
                     </div>
                   </div>
