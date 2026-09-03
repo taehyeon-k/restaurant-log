@@ -63,13 +63,18 @@ export default function LocationPickerMap({
     };
   }, []);
 
+  // center 는 글자를 칠 때마다 새 객체로 만들어집니다. 그대로 쓰면
+  // 타이핑마다 지도가 다시 움직이므로 숫자로 꺼내 씁니다.
+  const lat = center?.lat ?? null;
+  const lng = center?.lng ?? null;
+
   useEffect(() => {
     const L = leafletRef.current;
     const map = mapRef.current;
 
     if (!L || !map) return;
 
-    if (!center) {
+    if (lat === null || lng === null) {
       markerRef.current?.remove();
       markerRef.current = null;
       return;
@@ -81,22 +86,22 @@ export default function LocationPickerMap({
     });
 
     if (markerRef.current) {
-      markerRef.current.setLatLng([center.lat, center.lng]);
+      markerRef.current.setLatLng([lat, lng]);
       markerRef.current.setIcon(icon);
     } else {
-      markerRef.current = L.marker([center.lat, center.lng], {
+      markerRef.current = L.marker([lat, lng], {
         icon,
       }).addTo(map);
     }
 
     if (map.getZoom() < 15) {
-      map.flyTo([center.lat, center.lng], 16, {
+      map.flyTo([lat, lng], 16, {
         duration: 0.7,
       });
     } else {
-      map.panTo([center.lat, center.lng]);
+      map.panTo([lat, lng]);
     }
-  }, [center, category, revisit]);
+  }, [lat, lng, category, revisit]);
 
   return <div ref={containerRef} className="absolute inset-0" />;
 }
