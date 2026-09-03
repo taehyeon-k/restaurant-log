@@ -77,7 +77,7 @@ export default function PlacePane({ place }: { place: Place }) {
 
         {gallery.length > 0 && (
           <div className="mt-6 flex flex-col gap-2.5">
-            <div className="h-75 border border-line bg-[#eae5da]">
+            <div className="aspect-[4/3] border border-line bg-[#eae5da]">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={big} alt={place.name} className="size-full object-cover" />
             </div>
