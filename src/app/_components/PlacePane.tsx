@@ -71,7 +71,7 @@ export default function PlacePane({ place }: { place: Place }) {
                 : undefined
             }
           >
-         서울 {place.region}
+         {place.region}
           </span>
         </div>
 
