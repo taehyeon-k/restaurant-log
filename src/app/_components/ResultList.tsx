@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { shortDate, type Restaurant } from "@/lib/types";
+import { shortDate, coverPhoto, type Restaurant } from "@/lib/types";
 import PriceLevel from "./PriceLevel";
 import Stars from "./Stars";
 import { useHover } from "./Workspace";
@@ -45,10 +45,10 @@ export default function ResultList({ rows }: { rows: Restaurant[] }) {
           }`}
         >
           <div className="flex items-start gap-4">
-            {r.photo_url ? (
+             {coverPhoto(r) ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
-                src={r.photo_url}
+                src={coverPhoto(r)!}
                 alt=""
                 className="size-21 shrink-0 border border-[#ded8cb] object-cover"
               />
