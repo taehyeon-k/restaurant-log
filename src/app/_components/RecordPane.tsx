@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
@@ -26,7 +27,12 @@ export default function RecordPane({
     : record.photo_url
       ? [record.photo_url]
       : [];
-  const cover = coverPhoto(record);
+
+  // 처음에는 대표사진, 썸네일을 누르면 그 사진이 크게 뜹니다.
+  const [shown, setShown] = useState(
+    Math.min(record.cover_index ?? 0, Math.max(0, photos.length - 1))
+  );
+  const cover = photos[shown] ?? coverPhoto(record);
 
   async function remove() {
     if (!confirm(`"${record.name}" 기록을 삭제할까요?`)) return;
@@ -99,23 +105,29 @@ export default function RecordPane({
         </div>
 
         {photos.length > 1 && (
-          <div className="mt-2.5 flex gap-2">
+          <div className="mt-2.5 flex items-center gap-2">
             {photos.map((url, i) => (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
+              <button
                 key={url}
-                src={url}
-                alt=""
-                className={`size-15 shrink-0 object-cover ${
-                  i === (record.cover_index ?? 0)
+                type="button"
+                onClick={() => setShown(i)}
+                className={`relative size-15 shrink-0 cursor-pointer overflow-hidden p-0 ${
+                  i === shown
                     ? "border-[1.5px] border-brick"
-                    : "border border-[#ded8cb]"
+                    : "border border-[#ded8cb] opacity-75 hover:opacity-100"
                 }`}
-              />
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={url} alt="" className="size-full object-cover" />
+                {i === (record.cover_index ?? 0) && (
+                  <span className="absolute right-0 bottom-0 bg-ink px-1 py-0.25 text-[9px] text-paper">
+                    대표
+                  </span>
+                )}
+              </button>
             ))}
           </div>
         )}
-
         {record.menu && (
           <Section label="메뉴">
             <p className="text-[15px] leading-relaxed">{record.menu}</p>
