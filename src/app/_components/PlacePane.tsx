@@ -30,7 +30,9 @@ export default function PlacePane({ place }: { place: Place }) {
   // 기록마다 대표사진을 먼저 한 장씩, 자리가 남으면 나머지 사진으로 최대 5장.
   const gallery = useMemo(() => {
     const covers = place.visits.map((v) => coverPhoto(v)).filter((u): u is string => !!u);
-    const rest = place.visits.flatMap((v) => v.photo_urls ?? []);
+    const rest = place.visits.flatMap((v) =>
+      v.photo_urls?.length ? v.photo_urls : v.photo_url ? [v.photo_url] : []
+    );
     return [...new Set([...covers, ...rest])].slice(0, 5);
   }, [place]);
 
