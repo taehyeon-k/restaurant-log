@@ -38,7 +38,7 @@ export function groupPlaces(rows: Restaurant[]): Place[] {
       (a.visited_at ?? "") < (b.visited_at ?? "") ? 1 : -1
     );
     const latest = visits[0];
-    const level = avg(nums(visits.map((v) => v.price_level)));
+   
 
     return {
       key,
@@ -52,8 +52,8 @@ export function groupPlaces(rows: Restaurant[]): Place[] {
       visits,
       latest,
       rating: avg(nums(visits.map((v) => v.rating))),
-      price_range: avg(nums(visits.map((v) => v.price_range))),
-      price_level: level == null ? null : Math.round(level),
+      price_range: latest.price_range,
+      price_level: latest.price_level,
       revisit: latest.revisit,
       keywords: [...new Set(visits.flatMap((v) => v.keywords))],
     };
