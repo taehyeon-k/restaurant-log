@@ -93,7 +93,7 @@ export default function RecordPane({
           </span>
         </div>
 
-        <div className="mt-6 h-75 border border-line bg-[#eae5da]">
+        <div className="mt-6 aspect-[4/3] border border-line bg-[#eae5da]">
           {cover ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={cover} alt={record.name} className="size-full object-cover" />
