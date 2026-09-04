@@ -1,4 +1,4 @@
-import type { Kind, Restaurant } from "./types";
+import { coverPhoto, type Kind, type Restaurant } from "./types";
 
 export type Place = {
   key: string;
@@ -16,6 +16,10 @@ export type Place = {
   price_level: number | null;
   revisit: boolean;
   keywords: string[];
+  /** 방문 기록 중 하나라도 그 자리에서 인증된 것이 있으면 true */
+  verified: boolean;
+  /** 대표로 쓸 사진 — 최신 기록의 대표사진부터 찾습니다. 없으면 null. */
+  photo: string | null;
 };
 
 const avg = (list: number[]) =>
@@ -52,10 +56,13 @@ export function groupPlaces(rows: Restaurant[]): Place[] {
       visits,
       latest,
       rating: avg(nums(visits.map((v) => v.rating))),
-      price_range: latest.price_range,
-      price_level: latest.price_level,
+      // 가격은 최신값, 최신 기록에 없으면 값이 있는 기록 중 가장 최근 것.
+      price_range: latest.price_range ?? nums(visits.map((v) => v.price_range))[0] ?? null,
+      price_level: latest.price_level ?? nums(visits.map((v) => v.price_level))[0] ?? null,
       revisit: latest.revisit,
       keywords: [...new Set(visits.flatMap((v) => v.keywords))],
+      verified: visits.some((v) => v.verified),
+      photo: visits.map((v) => coverPhoto(v)).find(Boolean) ?? null,
     };
   });
 }

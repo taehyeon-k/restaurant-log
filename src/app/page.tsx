@@ -1,6 +1,11 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { getFacets, getRestaurant, searchRestaurants } from "@/lib/queries";
+import {
+  getAllRestaurants,
+  getFacets,
+  getRestaurant,
+  searchRestaurants,
+} from "@/lib/queries";
 import { CATEGORY_COLORS, parseBbox, type Kind, type Sort } from "@/lib/types";
 import { groupPlaces } from "@/lib/places";
 import KindTabs from "./_components/KindTabs";
@@ -9,6 +14,7 @@ import PlaceSearch from "./_components/PlaceSearch";
 import FilterPanel from "./_components/FilterPanel";
 import SortRow from "./_components/SortRow";
 import Workspace from "./_components/Workspace";
+import Shell from "./_components/Shell";
 
 const toArray = (v: string | string[] | undefined) =>
   v == null ? [] : Array.isArray(v) ? v : [v];
@@ -30,9 +36,11 @@ export default async function Home({
   const revisitOnly = sp.revisit === "1";
   const bbox = parseBbox(typeof sp.bbox === "string" ? sp.bbox : undefined);
 
-  const [rows, facets] = await Promise.all([
+  const [rows, facets, allRows] = await Promise.all([
     searchRestaurants({ kind, q, categories, regions, keywords, revisitOnly, sort, bbox }),
     getFacets(kind, bbox),
+    // 모바일 화면은 거르기·정렬을 브라우저에서 하므로 전체 목록을 함께 넘깁니다.
+    getAllRestaurants(),
   ]);
   const places = groupPlaces(rows);
    // ?rid=기록번호 → 기록 하나 / ?place=키 → 가게 화면. 옛 ?id= 도 그대로 받습니다.
@@ -75,7 +83,7 @@ export default async function Home({
   );
   const clearBboxHref = clearBbox.toString() ? `/?${clearBbox}` : "/";
 
-  return (
+  const desktop = (
     <main className="flex h-screen">
        <Workspace
         places={places}
@@ -152,4 +160,6 @@ export default async function Home({
       />
     </main>
   );
+
+  return <Shell rows={allRows} desktop={desktop} />;
 }

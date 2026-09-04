@@ -12,6 +12,27 @@ type Place = {
   lng: number;
 };
 
+type NearbyPlace = Place & { distance: number; category: string | null };
+
+/** 카카오 카테고리 코드 — 음식점 / 카페 */
+const GROUP = { restaurant: "FD6", cafe: "CE7" } as const;
+
+/** "음식점 > 한식 > 냉면" → "한식". 앱이 쓰는 종류 이름으로 좁힙니다. */
+const KNOWN = [
+  "한식", "중식", "일식", "양식", "아시안", "분식",
+  "커피", "디저트", "베이커리", "차",
+];
+
+const category = (name?: string) => {
+  const parts = (name ?? "").split(">").map((s) => s.trim());
+  for (const part of parts.slice(1)) {
+    const hit = KNOWN.find((k) => part.startsWith(k));
+    if (hit) return hit;
+  }
+  if (parts.some((p) => p.includes("카페") || p.includes("커피"))) return "커피";
+  return null;
+};
+
 async function kakao(path: string, params: Record<string, string>) {
   const res = await fetch(`${BASE}/${path}?${new URLSearchParams(params)}`, {
     headers: { Authorization: `KakaoAK ${KEY}` },
@@ -51,6 +72,36 @@ export async function GET(req: Request) {
   const lng = sp.get("lng");
 
   try {
+    // 좌표 둘레의 음식점·카페 — 방문인증 후보 (좌표는 여기서만 쓰고 남기지 않습니다)
+    if (lat && lng && sp.get("near")) {
+      const kind = sp.get("kind") === "cafe" ? "cafe" : "restaurant";
+      const json = await kakao("search/category.json", {
+        category_group_code: GROUP[kind],
+        x: lng,
+        y: lat,
+        radius: "500",
+        sort: "distance",
+        size: "10",
+      });
+
+      const places: NearbyPlace[] = (json?.documents ?? []).map(
+        (d: Record<string, string>) => {
+          const address = d.road_address_name || d.address_name;
+          return {
+            name: d.place_name,
+            address,
+            region: gu(address),
+            category: category(d.category_name),
+            lat: Number(d.y),
+            lng: Number(d.x),
+            distance: Number(d.distance) || 0,
+          };
+        }
+      );
+
+      return NextResponse.json({ places });
+    }
+
     // 좌표 → 주소
     if (lat && lng) {
       const json = await kakao("geo/coord2address.json", { x: lng, y: lat });

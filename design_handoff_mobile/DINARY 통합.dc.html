@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>
+  html, body { margin: 0; background: #f6f3ec; }
+</style>
+<template id="__bundler_thumbnail">
+  <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+    <rect width="200" height="200" fill="#b4552d"></rect>
+    <text x="100" y="124" text-anchor="middle" font-family="Georgia, serif" font-size="76" font-weight="700" fill="#fbfaf6">D</text>
+  </svg>
+</template>
+</helmet>
+
+<sc-if value="{{ isMobile }}" hint-placeholder-val="{{ false }}">
+  <dc-import name="DINARY 모바일 v3" hint-size="100%,100%"></dc-import>
+</sc-if>
+<sc-if value="{{ isDesktop }}" hint-placeholder-val="{{ true }}">
+  <dc-import name="DINARY" hint-size="100%,100%"></dc-import>
+</sc-if>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { mobile: typeof window !== "undefined" && window.innerWidth <= 820 };
+
+  componentDidMount() {
+    this.mq = window.matchMedia("(max-width: 820px)");
+    this.onChange = (e) => this.setState({ mobile: e.matches });
+    if (this.mq.addEventListener) this.mq.addEventListener("change", this.onChange);
+    else this.mq.addListener(this.onChange);
+    if (this.mq.matches !== this.state.mobile) this.setState({ mobile: this.mq.matches });
+  }
+
+  componentWillUnmount() {
+    if (!this.mq) return;
+    if (this.mq.removeEventListener) this.mq.removeEventListener("change", this.onChange);
+    else this.mq.removeListener(this.onChange);
+  }
+
+  renderVals() {
+    return { isMobile: this.state.mobile, isDesktop: !this.state.mobile };
+  }
+}
+</script>
+</body>
+</html>

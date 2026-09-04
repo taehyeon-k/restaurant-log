@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Gowun_Batang, Noto_Sans_KR, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -23,6 +23,14 @@ const jetbrains = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "DINARY",
   description: "다녀온 맛집과 카페를 지도에 기록합니다",
+};
+
+/** 폰에서는 노치 밑까지 화면을 씁니다 — 안전 영역은 각 화면이 직접 피합니다. */
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#f6f3ec",
 };
 
 export default function RootLayout({

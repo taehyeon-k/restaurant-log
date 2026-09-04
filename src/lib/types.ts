@@ -25,6 +25,10 @@ export type Restaurant = {
   photo_urls: string[];
  cover_index: number;
   place_key: string | null;
+  /** 그 자리에서 찍은 사진으로 인증된 기록 (모바일 카메라 흐름) */
+  verified: boolean;
+  /** 인증 촬영 시 위치 정확도(m). 좌표 자체는 남기지 않습니다. */
+  acc: number | null;
 };
 
 export const CATEGORIES: Record<Kind, string[]> = {
@@ -63,6 +67,9 @@ export const won = (n: number | null) =>
 
 export const shortDate = (d: string | null) =>
   d == null ? "" : d.slice(5).replace("-", ".");
+
+/** "2026-07-12" → "2026.07.12" */
+export const dottedDate = (d: string | null) => (d ?? "").replaceAll("-", ".");
 
 /** 카테고리별 핀 색. 종이 팔레트 안에서 서로 구분되는 톤으로 골랐습니다. */
 export const CATEGORY_COLORS: Record<string, string> = {

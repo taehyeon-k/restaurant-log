@@ -103,3 +103,17 @@ export async function getRestaurant(id: number) {
   if (error) return null;
   return data as Restaurant;
 }
+
+/**
+ * 모바일 화면이 쓰는 전체 목록. 거르기·정렬·묶기를 브라우저에서 하므로
+ * (바텀시트가 서버를 오가지 않고 바로 반응합니다) 조건 없이 한 번만 읽습니다.
+ */
+export async function getAllRestaurants() {
+  const { data, error } = await supabase
+    .from("restaurants")
+    .select("*")
+    .order("visited_at", { ascending: false, nullsFirst: false });
+
+  if (error) throw new Error(error.message);
+  return (data ?? []) as Restaurant[];
+}

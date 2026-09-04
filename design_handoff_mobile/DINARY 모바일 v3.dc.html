@@ -1,0 +1,1554 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+<link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&amp;family=Noto+Sans+KR:wght@300;400;500;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  html, body { margin: 0; background: #e5e0d5; color: #1c1a17; font-family: "Noto Sans KR", sans-serif; -webkit-tap-highlight-color: transparent; }
+  a { color: #b4552d; text-decoration: none; }
+  a:hover { color: #8f4224; }
+  .paper-tiles { filter: saturate(0.72) sepia(0.1) brightness(1.04) contrast(0.97); }
+  .leaflet-container { background: #e7e3d8; font-family: inherit; }
+  .restaurant-map-pin { background: transparent !important; border: none !important; }
+  .leaflet-control-attribution, .leaflet-control-zoom { display: none !important; }
+  .sheet-scroll::-webkit-scrollbar { width: 0; height: 0; }
+  input, textarea, select, button { font-family: inherit; }
+  @media (max-width: 520px) {
+    body { background: #f6f3ec; }
+    .stage-wrap { padding: 0 !important; }
+    .device-outer { width: 100vw !important; height: 100dvh !important; padding: 0 !important; border-radius: 0 !important; background: #f6f3ec !important; box-shadow: none !important; }
+    .device-inner { width: 100vw !important; height: 100dvh !important; border-radius: 0 !important; }
+  }
+</style>
+<template id="__bundler_thumbnail">
+  <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+    <rect width="200" height="200" fill="#b4552d"></rect>
+    <text x="100" y="124" text-anchor="middle" font-family="Georgia, serif" font-size="76" font-weight="700" fill="#fbfaf6">D</text>
+  </svg>
+</template>
+</helmet>
+
+<div class="stage-wrap" style="display:flex; justify-content:center; padding:40px 20px 60px; background:#e5e0d5">
+  <div class="device-outer" style="position:relative; width:390px; height:844px; border-radius:44px; padding:9px; background:#1c1a17; box-shadow:0 24px 50px rgba(28,26,23,.22)">
+    <div class="device-inner" style="position:relative; width:372px; height:826px; border-radius:36px; overflow:hidden; background:#e7e3d8">
+
+      <div ref="{{ mapRef }}" style="position:absolute; top:0; left:0; right:0; height:620px"></div>
+      <div style="position:absolute; top:0; left:0; right:0; z-index:900; height:104px; background:linear-gradient(rgba(246,243,236,.96), rgba(246,243,236,0)); pointer-events:none"></div>
+
+      <div style="position:absolute; top:16px; left:0; right:0; z-index:1000; display:flex; align-items:center; justify-content:space-between; padding:0 22px; font-family:'JetBrains Mono',monospace; font-size:12px; color:#1c1a17">
+        <span>{{ clock }}</span>
+        <span style="letter-spacing:.1em">▮▮▮ ◗</span>
+      </div>
+
+      <div style="position:absolute; top:50px; left:16px; right:16px; z-index:1000; display:flex; align-items:center; gap:9px">
+        <div style="flex:1; min-width:0; display:flex; align-items:center; gap:9px; height:46px; border-radius:23px; border:1px solid #d8d3c8; background:#fbfaf6; padding:0 15px; box-shadow:0 4px 14px rgba(28,26,23,.08)">
+          <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="#8a8377" stroke-width="1.6"><circle cx="7" cy="7" r="4.6"></circle><path d="M10.5 10.5L14 14"></path></svg>
+          <input value="{{ mapQuery }}" onChange="{{ onMapQuery }}" onKeyDown="{{ onMapKeyDown }}" placeholder="음식점이나 지역 찾기" style="flex:1; min-width:0; border:none; outline:none; background:transparent; font-size:13.5px; color:#1c1a17"></input>
+          <button onClick="{{ onMapSearch }}" style="flex-shrink:0; border:none; background:transparent; font-size:12px; color:#b4552d; cursor:pointer; padding:6px 0">찾기</button>
+        </div>
+        <button onClick="{{ onOpenLabels }}" style="display:grid; place-items:center; width:44px; height:44px; flex-shrink:0; border:1px solid #d8d3c8; border-radius:50%; background:#fbfaf6; box-shadow:0 4px 14px rgba(28,26,23,.08); cursor:pointer" style-hover="border-color:#b4552d">
+          <div style="width:18px; height:18px; background:#b4552d; clip-path:polygon(50.0% 0.0%, 60.6% 10.4%, 75.0% 6.7%, 79.0% 21.0%, 93.3% 25.0%, 89.6% 39.4%, 100.0% 50.0%, 89.6% 60.6%, 93.3% 75.0%, 79.0% 79.0%, 75.0% 93.3%, 60.6% 89.6%, 50.0% 100.0%, 39.4% 89.6%, 25.0% 93.3%, 21.0% 79.0%, 6.7% 75.0%, 10.4% 60.6%, 0.0% 50.0%, 10.4% 39.4%, 6.7% 25.0%, 21.0% 21.0%, 25.0% 6.7%, 39.4% 10.4%)"></div>
+        </button>
+      </div>
+
+      <button onClick="{{ onShoot }}" style="position:absolute; right:16px; z-index:1000; display:grid; place-items:center; width:60px; height:60px; border:none; border-radius:50%; background:#b4552d; box-shadow:0 8px 20px rgba(180,85,45,.34); cursor:pointer; transition:bottom .26s cubic-bezier(.32,.72,0,1); bottom:{{ fabBottom }}px" style-hover="background:#9d4826">
+        <svg width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="#fbfaf6" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5.5" width="19" height="14" rx="3.5"></rect><circle cx="12" cy="12.5" r="4"></circle><path d="M8 5.5L9.4 3h5.2l1.4 2.5"></path></svg>
+      </button>
+
+      <button onClick="{{ onAddManual }}" style="position:absolute; right:88px; z-index:1000; display:grid; place-items:center; width:52px; height:52px; border:1px solid #d8d3c8; border-radius:50%; background:#fbfaf6; box-shadow:0 6px 16px rgba(28,26,23,.14); cursor:pointer; transition:bottom .26s cubic-bezier(.32,.72,0,1); bottom:{{ plusBottom }}px" style-hover="border-color:#b4552d">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1c1a17" stroke-width="1.7" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+      </button>
+
+      <div style="position:absolute; left:0; right:0; bottom:0; z-index:1100; display:flex; flex-direction:column; border-radius:28px 28px 0 0; background:#f6f3ec; box-shadow:0 -8px 30px rgba(28,26,23,.16); transition:height .26s cubic-bezier(.32,.72,0,1); height:{{ sheetH }}px">
+
+        <div onPointerDown="{{ onDragStart }}" onClick="{{ onHandleTap }}" style="flex-shrink:0; padding:11px 0 9px; cursor:grab; touch-action:none">
+          <div style="width:42px; height:4px; margin:0 auto; border-radius:2px; background:#cfc8ba"></div>
+        </div>
+
+        <div style="flex-shrink:0; display:flex; align-items:flex-end; justify-content:space-between; gap:12px; padding:0 20px 10px">
+          <div>
+            <div style="font-family:'Gowun Batang',serif; font-size:19px; font-weight:700">{{ sheetTitle }}</div>
+            <div style="margin-top:3px; font-family:'JetBrains Mono',monospace; font-size:10.5px; color:#8a8377">{{ countLabel }}</div>
+          </div>
+          <button onClick="{{ onOpenFilters }}" style="{{ filterBtnStyle }}">{{ filterBtnLabel }}</button>
+        </div>
+
+        <div style="flex-shrink:0; display:flex; align-items:center; padding:0 16px 10px">
+          <div style="display:flex; align-items:center; gap:4px; padding:3px; border-radius:21px; background:#ece7dc">
+            <sc-for list="{{ kindTabs }}" as="t" hint-placeholder-count="2">
+              <button onClick="{{ t.onClick }}" style="{{ t.style }}">{{ t.label }}</button>
+            </sc-for>
+          </div>
+        </div>
+
+        <div style="flex-shrink:0; padding:0 16px 10px">
+          <div style="display:flex; align-items:center; gap:9px; height:42px; border-radius:21px; border:1px solid #ded8cb; background:#fbfaf6; padding:0 15px">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#8a8377" stroke-width="1.6"><circle cx="7" cy="7" r="4.6"></circle><path d="M10.5 10.5L14 14"></path></svg>
+            <input value="{{ query }}" onChange="{{ onQuery }}" placeholder="가게 · 지역 · 메뉴 · 메모" style="flex:1; min-width:0; border:none; outline:none; background:transparent; font-size:13px; color:#1c1a17"></input>
+            <sc-if value="{{ hasQuery }}" hint-placeholder-val="{{ false }}">
+              <button onClick="{{ onClearQuery }}" style="border:none; background:transparent; font-size:14px; color:#a29a8c; cursor:pointer; padding:0">✕</button>
+            </sc-if>
+          </div>
+        </div>
+
+        <div style="flex-shrink:0; display:flex; align-items:center; gap:16px; padding:0 20px 10px; border-bottom:1px solid #e6e0d3">
+          <sc-for list="{{ sortButtons }}" as="s" hint-placeholder-count="3">
+            <button onClick="{{ s.onClick }}" style="{{ s.style }}">{{ s.label }}</button>
+          </sc-for>
+        </div>
+
+        <div class="sheet-scroll" style="flex:1; min-height:0; overflow-y:auto; padding:12px 16px 108px">
+          <sc-if value="{{ isEmpty }}" hint-placeholder-val="{{ false }}">
+            <div style="padding:44px 20px; text-align:center; font-size:12.5px; line-height:1.8; color:#8a8377">조건에 맞는 기록이 없습니다.<br>필터를 지우거나 다른 낱말로 찾아보세요.</div>
+          </sc-if>
+          <div style="display:flex; flex-direction:column; gap:10px">
+            <sc-for list="{{ places }}" as="p" hint-placeholder-count="6">
+              <button onClick="{{ p.onOpen }}" style="{{ p.cardStyle }}">
+                <div style="{{ p.thumbStyle }}">
+                  <span style="font-family:'JetBrains Mono',monospace; font-size:9px; letter-spacing:.08em; color:rgba(251,250,246,.9)">{{ p.thumbLabel }}</span>
+                  <sc-if value="{{ p.verified }}" hint-placeholder-val="{{ false }}">
+                    <div style="position:absolute; right:-3px; bottom:-3px; display:grid; place-items:center; width:24px; height:24px; background:#b4552d; clip-path:polygon(50.0% 0.0%, 60.6% 10.4%, 75.0% 6.7%, 79.0% 21.0%, 93.3% 25.0%, 89.6% 39.4%, 100.0% 50.0%, 89.6% 60.6%, 93.3% 75.0%, 79.0% 79.0%, 75.0% 93.3%, 60.6% 89.6%, 50.0% 100.0%, 39.4% 89.6%, 25.0% 93.3%, 21.0% 79.0%, 6.7% 75.0%, 10.4% 60.6%, 0.0% 50.0%, 10.4% 39.4%, 6.7% 25.0%, 21.0% 21.0%, 25.0% 6.7%, 39.4% 10.4%)">
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fbfaf6" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.6L9.6 17.2L19 7.4"></path></svg>
+                    </div>
+                  </sc-if>
+                </div>
+                <div style="flex:1; min-width:0; text-align:left">
+                  <div style="display:flex; align-items:center; gap:6px">
+                    <span style="font-family:'Gowun Batang',serif; font-size:16px; font-weight:700; color:#1c1a17">{{ p.name }}</span>
+                    <sc-if value="{{ p.hasMany }}" hint-placeholder-val="{{ false }}">
+                      <span style="border-radius:9px; background:#efe9dc; padding:2px 7px; font-family:'JetBrains Mono',monospace; font-size:9px; color:#6b665e; white-space:nowrap">{{ p.visitBadge }}</span>
+                    </sc-if>
+                    <sc-if value="{{ p.revisit }}" hint-placeholder-val="{{ false }}">
+                      <span style="border-radius:9px; background:#f7ece5; padding:2px 7px; font-size:9.5px; color:#b4552d; white-space:nowrap">재방문</span>
+                    </sc-if>
+                  </div>
+                  <div style="margin-top:4px; font-size:11px; color:#8a8377">{{ p.catRegion }}</div>
+                  <div style="margin-top:6px; display:flex; align-items:center; gap:8px">
+                    <span style="position:relative; display:inline-block; font-size:12.5px; letter-spacing:1px; color:#ded8cb">★★★★★<span style="{{ p.starStyle }}">★★★★★</span></span>
+                    <span style="font-family:'JetBrains Mono',monospace; font-size:10.5px; color:#6b665e">{{ p.ratingText }}</span>
+                    <span style="width:1px; height:11px; background:#ded8cb"></span>
+                    <span style="display:flex; align-items:center; gap:2px">
+                      <sc-for list="{{ p.pigs }}" as="g" hint-placeholder-count="5">
+                        <img src="public/piggy.png" alt="" width="15" height="14" style="{{ g.style }}"></img>
+                      </sc-for>
+                    </span>
+                  </div>
+                  <div style="margin-top:6px; font-size:11.5px; line-height:1.5; color:#4d4842; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden">{{ p.summary }}</div>
+                </div>
+              </button>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+
+      <sc-if value="{{ showFilters }}" hint-placeholder-val="{{ false }}">
+        <div style="position:absolute; inset:0; z-index:1500; display:flex; flex-direction:column; justify-content:flex-end; background:rgba(28,26,23,.34)">
+          <div onClick="{{ onCloseFilters }}" style="flex:1"></div>
+          <div style="border-radius:28px 28px 0 0; background:#f6f3ec; padding:18px 20px 26px; box-shadow:0 -8px 30px rgba(28,26,23,.2)">
+            <div style="display:flex; align-items:center; justify-content:space-between">
+              <div style="font-family:'Gowun Batang',serif; font-size:18px; font-weight:700">골라 보기</div>
+              <button onClick="{{ onResetFilters }}" style="border:none; background:transparent; font-size:12px; color:#8a8377; cursor:pointer; padding:6px 0" style-hover="color:#b4552d">모두 지우기</button>
+            </div>
+
+            <div style="margin-top:16px; font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:.16em; color:#8a8377">종류</div>
+            <div style="margin-top:9px; display:flex; flex-wrap:wrap; gap:7px">
+              <sc-for list="{{ categoryChips }}" as="c" hint-placeholder-count="6">
+                <button onClick="{{ c.onClick }}" style="{{ c.style }}">{{ c.label }}</button>
+              </sc-for>
+            </div>
+
+            <div style="margin-top:18px; font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:.16em; color:#8a8377">낱말</div>
+            <div style="margin-top:9px; display:flex; flex-wrap:wrap; gap:7px">
+              <sc-for list="{{ keywordChips }}" as="k" hint-placeholder-count="6">
+                <button onClick="{{ k.onClick }}" style="{{ k.style }}">{{ k.label }}</button>
+              </sc-for>
+            </div>
+
+            <div style="margin-top:18px; display:flex; gap:7px">
+              <button onClick="{{ onToggleRevisit }}" style="{{ revisitStyle }}">재방문한 곳만</button>
+              <button onClick="{{ onToggleVerified }}" style="{{ verifiedStyle }}">인증된 기록만</button>
+            </div>
+
+            <button onClick="{{ onCloseFilters }}" style="width:100%; margin-top:22px; border:none; border-radius:20px; background:#1c1a17; padding:16px; font-size:14.5px; font-weight:500; color:#fbfaf6; cursor:pointer" style-hover="background:#332f2a">{{ applyLabel }}</button>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ showPlace }}" hint-placeholder-val="{{ false }}">
+        <div style="position:absolute; inset:0; z-index:1200; display:flex; flex-direction:column; background:#f6f3ec">
+          <div style="{{ place.heroStyle }}">
+            <button onClick="{{ onClosePlace }}" style="position:absolute; top:50px; left:16px; display:grid; place-items:center; width:44px; height:44px; border:none; border-radius:50%; background:rgba(251,250,246,.92); font-size:17px; color:#1c1a17; cursor:pointer" style-hover="background:#fbfaf6">←</button>
+            <div style="position:absolute; left:20px; bottom:18px; font-family:'JetBrains Mono',monospace; font-size:9.5px; letter-spacing:.14em; color:rgba(251,250,246,.85)">{{ place.heroLabel }}</div>
+          </div>
+
+          <div class="sheet-scroll" style="flex:1; min-height:0; overflow-y:auto; padding:22px 22px 40px">
+            <div style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:.16em; color:#8a8377">NO. {{ place.no }}</div>
+            <h1 style="margin:9px 0 0; font-family:'Gowun Batang',serif; font-size:27px; font-weight:700; letter-spacing:-.01em">{{ place.name }}</h1>
+            <div style="margin-top:8px; display:flex; align-items:center; gap:8px; font-size:12px; color:#8a8377">
+              <span>{{ place.category }}</span><span>·</span><span>{{ place.regionFull }}</span>
+            </div>
+            <div style="margin-top:6px; font-size:11.5px; color:#a29a8c">{{ place.address }}</div>
+
+            <div style="margin-top:16px; display:flex; align-items:center; gap:10px; flex-wrap:wrap">
+              <span style="position:relative; display:inline-block; font-size:15px; letter-spacing:1.5px; color:#ded8cb">★★★★★<span style="{{ place.starStyle }}">★★★★★</span></span>
+              <span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#6b665e">{{ place.ratingText }}</span>
+              <span style="width:1px; height:13px; background:#ded8cb"></span>
+              <span style="display:flex; align-items:center; gap:2px">
+                <sc-for list="{{ place.pigs }}" as="g" hint-placeholder-count="5">
+                  <img src="public/piggy.png" alt="" width="18" height="17" style="{{ g.style }}"></img>
+                </sc-for>
+              </span>
+              <span style="font-size:11.5px; color:#8a8377">{{ place.feltLabel }}</span>
+            </div>
+
+            <div style="margin-top:14px; display:flex; flex-wrap:wrap; gap:6px">
+              <sc-for list="{{ place.keywords }}" as="k" hint-placeholder-count="2">
+                <span style="border:1px solid #e2dccf; border-radius:14px; padding:4px 10px; font-size:11px; color:#6b665e">{{ k }}</span>
+              </sc-for>
+            </div>
+
+            <div style="margin-top:26px; display:flex; align-items:center; justify-content:space-between; border-top:1px solid #ded8cb; padding-top:18px">
+              <div style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:.16em; color:#8a8377">RECORDS</div>
+              <div style="font-size:11.5px; color:#8a8377">{{ place.visitCountLabel }}</div>
+            </div>
+
+            <div style="margin-top:12px; display:flex; flex-direction:column; gap:9px">
+              <sc-for list="{{ place.history }}" as="v" hint-placeholder-count="3">
+                <button onClick="{{ v.onOpen }}" style="{{ v.style }}">
+                  <div style="display:flex; align-items:center; justify-content:space-between; gap:10px">
+                    <span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#1c1a17">{{ v.dateFull }}</span>
+                    <span style="display:flex; align-items:center; gap:7px">
+                      <span style="position:relative; display:inline-block; font-size:11.5px; letter-spacing:1px; color:#ded8cb">★★★★★<span style="{{ v.starStyle }}">★★★★★</span></span>
+                      <span style="font-family:'JetBrains Mono',monospace; font-size:10.5px; color:#6b665e">{{ v.ratingText }}</span>
+                    </span>
+                  </div>
+                  <div style="margin-top:7px; text-align:left; font-size:11.5px; color:#6b665e">{{ v.menu }}</div>
+                  <div style="margin-top:5px; text-align:left; font-size:11.5px; line-height:1.55; color:#4d4842; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden">{{ v.review }}</div>
+                  <div style="margin-top:9px; display:flex; align-items:center; gap:8px; font-family:'JetBrains Mono',monospace; font-size:9.5px; color:#a29a8c">
+                    <span>{{ v.photoBadge }}</span><span>·</span><span>{{ v.coverLabel }}</span>
+                  </div>
+                </button>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ showRecord }}" hint-placeholder-val="{{ false }}">
+        <div style="position:absolute; inset:0; z-index:1250; display:flex; flex-direction:column; background:#f6f3ec">
+          <div style="{{ record.photoStyle }}">
+            <span style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:.14em; color:rgba(251,250,246,.9)">{{ record.photoLabel }}</span>
+            <button onClick="{{ record.onBack }}" style="position:absolute; top:50px; left:16px; display:grid; place-items:center; width:44px; height:44px; border:none; border-radius:50%; background:rgba(251,250,246,.92); font-size:17px; color:#1c1a17; cursor:pointer" style-hover="background:#fbfaf6">←</button>
+            <sc-if value="{{ record.verified }}" hint-placeholder-val="{{ false }}">
+              <div style="position:absolute; right:16px; bottom:16px; display:grid; place-items:center; width:50px; height:50px; background:#b4552d; clip-path:polygon(50.0% 0.0%, 60.6% 10.4%, 75.0% 6.7%, 79.0% 21.0%, 93.3% 25.0%, 89.6% 39.4%, 100.0% 50.0%, 89.6% 60.6%, 93.3% 75.0%, 79.0% 79.0%, 75.0% 93.3%, 60.6% 89.6%, 50.0% 100.0%, 39.4% 89.6%, 25.0% 93.3%, 21.0% 79.0%, 6.7% 75.0%, 10.4% 60.6%, 0.0% 50.0%, 10.4% 39.4%, 6.7% 25.0%, 21.0% 21.0%, 25.0% 6.7%, 39.4% 10.4%); box-shadow:0 4px 12px rgba(28,26,23,.26)">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fbfaf6" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.6L9.6 17.2L19 7.4"></path></svg>
+              </div>
+            </sc-if>
+          </div>
+
+          <div style="flex-shrink:0; display:flex; align-items:center; gap:7px; padding:10px 16px; border-bottom:1px solid #e6e0d3; overflow-x:auto" class="sheet-scroll">
+            <sc-for list="{{ record.thumbs }}" as="t" hint-placeholder-count="3">
+              <button onClick="{{ t.onClick }}" style="{{ t.style }}">
+                {{ t.label }}
+                <sc-if value="{{ t.isCover }}" hint-placeholder-val="{{ false }}">
+                  <span style="position:absolute; top:2px; right:3px; font-family:'JetBrains Mono',monospace; font-size:8px; color:#b4552d">★</span>
+                </sc-if>
+              </button>
+            </sc-for>
+            <sc-if value="{{ record.canSetCover }}" hint-placeholder-val="{{ false }}">
+              <button onClick="{{ record.setCover }}" style="flex-shrink:0; min-height:44px; border:1px dashed #d8d3c8; border-radius:14px; background:transparent; padding:0 13px; font-size:11.5px; color:#6b665e; cursor:pointer; white-space:nowrap" style-hover="border-color:#b4552d; color:#b4552d">대표사진으로</button>
+            </sc-if>
+          </div>
+
+          <div class="sheet-scroll" style="flex:1; min-height:0; overflow-y:auto; padding:20px 22px 40px">
+            <div style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:.16em; color:#8a8377">NO. {{ record.no }}</div>
+            <h1 style="margin:8px 0 0; font-family:'Gowun Batang',serif; font-size:25px; font-weight:700">{{ record.name }}</h1>
+            <div style="margin-top:7px; display:flex; align-items:center; gap:8px; font-size:12px; color:#8a8377">
+              <span>{{ record.category }}</span><span>·</span><span>{{ record.regionFull }}</span>
+            </div>
+
+            <div style="margin-top:14px; display:flex; align-items:center; gap:10px; flex-wrap:wrap">
+              <span style="position:relative; display:inline-block; font-size:15px; letter-spacing:1.5px; color:#ded8cb">★★★★★<span style="{{ record.starStyle }}">★★★★★</span></span>
+              <span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#6b665e">{{ record.ratingText }}</span>
+              <span style="width:1px; height:13px; background:#ded8cb"></span>
+              <span style="display:flex; align-items:center; gap:2px">
+                <sc-for list="{{ record.pigs }}" as="g" hint-placeholder-count="5">
+                  <img src="public/piggy.png" alt="" width="18" height="17" style="{{ g.style }}"></img>
+                </sc-for>
+              </span>
+            </div>
+
+            <div style="margin-top:22px; border-top:1px solid #ded8cb; padding-top:18px; display:flex; flex-direction:column; gap:18px">
+              <div>
+                <div style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:.16em; color:#8a8377">방문</div>
+                <div style="margin-top:7px; font-size:13.5px">{{ record.dateFull }}</div>
+              </div>
+              <div>
+                <div style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:.16em; color:#8a8377">메뉴</div>
+                <div style="margin-top:7px; font-size:13.5px; line-height:1.6">{{ record.menu }}</div>
+              </div>
+              <div>
+                <div style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:.16em; color:#8a8377">메모</div>
+                <div style="margin-top:8px; font-family:'Gowun Batang',serif; font-size:16px; line-height:1.95; color:#2e2a25; white-space:pre-line; text-wrap:pretty">{{ record.review }}</div>
+              </div>
+              <div>
+                <div style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:.16em; color:#8a8377">주소</div>
+                <div style="margin-top:7px; font-size:12.5px; color:#4d4842">{{ record.address }}</div>
+              </div>
+            </div>
+
+            <div style="margin-top:16px; display:flex; flex-wrap:wrap; gap:6px">
+              <sc-for list="{{ record.keywords }}" as="k" hint-placeholder-count="2">
+                <span style="border:1px solid #e2dccf; border-radius:14px; padding:4px 10px; font-size:11px; color:#6b665e">{{ k }}</span>
+              </sc-for>
+            </div>
+
+            <sc-if value="{{ record.verified }}" hint-placeholder-val="{{ false }}">
+              <div style="margin-top:20px; border-radius:18px; border:1px solid #e4dfd3; background:#fbfaf6; padding:14px 16px; font-size:11.5px; line-height:1.7; color:#6b665e">{{ record.verifyNote }}</div>
+            </sc-if>
+
+            <div style="margin-top:20px; display:flex; gap:8px">
+              <button onClick="{{ record.onEdit }}" style="flex:1; min-height:50px; border:none; border-radius:18px; background:#1c1a17; font-size:13.5px; font-weight:500; color:#fbfaf6; cursor:pointer" style-hover="background:#332f2a">기록 수정</button>
+              <sc-if value="{{ record.canDelete }}" hint-placeholder-val="{{ false }}">
+                <button onClick="{{ record.onDelete }}" style="flex-shrink:0; min-height:50px; padding:0 18px; border:1px solid #e4dfd3; border-radius:18px; background:transparent; font-size:12.5px; color:#8a8377; cursor:pointer" style-hover="border-color:#c9a294; color:#a8412a">지우기</button>
+              </sc-if>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ showEdit }}" hint-placeholder-val="{{ false }}">
+        <div style="position:absolute; inset:0; z-index:1300; display:flex; flex-direction:column; background:#f6f3ec">
+          <div style="flex-shrink:0; padding:46px 16px 12px; border-bottom:1px solid #e6e0d3; display:flex; align-items:center; justify-content:space-between; gap:10px">
+            <button onClick="{{ edit.onCancel }}" style="min-height:44px; border:none; background:transparent; font-size:13px; color:#8a8377; cursor:pointer; padding:0 6px" style-hover="color:#1c1a17">취소</button>
+            <div style="text-align:center">
+              <div style="font-family:'Gowun Batang',serif; font-size:15px; font-weight:700">{{ edit.name }}</div>
+              <div style="margin-top:2px; font-family:'JetBrains Mono',monospace; font-size:9.5px; color:#8a8377">NO. {{ edit.no }}</div>
+            </div>
+            <button onClick="{{ edit.onSave }}" style="min-height:44px; border:none; border-radius:18px; background:#b4552d; padding:0 16px; font-size:13px; font-weight:500; color:#fbfaf6; cursor:pointer" style-hover="background:#9d4826">저장</button>
+          </div>
+
+          <div class="sheet-scroll" style="flex:1; min-height:0; overflow-y:auto; padding:20px 20px 44px">
+            <sc-if value="{{ edit.isNew }}" hint-placeholder-val="{{ false }}">
+              <div style="margin-bottom:22px; display:flex; flex-direction:column; gap:16px">
+                <label style="display:block">
+                  <span style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:.16em; color:#8a8377">가게 이름</span>
+                  <input value="{{ edit.nameValue }}" onChange="{{ edit.onName }}" placeholder="어디에 갔나요" style="margin-top:8px; width:100%; box-sizing:border-box; min-height:48px; border:1px solid #ded8cb; border-radius:16px; background:#fbfaf6; padding:0 15px; font-family:'Gowun Batang',serif; font-size:16px; color:#1c1a17"></input>
+                </label>
+                <div>
+                  <span style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:.16em; color:#8a8377">종류</span>
+                  <div style="margin-top:9px; display:flex; flex-wrap:wrap; gap:6px">
+                    <sc-for list="{{ edit.categoryChips }}" as="c" hint-placeholder-count="6">
+                      <button onClick="{{ c.onClick }}" style="{{ c.style }}">{{ c.label }}</button>
+                    </sc-for>
+                  </div>
+                </div>
+                <label style="display:block">
+                  <span style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:.16em; color:#8a8377">지역 · 주소</span>
+                  <input value="{{ edit.regionValue }}" onChange="{{ edit.onRegion }}" placeholder="종로구" style="margin-top:8px; width:100%; box-sizing:border-box; min-height:48px; border:1px solid #ded8cb; border-radius:16px; background:#fbfaf6; padding:0 15px; font-size:13.5px; color:#1c1a17"></input>
+                  <input value="{{ edit.addressValue }}" onChange="{{ edit.onAddress }}" placeholder="서울 종로구 인사동길 12" style="margin-top:8px; width:100%; box-sizing:border-box; min-height:48px; border:1px solid #ded8cb; border-radius:16px; background:#fbfaf6; padding:0 15px; font-size:13px; color:#1c1a17"></input>
+                </label>
+                <div style="font-size:11.5px; line-height:1.7; color:#8a8377">직접 쓴 기록에는 인증 마크가 붙지 않습니다. 사진을 그 자리에서 찍으면 인증됩니다.</div>
+              </div>
+            </sc-if>
+            <div style="display:flex; align-items:center; justify-content:space-between">
+              <div style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:.16em; color:#8a8377">사진 {{ edit.countLabel }}</div>
+              <sc-if value="{{ edit.canAdd }}" hint-placeholder-val="{{ true }}">
+                <button onClick="{{ edit.onAdd }}" style="min-height:38px; border:1px dashed #d8d3c8; border-radius:14px; background:transparent; padding:0 13px; font-size:11.5px; color:#6b665e; cursor:pointer" style-hover="border-color:#b4552d; color:#b4552d">사진 추가</button>
+              </sc-if>
+            </div>
+            <div style="margin-top:11px; display:grid; grid-template-columns:repeat(2, 1fr); gap:9px">
+              <sc-for list="{{ edit.slots }}" as="s" hint-placeholder-count="2">
+                <div style="{{ s.style }}">
+                  <span>{{ s.label }}</span>
+                  <div style="position:absolute; left:0; right:0; bottom:0; display:flex; border-top:1px solid #ded8cb">
+                    <sc-if value="{{ s.notCover }}" hint-placeholder-val="{{ true }}">
+                      <button onClick="{{ s.onCover }}" style="flex:1; min-height:34px; border:none; background:#fbfaf6; font-size:10.5px; color:#6b665e; cursor:pointer" style-hover="color:#b4552d">대표로</button>
+                    </sc-if>
+                    <sc-if value="{{ s.isCover }}" hint-placeholder-val="{{ false }}">
+                      <div style="flex:1; min-height:34px; display:grid; place-items:center; background:#b4552d; font-size:10.5px; color:#fbfaf6">대표사진</div>
+                    </sc-if>
+                    <sc-if value="{{ s.canRemove }}" hint-placeholder-val="{{ true }}">
+                      <button onClick="{{ s.onRemove }}" style="flex-shrink:0; width:38px; min-height:34px; border:none; border-left:1px solid #ded8cb; background:#fbfaf6; font-size:11px; color:#a29a8c; cursor:pointer" style-hover="color:#a8412a">✕</button>
+                    </sc-if>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+
+            <div style="margin-top:22px; display:flex; flex-direction:column; gap:16px">
+              <label style="display:block">
+                <span style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:.16em; color:#8a8377">방문일</span>
+                <input type="date" value="{{ edit.dateValue }}" onChange="{{ edit.onDate }}" style="margin-top:8px; width:100%; box-sizing:border-box; min-height:48px; border:1px solid #ded8cb; border-radius:16px; background:#fbfaf6; padding:0 15px; font-size:13.5px; color:#1c1a17"></input>
+              </label>
+
+              <div>
+                <span style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:.16em; color:#8a8377">별점 {{ edit.ratingLabel }}</span>
+                <div style="margin-top:9px; display:flex; flex-wrap:wrap; gap:6px">
+                  <sc-for list="{{ edit.ratingOptions }}" as="r" hint-placeholder-count="10">
+                    <button onClick="{{ r.onClick }}" style="{{ r.style }}">{{ r.label }}</button>
+                  </sc-for>
+                </div>
+              </div>
+
+              <label style="display:block">
+                <span style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:.16em; color:#8a8377">메뉴</span>
+                <input value="{{ edit.menu }}" onChange="{{ edit.onMenu }}" placeholder="먹은 것과 가격" style="margin-top:8px; width:100%; box-sizing:border-box; min-height:48px; border:1px solid #ded8cb; border-radius:16px; background:#fbfaf6; padding:0 15px; font-size:13.5px; color:#1c1a17"></input>
+              </label>
+
+              <label style="display:block">
+                <span style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:.16em; color:#8a8377">1인 기준 가격</span>
+                <input type="number" value="{{ edit.priceValue }}" onChange="{{ edit.onPrice }}" placeholder="15000" style="margin-top:8px; width:100%; box-sizing:border-box; min-height:48px; border:1px solid #ded8cb; border-radius:16px; background:#fbfaf6; padding:0 15px; font-family:'JetBrains Mono',monospace; font-size:13.5px; color:#1c1a17"></input>
+                <span style="display:block; margin-top:7px; font-size:11.5px; color:#8a8377">{{ edit.feltLabel }}</span>
+              </label>
+
+              <label style="display:block">
+                <span style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:.16em; color:#8a8377">메모</span>
+                <textarea value="{{ edit.review }}" onChange="{{ edit.onReview }}" rows="6" placeholder="다음에 올 나를 위해" style="margin-top:8px; width:100%; box-sizing:border-box; border:1px solid #ded8cb; border-radius:16px; background:#fbfaf6; padding:13px 15px; font-family:'Gowun Batang',serif; font-size:15px; line-height:1.8; color:#1c1a17; resize:none"></textarea>
+              </label>
+
+              <button onClick="{{ edit.onToggleRevisit }}" style="{{ edit.revisitStyle }}">{{ edit.revisitLabel }}</button>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ showShoot }}" hint-placeholder-val="{{ false }}">
+        <div style="position:absolute; inset:0; z-index:1400; background:#171614">
+          <video ref="{{ videoRef }}" autoplay="" playsinline="" muted="" style="position:absolute; top:152px; left:16px; width:340px; height:352px; border-radius:28px; object-fit:cover; background:#232120"></video>
+
+          <div style="position:absolute; top:16px; left:0; right:0; display:flex; align-items:center; justify-content:space-between; padding:0 22px; font-family:'JetBrains Mono',monospace; font-size:12px; color:#fbfaf6">
+            <span>{{ clock }}</span>
+            <span style="letter-spacing:.1em">▮▮▮ ◗</span>
+          </div>
+          <button onClick="{{ onCancelFlow }}" style="position:absolute; top:52px; left:16px; z-index:3; display:grid; place-items:center; width:44px; height:44px; border:none; border-radius:50%; background:rgba(251,250,246,.14); font-size:16px; color:#fbfaf6; cursor:pointer" style-hover="background:rgba(251,250,246,.24)">✕</button>
+
+          <div style="position:absolute; top:70px; left:0; right:0; display:flex; flex-direction:column; align-items:center; gap:7px">
+            <div style="font-family:'Gowun Batang',serif; font-size:18px; font-weight:700; color:#fbfaf6">지금 여기</div>
+            <div style="border-radius:14px; background:rgba(251,250,246,.12); padding:4px 12px; font-size:11px; color:rgba(251,250,246,.8)">{{ camStatus }}</div>
+          </div>
+
+          <sc-if value="{{ camBlocked }}" hint-placeholder-val="{{ false }}">
+            <div style="position:absolute; top:152px; left:16px; width:340px; height:352px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; border-radius:28px; background:#232120; padding:0 34px; text-align:center">
+              <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="rgba(251,250,246,.45)" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5.5" width="19" height="14" rx="3.5"></rect><circle cx="12" cy="12.5" r="4"></circle><path d="M4 3l16 18"></path></svg>
+              <div style="font-size:12.5px; line-height:1.7; color:rgba(251,250,246,.6)">{{ camError }}</div>
+              <div style="display:flex; gap:8px">
+                <label style="min-height:44px; display:grid; place-items:center; border-radius:18px; background:#b4552d; padding:0 18px; font-size:12.5px; color:#fbfaf6; cursor:pointer">
+                  사진 찍어 올리기
+                  <input type="file" accept="image/*" capture="environment" onChange="{{ onFilePick }}" style="display:none"></input>
+                </label>
+                <button onClick="{{ onRetryCam }}" style="min-height:44px; border:1px solid rgba(251,250,246,.3); border-radius:18px; background:transparent; padding:0 16px; font-size:12.5px; color:rgba(251,250,246,.8); cursor:pointer" style-hover="border-color:#fbfaf6; color:#fbfaf6">다시 시도</button>
+              </div>
+            </div>
+          </sc-if>
+
+          <div style="position:absolute; bottom:128px; left:0; right:0; display:flex; align-items:center; justify-content:center; gap:34px">
+            <button onClick="{{ onFlip }}" style="display:grid; place-items:center; width:44px; height:44px; border:none; border-radius:50%; background:rgba(251,250,246,.1); font-size:15px; color:rgba(251,250,246,.6); cursor:pointer" style-hover="background:rgba(251,250,246,.2)">↺</button>
+            <button onClick="{{ onCapture }}" style="display:grid; place-items:center; width:78px; height:78px; border:3px solid rgba(251,250,246,.85); border-radius:50%; background:transparent; padding:0; cursor:pointer" style-hover="border-color:#fbfaf6">
+              <div style="width:62px; height:62px; border-radius:50%; background:#fbfaf6"></div>
+            </button>
+            <label style="display:grid; place-items:center; width:44px; height:44px; border-radius:50%; background:rgba(251,250,246,.1); cursor:pointer" style-hover="background:rgba(251,250,246,.2)">
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="rgba(251,250,246,.6)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5.5" width="19" height="14" rx="3.5"></rect><circle cx="12" cy="12.5" r="4"></circle><path d="M8 5.5L9.4 3h5.2l1.4 2.5"></path></svg>
+              <input type="file" accept="image/*" capture="environment" onChange="{{ onFilePick }}" style="display:none"></input>
+            </label>
+          </div>
+
+          <div style="position:absolute; bottom:62px; left:0; right:0; text-align:center; font-size:11.5px; color:rgba(251,250,246,.45)">갤러리에서 고른 사진은 인증되지 않아요</div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ showPick }}" hint-placeholder-val="{{ false }}">
+        <div style="position:absolute; inset:0; z-index:1400; background:#f6f3ec">
+          <div style="position:absolute; top:16px; left:0; right:0; display:flex; align-items:center; justify-content:space-between; padding:0 22px; font-family:'JetBrains Mono',monospace; font-size:12px; color:#1c1a17">
+            <span>{{ clock }}</span>
+            <span style="letter-spacing:.1em">▮▮▮ ◗</span>
+          </div>
+
+          <div style="position:absolute; top:62px; left:20px; right:20px; display:flex; align-items:center; gap:14px">
+            <div style="{{ shotThumbStyle }}"></div>
+            <div style="flex:1; min-width:0">
+              <div style="font-family:'Gowun Batang',serif; font-size:20px; font-weight:700; line-height:1.35">여기 어디예요?</div>
+              <div style="margin-top:5px; font-size:11.5px; line-height:1.55; color:#6b665e">{{ geoStatus }}</div>
+            </div>
+          </div>
+
+          <div class="sheet-scroll" style="position:absolute; top:158px; left:0; right:0; bottom:104px; overflow-y:auto; padding:0 20px">
+            <div style="display:flex; flex-direction:column; gap:9px">
+              <sc-for list="{{ candidates }}" as="c" hint-placeholder-count="4">
+                <button onClick="{{ c.onPick }}" style="{{ c.style }}">
+                  <div style="{{ c.distStyle }}">{{ c.dist }}</div>
+                  <div style="flex:1; min-width:0; text-align:left">
+                    <div style="font-family:'Gowun Batang',serif; font-size:16px; font-weight:700; color:#1c1a17">{{ c.name }}</div>
+                    <div style="margin-top:3px; font-size:11.5px; color:#8a8377">{{ c.sub }}</div>
+                  </div>
+                </button>
+              </sc-for>
+              <button onClick="{{ onCancelFlow }}" style="display:flex; align-items:center; justify-content:center; min-height:48px; margin-top:4px; border:1px dashed #d8d3c8; border-radius:20px; background:transparent; font-size:12.5px; color:#6b665e; cursor:pointer" style-hover="border-color:#b4552d; color:#b4552d">여기 없어요 · 직접 찾기</button>
+            </div>
+          </div>
+
+          <div style="position:absolute; left:20px; right:20px; bottom:26px; border-radius:18px; border:1px solid #e4dfd3; background:#fbfaf6; padding:14px 16px">
+            <div style="display:flex; align-items:center; gap:9px">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#b4552d" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-6.3 7-11.3A7 7 0 005 9.7C5 14.7 12 21 12 21z"></path><circle cx="12" cy="9.7" r="2.4"></circle></svg>
+              <div style="flex:1; min-width:0; font-size:11.5px; line-height:1.55; color:#6b665e">{{ geoNote }}</div>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ showDone }}" hint-placeholder-val="{{ false }}">
+        <div style="position:absolute; inset:0; z-index:1400; background:#f6f3ec">
+          <div style="position:absolute; top:16px; left:0; right:0; display:flex; align-items:center; justify-content:space-between; padding:0 22px; font-family:'JetBrains Mono',monospace; font-size:12px; color:#1c1a17">
+            <span>{{ clock }}</span>
+            <span style="letter-spacing:.1em">▮▮▮ ◗</span>
+          </div>
+
+          <div style="position:absolute; top:74px; left:20px; right:20px; border-radius:30px; background:#fbfaf6; padding:14px 14px 20px; box-shadow:0 12px 32px rgba(28,26,23,.09)">
+            <div style="{{ donePhotoStyle }}">
+              <div style="position:absolute; top:14px; left:14px; border-radius:14px; background:rgba(28,26,23,.55); padding:4px 11px; font-family:'JetBrains Mono',monospace; font-size:9.5px; letter-spacing:.1em; color:#fbfaf6">{{ clock }}</div>
+              <div style="position:absolute; right:14px; bottom:14px; display:grid; place-items:center; width:52px; height:52px; background:#b4552d; clip-path:polygon(50.0% 0.0%, 60.6% 10.4%, 75.0% 6.7%, 79.0% 21.0%, 93.3% 25.0%, 89.6% 39.4%, 100.0% 50.0%, 89.6% 60.6%, 93.3% 75.0%, 79.0% 79.0%, 75.0% 93.3%, 60.6% 89.6%, 50.0% 100.0%, 39.4% 89.6%, 25.0% 93.3%, 21.0% 79.0%, 6.7% 75.0%, 10.4% 60.6%, 0.0% 50.0%, 10.4% 39.4%, 6.7% 25.0%, 21.0% 21.0%, 25.0% 6.7%, 39.4% 10.4%); box-shadow:0 4px 12px rgba(28,26,23,.28)">
+                <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#fbfaf6" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.6L9.6 17.2L19 7.4"></path></svg>
+              </div>
+            </div>
+            <div style="margin-top:18px; text-align:center">
+              <div style="font-family:'Gowun Batang',serif; font-size:22px; font-weight:700">방문이 인증되었습니다</div>
+              <div style="margin-top:7px; font-size:12px; line-height:1.6; color:#6b665e">{{ doneLine }}</div>
+            </div>
+          </div>
+
+          <div style="position:absolute; left:20px; right:20px; bottom:26px">
+            <button onClick="{{ onWriteNow }}" style="width:100%; border:none; border-radius:20px; background:#1c1a17; padding:17px; font-size:15px; font-weight:500; color:#fbfaf6; cursor:pointer" style-hover="background:#332f2a">이어서 기록 쓰기</button>
+            <button onClick="{{ onWriteLater }}" style="width:100%; margin-top:8px; border:none; border-radius:20px; background:transparent; padding:14px; font-size:13px; color:#8a8377; cursor:pointer" style-hover="color:#1c1a17">나중에 쓸게요</button>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ showLabels }}" hint-placeholder-val="{{ false }}">
+        <div style="position:absolute; inset:0; z-index:1450; background:#f6f3ec">
+          <div style="position:absolute; top:16px; left:0; right:0; display:flex; align-items:center; justify-content:space-between; padding:0 22px; font-family:'JetBrains Mono',monospace; font-size:12px; color:#1c1a17">
+            <span>{{ clock }}</span>
+            <span style="letter-spacing:.1em">▮▮▮ ◗</span>
+          </div>
+          <button onClick="{{ onCloseLabels }}" style="position:absolute; top:48px; left:14px; z-index:2; display:grid; place-items:center; width:44px; height:44px; border:none; border-radius:50%; background:transparent; font-size:17px; color:#1c1a17; cursor:pointer" style-hover="background:#ece7dc">←</button>
+
+          <div style="position:absolute; top:104px; left:22px; right:22px">
+            <div style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:.22em; color:#8a8377">LABELS</div>
+            <h1 style="margin:8px 0 0; font-family:'Gowun Batang',serif; font-size:26px; font-weight:700">라벨첩</h1>
+            <div style="margin-top:6px; font-size:12px; color:#8a8377">{{ labelCount }}</div>
+          </div>
+
+          <div class="sheet-scroll" style="position:absolute; top:196px; left:0; right:0; bottom:0; overflow-y:auto; padding:0 22px 40px">
+            <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:26px 14px">
+              <sc-for list="{{ labels }}" as="l" hint-placeholder-count="6">
+                <div style="display:flex; flex-direction:column; align-items:center; gap:10px">
+                  <div style="{{ l.shapeStyle }}"><span style="{{ l.glyphStyle }}">{{ l.glyph }}</span></div>
+                  <div style="text-align:center">
+                    <div style="{{ l.titleStyle }}">{{ l.name }}</div>
+                    <div style="margin-top:3px; font-size:10px; line-height:1.45; color:#8a8377">{{ l.desc }}</div>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:430,&quot;height&quot;:944},&quot;defaultKind&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;restaurant&quot;,&quot;cafe&quot;],&quot;default&quot;:&quot;restaurant&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;defaultSort&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;recent&quot;,&quot;rating&quot;,&quot;price&quot;],&quot;default&quot;:&quot;recent&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;sheetStart&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;peek&quot;,&quot;half&quot;,&quot;full&quot;],&quot;default&quot;:&quot;half&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+const PAPER = "#fbfaf6";
+const SNAP = { peek: 192, half: 462, full: 742 };
+const ORDER = ["peek", "half", "full"];
+const STORE = "dinary.mobile.v3";
+
+const CATEGORY_COLORS = {
+  한식: "#b4552d", 중식: "#9a4a52", 일식: "#5f7a8a", 양식: "#7a6a9a",
+  아시안: "#6f8455", 분식: "#c07a2e", 커피: "#7a5c42", 디저트: "#b06a86",
+  베이커리: "#a8853f", 차: "#4f7a6a",
+};
+const pinColor = (c) => CATEGORY_COLORS[c] || "#8a8377";
+const PRICE_STEPS = [8000, 15000, 30000, 60000];
+const FELT_PRICE = ["부담없이", "가볍게 한 끼", "적당히 썼다", "큰맘 먹고", "인생에 한 번"];
+const feltLevel = (r) => (r.price_range == null ? 0 : PRICE_STEPS.filter((s) => r.price_range > s).length + 1);
+const uniq = (a) => Array.from(new Set(a.filter(Boolean)));
+const pad = (n) => String(n).padStart(2, "0");
+const hhmm = (d) => pad(d.getHours()) + ":" + pad(d.getMinutes());
+const iso = (d) => d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+const dots = (s) => (s || "").split("-").join(".");
+
+const SORTS = [
+  { value: "recent", label: "최근순" },
+  { value: "rating", label: "별점순" },
+  { value: "price", label: "가격순" },
+];
+
+const SEED = [
+  { id: 1, photoCount: 3, kind: "restaurant", name: "을지면옥", category: "한식", region: "중구", address: "서울 중구 충무로14길 2-1", rating: 4.5, menu: "평양냉면 15,000원, 편육 30,000원", price_range: 15000, review: "국물이 심심한 듯 하다가 세 숟갈째부터 계속 들어간다. 여름에 다시.", revisit: true, visited_at: "2026-07-12", keywords: ["노포", "혼밥"], lat: 37.5668, lng: 126.9915 },
+  { id: 2, photoCount: 2, kind: "restaurant", name: "한남동 소이연남", category: "아시안", region: "용산구", address: "서울 용산구 대사관로 30", rating: 4.0, menu: "카오소이 14,000원, 팟카파오 13,000원", price_range: 18000, review: "면이 붇기 전에 먹어야 한다. 점심에는 줄이 짧다.", revisit: true, visited_at: "2026-06-28", keywords: ["데이트"], lat: 37.5352, lng: 126.9989 },
+  { id: 3, photoCount: 5, kind: "restaurant", name: "무無 스시", category: "일식", region: "강남구", address: "서울 강남구 도산대로 45길 10", rating: 4.8, menu: "오마카세 런치 72,000원", price_range: 72000, review: "런치가 디너의 절반 값인데 구성이 거의 같다. 다음엔 카운터 끝자리로.", revisit: true, visited_at: "2026-05-30", keywords: ["기념일", "분위기"], lat: 37.5245, lng: 127.0374 },
+  { id: 4, photoCount: 1, kind: "restaurant", name: "성수 양화", category: "양식", region: "성동구", address: "서울 성동구 연무장길 33", rating: 3.5, menu: "라구 파파르델레 29,000원", price_range: 32000, review: "소스는 좋았지만 면이 조금 질겼다. 와인 리스트는 훌륭.", revisit: false, visited_at: "2026-05-11", keywords: ["모임", "분위기"], lat: 37.5445, lng: 127.0557 },
+  { id: 5, photoCount: 2, kind: "restaurant", name: "종로 만두집", category: "분식", region: "종로구", address: "서울 종로구 인사동길 12", rating: 4.2, menu: "김치만두 7,000원, 칼국수 9,000원", price_range: 9000, review: "혼자 앉아 만두 한 접시. 이 가격에 이 만족도는 반칙이다.", revisit: true, visited_at: "2026-04-22", keywords: ["가성비", "혼밥", "노포"], lat: 37.5730, lng: 126.9855 },
+  { id: 6, photoCount: 3, kind: "restaurant", name: "홍대 마라공방", category: "중식", region: "마포구", address: "서울 마포구 어울마당로 65", rating: 3.8, menu: "마라샹궈 32,000원, 꿔바로우 22,000원", price_range: 26000, review: "3단계는 충분히 맵다. 넷이 가서 나눠 먹기 좋았다.", revisit: false, visited_at: "2026-04-05", keywords: ["회식", "모임"], lat: 37.5540, lng: 126.9224 },
+  { id: 7, photoCount: 4, kind: "restaurant", name: "연희동 고깃집", category: "한식", region: "서대문구", address: "서울 서대문구 연희로 91", rating: 4.6, menu: "돼지목살 19,000원, 된장찌개 8,000원", price_range: 34000, review: "불판을 자주 갈아준다. 사장님이 직접 구워주는 게 절반의 이유.", revisit: true, visited_at: "2026-03-19", keywords: ["회식", "노포"], lat: 37.5747, lng: 126.9319 },
+  { id: 8, photoCount: 1, kind: "restaurant", name: "잠원 우동", category: "일식", region: "서초구", address: "서울 서초구 반포대로 58", rating: 3.9, menu: "붓카케 우동 11,000원, 튀김 5,000원", price_range: 12000, review: "면이 단단하다. 튀김은 굳이 시킬 필요 없었다.", revisit: false, visited_at: "2026-02-27", keywords: ["혼밥", "가성비"], lat: 37.5029, lng: 127.0069 },
+  { id: 9, photoCount: 2, kind: "cafe", name: "안국 서점카페", category: "커피", region: "종로구", address: "서울 종로구 율곡로 61", rating: 4.4, menu: "핸드드립 에티오피아 7,000원", price_range: 7000, review: "책 읽으러 갔다가 세 시간 앉아 있었다. 창가 자리 두 개뿐.", revisit: true, visited_at: "2026-07-02", keywords: ["혼밥", "분위기"], lat: 37.5760, lng: 126.9856 },
+  { id: 10, photoCount: 3, kind: "cafe", name: "연남 소금빵", category: "베이커리", region: "마포구", address: "서울 마포구 성미산로 29", rating: 4.7, menu: "소금빵 3,800원, 캄파뉴 8,000원", price_range: 6000, review: "오후 두 시면 소금빵이 없다. 다음엔 열 시에.", revisit: true, visited_at: "2026-06-14", keywords: ["가성비"], lat: 37.5620, lng: 126.9253 },
+  { id: 11, photoCount: 1, kind: "cafe", name: "삼청동 다과", category: "차", region: "종로구", address: "서울 종로구 삼청로 76", rating: 4.1, menu: "황차 9,000원, 약과 세트 14,000원", price_range: 14000, review: "조용하다. 대화하러 갈 곳은 아니고 혼자 앉아 있을 곳.", revisit: false, visited_at: "2026-05-05", keywords: ["분위기", "데이트"], lat: 37.5847, lng: 126.9812 },
+  { id: 12, photoCount: 2, kind: "cafe", name: "성수 티라미수", category: "디저트", region: "성동구", address: "서울 성동구 아차산로 7길 8", rating: 4.3, menu: "말차 티라미수 9,500원", price_range: 11000, review: "단맛이 절제되어 있다. 커피는 평범.", revisit: true, visited_at: "2026-03-30", keywords: ["데이트", "모임"], lat: 37.5470, lng: 127.0473 },
+  { id: 13, photoCount: 2, kind: "restaurant", name: "을지면옥", category: "한식", region: "중구", address: "서울 중구 충무로14길 2-1", rating: 4.0, menu: "평양냉면 15,000원", price_range: 15000, review: "겨울에 와보니 여름의 그 맛은 아니다.\n그래도 편육은 여전히 좋다.", revisit: true, visited_at: "2026-01-18", keywords: ["노포"], lat: 37.5668, lng: 126.9915 },
+  { id: 14, photoCount: 4, kind: "restaurant", name: "을지면옥", category: "한식", region: "중구", address: "서울 중구 충무로14길 2-1", rating: 5.0, menu: "평양냉면 15,000원, 편육 30,000원", price_range: 18000, review: "세 번째 방문. 이제 이 심심함이 목적이 되었다.", revisit: true, visited_at: "2026-08-09", keywords: ["노포", "혼밥"], lat: 37.5668, lng: 126.9915 },
+  { id: 15, photoCount: 1, kind: "restaurant", name: "종로 만두집", category: "분식", region: "종로구", address: "서울 종로구 인사동길 12", rating: 3.9, menu: "칼국수 9,000원", price_range: 9000, review: "만두가 다 팔려서 칼국수만. 다음엔 일찍.", revisit: true, visited_at: "2026-06-02", keywords: ["가성비"], lat: 37.5730, lng: 126.9855 },
+  { id: 16, photoCount: 3, kind: "cafe", name: "안국 서점카페", category: "커피", region: "종로구", address: "서울 종로구 율곡로 61", rating: 4.6, menu: "핸드드립 케냐 7,500원", price_range: 7500, review: "창가 자리 성공. 두 시간 동안 아무도 말을 걸지 않았다.", revisit: true, visited_at: "2026-08-21", keywords: ["혼밥", "분위기"], lat: 37.5760, lng: 126.9856 },
+];
+
+const NEARBY = [
+  { name: "성수 화로", category: "한식", kind: "restaurant", region: "성동구", address: "서울 성동구 아차산로 12" },
+  { name: "뚝섬 우동", category: "일식", kind: "restaurant", region: "성동구", address: "서울 성동구 성수이로 58" },
+  { name: "서울숲 만두", category: "중식", kind: "restaurant", region: "성동구", address: "서울 성동구 서울숲길 30" },
+  { name: "연무장 커피", category: "커피", kind: "cafe", region: "성동구", address: "서울 성동구 연무장길 41" },
+];
+
+const LABELS = [
+  { glyph: "✓", kind: "check", color: "#b4552d", name: "인증 기록자", desc: "인증 기록 40개" },
+  { glyph: "★", kind: "scallop", color: "#b58a2b", name: "골드 라벨", desc: "5.0을 준 집 열 곳" },
+  { glyph: "常", kind: "shield", color: "#a8412a", name: "레드 라벨", desc: "한 가게에 다섯 번" },
+  { glyph: "百", kind: "hex", color: "#2f3a47", name: "백 그릇", desc: "방문 100회" },
+  { glyph: "夜", kind: "diamond", color: "#2f3a47", name: "한밤의 기록", desc: "자정 이후 10개" },
+  { glyph: "初", kind: "oct", color: "#6f7350", name: "첫 한 끼", desc: "첫 기록을 남긴 날" },
+  { glyph: "十", kind: "burst", color: null, name: "열 동네", desc: "지역 10곳 · 7/10" },
+  { glyph: "三", kind: "shield", color: null, name: "세 해의 기록", desc: "3년 연속" },
+];
+
+const CLIP = {
+  burst: "polygon(50.0% 0.0%, 60.6% 10.4%, 75.0% 6.7%, 79.0% 21.0%, 93.3% 25.0%, 89.6% 39.4%, 100.0% 50.0%, 89.6% 60.6%, 93.3% 75.0%, 79.0% 79.0%, 75.0% 93.3%, 60.6% 89.6%, 50.0% 100.0%, 39.4% 89.6%, 25.0% 93.3%, 21.0% 79.0%, 6.7% 75.0%, 10.4% 60.6%, 0.0% 50.0%, 10.4% 39.4%, 6.7% 25.0%, 21.0% 21.0%, 25.0% 6.7%, 39.4% 10.4%)",
+  hex: "polygon(50.0% 0.0%, 93.3% 25.0%, 93.3% 75.0%, 50.0% 100.0%, 6.7% 75.0%, 6.7% 25.0%)",
+  shield: "polygon(50% 0%, 100% 17%, 100% 60%, 50% 100%, 0% 60%, 0% 17%)",
+  oct: "polygon(30.9% 3.8%, 69.1% 3.8%, 96.2% 30.9%, 96.2% 69.1%, 69.1% 96.2%, 30.9% 96.2%, 3.8% 69.1%, 3.8% 30.9%)",
+};
+CLIP.check = CLIP.burst;
+
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.data = SEED.map((r) => Object.assign({}, r));
+    this.state = {
+      kind: props.defaultKind === "cafe" ? "cafe" : "restaurant",
+      sort: props.defaultSort || "recent",
+      snap: props.sheetStart || "half",
+      q: "",
+      mapQuery: "",
+      categories: [],
+      keywords: [],
+      revisitOnly: false,
+      verifiedOnly: false,
+      filtersOpen: false,
+      placeKey: null,
+      visitId: null,
+      photoIndex: 0,
+      covers: {},
+      editing: false,
+      draft: null,
+      labelsOpen: false,
+      flow: null,
+      shot: null,
+      geo: null,
+      geoErr: null,
+      camErr: null,
+      camLive: false,
+      facing: "environment",
+      clock: hhmm(new Date()),
+    };
+    this.markers = new Map();
+  }
+
+  /* ---------- lifecycle ---------- */
+
+  componentDidMount() {
+    try {
+      const raw = localStorage.getItem(STORE);
+      if (raw) {
+        const saved = JSON.parse(raw);
+        if (Array.isArray(saved) && saved.length) this.data = saved.concat(this.data);
+      }
+    } catch (e) {}
+    this.timer = setInterval(() => this.setState({ clock: hhmm(new Date()) }), 20000);
+    this.waitForLeaflet();
+  }
+
+  componentWillUnmount() {
+    clearInterval(this.timer);
+    clearTimeout(this.camTimer);
+    this.stopCam();
+  }
+
+  componentDidUpdate(prevProps, prev) {
+    const st = this.state;
+    if (this.map && prev.snap !== st.snap) setTimeout(() => this.map.invalidateSize(), 280);
+    if (prev.flow !== "shoot" && st.flow === "shoot") this.startCam();
+    if (prev.flow === "shoot" && st.flow !== "shoot") this.stopCam();
+    this.syncMarkers();
+  }
+
+  persist() {
+    try {
+      localStorage.setItem(STORE, JSON.stringify(this.data.filter((r) => r.mine && !r.isNew)));
+    } catch (e) {}
+  }
+
+  /* ---------- map ---------- */
+
+  waitForLeaflet(tries = 0) {
+    if (window.L) return this.initMap();
+    if (tries > 120) return;
+    setTimeout(() => this.waitForLeaflet(tries + 1), 100);
+  }
+
+  initMap() {
+    const L = window.L;
+    if (!this.mapEl || this.map) return;
+    const map = L.map(this.mapEl, { zoomControl: false, attributionControl: false, keyboard: false }).setView([37.5605, 126.982], 12);
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, className: "paper-tiles" }).addTo(map);
+    this.map = map;
+    this.syncMarkers();
+    setTimeout(() => map.invalidateSize(), 60);
+  }
+
+  pinIcon(row, active) {
+    const L = window.L;
+    const base = pinColor(row.category);
+    const fill = row.revisit ? base : PAPER;
+    const stroke = row.revisit ? PAPER : base;
+    const core = row.revisit ? PAPER : base;
+    const size = active ? 30 : 23;
+    const html =
+      '<div style="position:absolute; left:50%; bottom:8px; transform:translateX(-50%); display:flex; flex-direction:column; align-items:center; gap:2px">' +
+      '<div style="width:' + size + "px; height:" + size + 'px; box-sizing:border-box; border-radius:50% 50% 50% 0; transform:rotate(-45deg); background:' +
+      fill + "; border:" + (active ? 2 : 1.5) + "px solid " + stroke +
+      '; box-shadow:1px -1px 5px rgba(28,26,23,.18); display:flex; align-items:center; justify-content:center">' +
+      '<div style="width:' + (active ? 10 : 8) + "px; height:" + (active ? 10 : 8) + 'px; border-radius:50%; background:' + core +
+      '; transform:rotate(45deg)"></div></div>' +
+      '<div style="width:9px; height:3px; border-radius:50%; background:rgba(28,26,23,.16)"></div></div>';
+    return L.divIcon({ className: "restaurant-map-pin", iconSize: [44, 44], iconAnchor: [22, 38], html });
+  }
+
+  syncMarkers() {
+    const L = window.L;
+    const map = this.map;
+    if (!L || !map) return;
+    const visible = this.filtered();
+    const next = new Set(visible.map((r) => r.key));
+
+    for (const [key, marker] of this.markers) {
+      if (!next.has(key)) {
+        marker.remove();
+        this.markers.delete(key);
+      }
+    }
+
+    for (const r of visible) {
+      const active = this.state.placeKey === r.key;
+      let marker = this.markers.get(r.key);
+      if (!marker) {
+        marker = L.marker([r.lat, r.lng], { icon: this.pinIcon(r, active) }).addTo(map);
+        marker.on("click", () => this.openPlace(r.key));
+        this.markers.set(r.key, marker);
+        marker._activeState = active;
+      }
+      if (marker._activeState !== active) {
+        marker.setIcon(this.pinIcon(r, active));
+        marker._activeState = active;
+      }
+    }
+
+    if (this.state.editing || this.state.flow) return;
+    if (!visible.length) return;
+    const key = this.state.kind + "|" + visible.map((r) => r.key).join(",");
+    if (key === this.lastFit) return;
+    this.lastFit = key;
+    if (visible.length === 1) {
+      map.setView([visible[0].lat, visible[0].lng], 15);
+      return;
+    }
+    map.fitBounds(L.latLngBounds(visible.map((r) => [r.lat, r.lng])), {
+      paddingTopLeft: [36, 120],
+      paddingBottomRight: [36, 40],
+      maxZoom: 15,
+    });
+  }
+
+  /* ---------- data ---------- */
+
+  places(kind) {
+    const map = new Map();
+    for (const v of this.data.filter((r) => r.kind === kind)) {
+      if (!map.has(v.name)) map.set(v.name, []);
+      map.get(v.name).push(v);
+    }
+    return Array.from(map.values()).map((list) => {
+      const visits = list.slice().sort((a, b) => (a.visited_at < b.visited_at ? 1 : -1));
+      const latest = visits[0];
+      const rated = visits.filter((v) => v.rating != null);
+      const priced = visits.filter((v) => v.price_range != null);
+      return {
+        key: latest.name,
+        name: latest.name,
+        kind: latest.kind,
+        category: latest.category,
+        region: latest.region,
+        address: latest.address,
+        lat: latest.lat,
+        lng: latest.lng,
+        menu: latest.menu,
+        review: latest.review,
+        visited_at: latest.visited_at,
+        revisit: latest.revisit,
+        latestId: latest.id,
+        visits,
+        verified: visits.some((v) => v.verified),
+        photo: visits.map((v) => v.photo).filter(Boolean)[0] || null,
+        rating: rated.length ? rated.reduce((s, v) => s + v.rating, 0) / rated.length : null,
+        price_range: latest.price_range != null ? latest.price_range : (priced.length ? priced[0].price_range : null),
+        keywords: uniq(visits.flatMap((v) => v.keywords || [])),
+      };
+    });
+  }
+
+  filtered() {
+    const { kind, q, categories, keywords, revisitOnly, verifiedOnly, sort } = this.state;
+    const needle = q.trim().toLowerCase();
+    let rows = this.places(kind)
+      .filter((r) => !categories.length || categories.includes(r.category))
+      .filter((r) => !keywords.length || r.keywords.some((k) => keywords.includes(k)))
+      .filter((r) => !revisitOnly || r.revisit)
+      .filter((r) => !verifiedOnly || r.verified)
+      .filter((r) =>
+        !needle ||
+        [r.name, r.region, r.category, r.address].some((f) => (f || "").toLowerCase().includes(needle)) ||
+        r.visits.some((v) => [v.menu, v.review].some((f) => (f || "").toLowerCase().includes(needle)))
+      );
+    rows = rows.slice();
+    if (sort === "rating") rows.sort((a, b) => (b.rating || 0) - (a.rating || 0));
+    else if (sort === "price") rows.sort((a, b) => (a.price_range || 0) - (b.price_range || 0));
+    else rows.sort((a, b) => (a.visited_at < b.visited_at ? 1 : -1));
+    return rows;
+  }
+
+  pigs(row) {
+    const level = feltLevel(row);
+    return [1, 2, 3, 4, 5].map((n) => ({
+      style: n <= level
+        ? { display: "block", flexShrink: 0, objectFit: "contain", opacity: 1 }
+        : { display: "block", flexShrink: 0, objectFit: "contain", opacity: 0.3, filter: "grayscale(0.85)" },
+    }));
+  }
+
+  starStyle(rating) {
+    const value = Math.max(0, Math.min(5, rating || 0));
+    return {
+      position: "absolute", top: 0, left: 0, overflow: "hidden", whiteSpace: "nowrap",
+      color: "#b4552d", width: (value / 5) * 100 + "%",
+    };
+  }
+
+  photoFill(src, category) {
+    if (src) return { backgroundImage: "url(" + src + ")", backgroundSize: "cover", backgroundPosition: "center" };
+    const c = pinColor(category);
+    return {
+      backgroundColor: "#ded8cb",
+      backgroundImage: "repeating-linear-gradient(135deg, " + c + "22 0 9px, " + c + "0f 9px 18px)",
+    };
+  }
+
+  toggle(key, value) {
+    this.setState((s) => {
+      const list = s[key];
+      return { [key]: list.includes(value) ? list.filter((v) => v !== value) : list.concat([value]) };
+    });
+  }
+
+  openPlace(key) {
+    const place = this.places(this.state.kind).find((p) => p.name === key);
+    if (!place) return;
+    if (place.visits.length === 1) {
+      const v = place.visits[0];
+      this.setState((st) => ({ placeKey: key, visitId: v.id, photoIndex: st.covers[v.id] ?? 0 }));
+    } else {
+      this.setState({ placeKey: key, visitId: null });
+    }
+  }
+
+  mapSearch() {
+    const L = window.L;
+    const needle = (this.state.mapQuery || "").trim().toLowerCase();
+    if (!needle) return;
+    const hits = this.data.filter((v) =>
+      [v.name, v.region, v.address, v.category].some((f) => (f || "").toLowerCase().includes(needle))
+    );
+    if (!hits.length) return;
+    const names = uniq(hits.map((v) => v.name));
+    if (names.length === 1) {
+      this.lastFit = "search:" + needle;
+      this.setState({ kind: hits[0].kind, q: "", categories: [], keywords: [], placeKey: null, visitId: null }, () => {
+        if (this.map) this.map.flyTo([hits[0].lat, hits[0].lng], 15, { duration: 0.7 });
+        this.openPlace(names[0]);
+      });
+      return;
+    }
+    this.setState({ kind: hits[0].kind, q: this.state.mapQuery, placeKey: null, visitId: null });
+    if (L && this.map) {
+      this.lastFit = "search:" + needle;
+      this.map.fitBounds(L.latLngBounds(hits.map((v) => [v.lat, v.lng])), {
+        paddingTopLeft: [36, 120], paddingBottomRight: [36, 40], maxZoom: 15,
+      });
+    }
+  }
+
+  addManual = () => {
+    const st = this.state;
+    const rec = {
+      id: "u" + Date.now(),
+      kind: st.kind,
+      name: "",
+      category: st.kind === "cafe" ? "커피" : "한식",
+      region: "",
+      address: "",
+      rating: null,
+      menu: "",
+      price_range: null,
+      review: "",
+      revisit: false,
+      visited_at: iso(new Date()),
+      keywords: [],
+      photoCount: 1,
+      verified: false,
+      mine: true,
+      isNew: true,
+      lat: 37.5665 + (Math.random() - 0.5) * 0.03,
+      lng: 126.982 + (Math.random() - 0.5) * 0.04,
+    };
+    this.data = [rec].concat(this.data);
+    this.lastFit = null;
+    this.openEdit(rec);
+  };
+
+  openEdit(v) {
+    this.setState((st) => ({
+      visitId: v.id,
+      editing: true,
+      photoIndex: st.covers[v.id] ?? 0,
+      draft: {
+        isNew: !!v.isNew,
+        name: v.name || "",
+        category: v.category || "한식",
+        region: v.region || "",
+        address: v.address || "",
+        menu: v.menu || "",
+        review: v.review || "",
+        rating: v.rating ?? 0,
+        visited_at: v.visited_at || "",
+        price_range: v.price_range == null ? "" : String(v.price_range),
+        revisit: !!v.revisit,
+        photoCount: Math.min(v.photoCount || 1, 5),
+        cover: st.covers[v.id] ?? 0,
+      },
+    }));
+  }
+
+  setDraft(patch) {
+    this.setState((st) => ({ draft: Object.assign({}, st.draft, patch) }));
+  }
+
+  saveDraft(v) {
+    const d = this.state.draft;
+    if (!d) return;
+    if (d.isNew) {
+      v.name = (d.name || "").trim() || "이름 없는 기록";
+      v.category = d.category;
+      v.region = (d.region || "").trim() || "서울";
+      v.address = (d.address || "").trim();
+      const twin = this.data.find((r) => r.id !== v.id && r.name === v.name && r.kind === v.kind);
+      if (twin) {
+        v.lat = twin.lat; v.lng = twin.lng;
+        v.address = v.address || twin.address;
+        v.region = twin.region;
+        v.revisit = true;
+      }
+      delete v.isNew;
+    }
+    v.menu = d.menu;
+    v.review = d.review;
+    v.rating = d.rating;
+    v.visited_at = d.visited_at;
+    v.revisit = d.revisit;
+    v.photoCount = d.photoCount;
+    const n = parseInt(d.price_range, 10);
+    v.price_range = isNaN(n) ? null : n;
+    this.lastFit = null;
+    this.persist();
+    this.setState((st) => ({
+      editing: false,
+      draft: null,
+      photoIndex: Math.min(d.cover, d.photoCount - 1),
+      covers: Object.assign({}, st.covers, { [v.id]: Math.min(d.cover, d.photoCount - 1) }),
+    }));
+  }
+
+  deleteVisit(v) {
+    const place = this.places(v.kind).find((p) => p.name === v.name);
+    const many = place && place.visits.length > 1;
+    this.data = this.data.filter((r) => r.id !== v.id);
+    this.lastFit = null;
+    this.persist();
+    this.setState({ visitId: null, placeKey: many ? v.name : null, editing: false, draft: null });
+  }
+
+  /* ---------- camera / geo ---------- */
+
+  camMessage(name) {
+    if (name === "NotAllowedError") return "카메라 권한이 거부되었습니다. 브라우저 설정에서 허용한 뒤 다시 시도하거나, 아래 버튼으로 찍어 주세요.";
+    if (name === "TimeoutError") return "이 화면에서는 카메라가 열리지 않습니다. 폰 브라우저에서 열면 바로 켜지고, 지금은 아래 버튼으로 찍을 수 있습니다.";
+    if (name === "NotFoundError" || name === "OverconstrainedError") return "쓸 수 있는 카메라가 없습니다. 아래 버튼으로 찍어 주세요.";
+    return "카메라를 열 수 없습니다. 아래 버튼으로 찍어 주세요.";
+  }
+
+  startCam() {
+    const token = (this.camToken = (this.camToken || 0) + 1);
+    this.setState({ camErr: null, camLive: false });
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      this.setState({ camErr: "이 브라우저는 카메라를 지원하지 않습니다. 아래 버튼으로 찍어 주세요." });
+      return;
+    }
+    clearTimeout(this.camTimer);
+    this.camTimer = setTimeout(() => {
+      if (token === this.camToken && !this.state.camLive && !this.state.camErr) {
+        this.setState({ camErr: this.camMessage("TimeoutError") });
+      }
+    }, 4000);
+
+    let ask;
+    try {
+      ask = navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: this.state.facing }, width: { ideal: 1280 } }, audio: false });
+    } catch (e) {
+      this.setState({ camErr: this.camMessage(e && e.name) });
+      return;
+    }
+    ask.then(
+      (stream) => {
+        if (token !== this.camToken) { stream.getTracks().forEach((t) => t.stop()); return; }
+        clearTimeout(this.camTimer);
+        this.stream = stream;
+        if (this.video) {
+          this.video.srcObject = stream;
+          const p = this.video.play();
+          if (p && p.catch) p.catch(() => {});
+        }
+        this.setState({ camLive: true, camErr: null });
+      },
+      (err) => {
+        if (token !== this.camToken) return;
+        clearTimeout(this.camTimer);
+        this.setState({ camErr: this.camMessage(err && err.name) });
+      }
+    );
+  }
+
+  stopCam() {
+    this.camToken = (this.camToken || 0) + 1;
+    clearTimeout(this.camTimer);
+    if (this.state.camLive) this.setState({ camLive: false });
+    if (this.stream) { this.stream.getTracks().forEach((t) => t.stop()); this.stream = null; }
+    if (this.video) this.video.srcObject = null;
+  }
+
+  grabFrame() {
+    const v = this.video;
+    if (!v || !v.videoWidth) return null;
+    const scale = Math.min(1, 900 / Math.max(v.videoWidth, v.videoHeight));
+    const w = Math.round(v.videoWidth * scale);
+    const h = Math.round(v.videoHeight * scale);
+    const c = document.createElement("canvas");
+    c.width = w; c.height = h;
+    const ctx = c.getContext("2d");
+    if (this.state.facing === "user") { ctx.translate(w, 0); ctx.scale(-1, 1); }
+    ctx.drawImage(v, 0, 0, w, h);
+    return c.toDataURL("image/jpeg", 0.72);
+  }
+
+  readGeo() {
+    this.setState({ geo: null, geoErr: null });
+    if (!navigator.geolocation) {
+      this.setState({ geoErr: "위치를 지원하지 않는 브라우저입니다." });
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (p) => this.setState({ geo: { lat: p.coords.latitude, lng: p.coords.longitude, acc: Math.round(p.coords.accuracy) } }),
+      () => this.setState({ geoErr: "위치 권한이 없어 좌표를 읽지 못했습니다." }),
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+    );
+  }
+
+  onCapture = () => {
+    const shot = this.grabFrame();
+    if (!shot) {
+      if (!this.state.camErr) this.setState({ camErr: "카메라 화면이 아직 준비되지 않았습니다. 아래 버튼으로 찍어 주세요." });
+      return;
+    }
+    this.readGeo();
+    this.setState({ flow: "pick", shot, shotAt: new Date() });
+  };
+
+  onFilePick = (e) => {
+    const f = e.target.files && e.target.files[0];
+    if (!f) return;
+    const fr = new FileReader();
+    fr.onload = () => {
+      this.readGeo();
+      this.setState({ flow: "pick", shot: fr.result, shotAt: new Date() });
+    };
+    fr.readAsDataURL(f);
+  };
+
+  onFlip = () => {
+    this.setState({ facing: this.state.facing === "user" ? "environment" : "user" }, () => {
+      this.stopCam();
+      this.startCam();
+    });
+  };
+
+  commitVisit() {
+    const st = this.state;
+    const c = st.pickedPlace || NEARBY[0];
+    const at = st.shotAt || new Date();
+    const g = st.geo;
+    const existing = this.data.find((r) => r.name === c.name);
+    const rec = {
+      id: "u" + Date.now(),
+      kind: existing ? existing.kind : c.kind,
+      name: c.name,
+      category: existing ? existing.category : c.category,
+      region: existing ? existing.region : c.region,
+      address: existing ? existing.address : c.address,
+      lat: existing ? existing.lat : (g ? g.lat : 37.5445),
+      lng: existing ? existing.lng : (g ? g.lng : 127.0557),
+      rating: null,
+      menu: "",
+      price_range: null,
+      review: "",
+      revisit: !!existing,
+      visited_at: iso(at),
+      keywords: [],
+      photoCount: 1,
+      photo: st.shot,
+      verified: true,
+      mine: true,
+      acc: g ? g.acc : null,
+    };
+    this.data = [rec].concat(this.data);
+    this.lastFit = null;
+    this.persist();
+    return rec;
+  }
+
+  onWriteNow = () => {
+    const rec = this.commitVisit();
+    this.setState({ flow: null, shot: null, pickedPlace: null, kind: rec.kind, placeKey: rec.name, snap: "half" }, () => this.openEdit(rec));
+  };
+
+  onWriteLater = () => {
+    const rec = this.commitVisit();
+    this.setState({ flow: null, shot: null, pickedPlace: null, kind: rec.kind, snap: "half", placeKey: null, visitId: null });
+  };
+
+  /* ---------- sheet ---------- */
+
+  onDragStart = (e) => {
+    const y0 = e.clientY;
+    const h0 = SNAP[this.state.snap];
+    const move = (ev) => { this.sheetH = Math.max(120, Math.min(760, h0 - (ev.clientY - y0))); this.forceUpdate(); };
+    const up = (ev) => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      const h = Math.max(120, Math.min(760, h0 - (ev.clientY - y0)));
+      this.sheetH = null;
+      this.setState({ snap: ORDER.reduce((a, b) => (Math.abs(SNAP[b] - h) < Math.abs(SNAP[a] - h) ? b : a), "peek") });
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  };
+
+  onHandleTap = () => {
+    const i = ORDER.indexOf(this.state.snap);
+    this.setState({ snap: ORDER[(i + 1) % ORDER.length] });
+  };
+
+  chip(active) {
+    return {
+      minHeight: "36px", padding: "0 13px", borderRadius: "18px",
+      border: active ? "1px solid #b4552d" : "1px solid #cdc6b8",
+      background: active ? "#b4552d" : "transparent",
+      color: active ? "#fdf9f3" : "#4a453d",
+      fontSize: "12.5px", cursor: "pointer",
+    };
+  }
+
+  labelShape(l) {
+    const on = !!l.color;
+    const base = {
+      display: "grid", placeItems: "center", width: "76px", height: "76px",
+      fontFamily: "'Gowun Batang',serif", fontSize: "26px", fontWeight: 700, lineHeight: 1,
+      color: on ? PAPER : "#6f695f", background: on ? l.color : "#dbd4c5",
+    };
+    if (l.kind === "diamond") return { ...base, width: "60px", height: "60px", borderRadius: "16px", transform: "rotate(45deg)", margin: "8px 0", fontSize: "22px" };
+    if (l.kind === "scallop") return { ...base, borderRadius: "42% 58% 45% 55% / 50% 46% 54% 50%" };
+    if (l.kind === "check") return { ...base, clipPath: CLIP.check, fontSize: "34px", fontWeight: 400, paddingBottom: "3px" };
+    return { ...base, clipPath: CLIP[l.kind] };
+  }
+
+  renderVals() {
+    const st = this.state;
+    const rows = this.filtered();
+    const inKind = this.data.filter((r) => r.kind === st.kind);
+    const allPlaces = this.places(st.kind);
+    const place = st.placeKey ? allPlaces.find((p) => p.name === st.placeKey) : null;
+    const visit = st.visitId != null ? this.data.find((v) => v.id === st.visitId) : null;
+    const visitPlace = visit ? this.places(visit.kind).find((p) => p.name === visit.name) : null;
+    const activeFilters = st.categories.length + st.keywords.length + (st.revisitOnly ? 1 : 0) + (st.verifiedOnly ? 1 : 0);
+
+    const tab = (active) => ({
+      minHeight: "36px", padding: "0 20px", border: "none", borderRadius: "18px",
+      background: active ? "#1c1a17" : "transparent",
+      color: active ? "#f6f3ec" : "#6b665e",
+      fontSize: "13.5px", fontWeight: 500, cursor: "pointer",
+    });
+
+    const sortStyle = (active) => ({
+      border: "none", background: "none", padding: "0 0 3px", fontSize: "12.5px", cursor: "pointer",
+      borderBottom: active ? "1px solid #1c1a17" : "1px solid transparent",
+      fontWeight: active ? 500 : 400,
+      color: active ? "#1c1a17" : "#a8a196",
+    });
+
+    /* --- record screen --- */
+    const shots = visit ? Math.min(visit.photoCount || 1, 5) : 0;
+    const cover = visit ? (st.covers[visit.id] ?? 0) : 0;
+    const shown = Math.min(st.photoIndex, Math.max(0, shots - 1));
+    const record = visit && {
+      no: String(visit.id).slice(-3).padStart(3, "0"),
+      name: visit.name,
+      category: visit.category,
+      regionFull: "서울 " + visit.region,
+      address: visit.address,
+      dateFull: dots(visit.visited_at),
+      menu: visit.menu || "아직 쓰지 않았습니다",
+      review: visit.review || "메모가 비어 있습니다.",
+      keywords: visit.keywords || [],
+      ratingText: visit.rating != null ? visit.rating.toFixed(1) : "—",
+      starStyle: this.starStyle(visit.rating),
+      pigs: this.pigs(visit),
+      verified: !!visit.verified,
+      canDelete: !!visit.mine,
+      verifyNote: "그 자리에서 찍은 사진으로 인증되었습니다." + (visit.acc ? " 촬영 시 위치 정확도 약 " + visit.acc + "m. 좌표는 이 기기에만 남습니다." : ""),
+      photoStyle: {
+        ...this.photoFill(visit.photo && shown === 0 ? visit.photo : null, visit.category),
+        position: "relative", flexShrink: 0, height: "268px", display: "grid", placeItems: "center",
+      },
+      photoLabel: visit.photo && shown === 0 ? "" : "PHOTO " + (shown + 1) + " / " + shots,
+      canSetCover: shots > 1 && shown !== cover,
+      setCover: () => this.setState((s) => ({ covers: Object.assign({}, s.covers, { [visit.id]: shown }) })),
+      thumbs: Array.from({ length: shots }, (_, i) => ({
+        label: "0" + (i + 1),
+        isCover: i === cover,
+        onClick: () => this.setState({ photoIndex: i }),
+        style: {
+          position: "relative", flexShrink: 0, display: "grid", placeItems: "center",
+          width: "54px", height: "54px", borderRadius: "14px", background: "#eae5da",
+          fontFamily: "'JetBrains Mono',monospace", fontSize: "10px", letterSpacing: ".08em",
+          color: i === shown ? "#1c1a17" : "#a8a196",
+          border: i === shown ? "1.5px solid #b4552d" : "1px solid #ded8cb",
+          cursor: "pointer",
+        },
+      })),
+      onEdit: () => this.openEdit(visit),
+      onDelete: () => this.deleteVisit(visit),
+      onBack: () =>
+        visitPlace && visitPlace.visits.length > 1
+          ? this.setState({ visitId: null, placeKey: visitPlace.name })
+          : this.setState({ visitId: null, placeKey: null }),
+    };
+
+    /* --- edit screen --- */
+    const d = st.editing ? st.draft : null;
+    const priceNum = d ? parseInt(d.price_range, 10) : NaN;
+    const edit = visit && d && {
+      name: visit.name,
+      no: String(visit.id).slice(-3).padStart(3, "0"),
+      menu: d.menu,
+      review: d.review,
+      dateValue: d.visited_at,
+      priceValue: d.price_range,
+      ratingLabel: d.rating ? d.rating.toFixed(1) : "—",
+      feltLabel: isNaN(priceNum) ? "가격을 적으면 돼지로 보입니다" : (FELT_PRICE[feltLevel({ price_range: priceNum }) - 1] || ""),
+      countLabel: d.photoCount + " / 5",
+      canAdd: d.photoCount < 5,
+      onAdd: () => this.setDraft({ photoCount: Math.min(5, d.photoCount + 1) }),
+      onMenu: (e) => this.setDraft({ menu: e.target.value }),
+      onReview: (e) => this.setDraft({ review: e.target.value }),
+      onDate: (e) => this.setDraft({ visited_at: e.target.value }),
+      onPrice: (e) => this.setDraft({ price_range: e.target.value }),
+      onToggleRevisit: () => this.setDraft({ revisit: !d.revisit }),
+      revisitLabel: d.revisit ? "재방문한 곳으로 표시됨" : "재방문한 곳으로 표시",
+      revisitStyle: {
+        width: "100%", minHeight: "50px", borderRadius: "18px", fontSize: "13px", cursor: "pointer",
+        border: d.revisit ? "1px solid #b4552d" : "1px solid #ded8cb",
+        background: d.revisit ? "#f7ece5" : "transparent",
+        color: d.revisit ? "#b4552d" : "#6b665e",
+      },
+      ratingOptions: [0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5].map((n) => ({
+        label: n.toFixed(1),
+        onClick: () => this.setDraft({ rating: n }),
+        style: {
+          minHeight: "38px", padding: "0 12px", borderRadius: "14px",
+          fontFamily: "'JetBrains Mono',monospace", fontSize: "12px", cursor: "pointer",
+          border: d.rating === n ? "1px solid #b4552d" : "1px solid #ded8cb",
+          background: d.rating === n ? "#b4552d" : PAPER,
+          color: d.rating === n ? PAPER : "#6b665e",
+        },
+      })),
+      slots: Array.from({ length: d.photoCount }, (_, i) => ({
+        label: "PHOTO " + (i + 1),
+        isCover: i === d.cover,
+        notCover: i !== d.cover,
+        canRemove: d.photoCount > 1,
+        onCover: () => this.setDraft({ cover: i }),
+        onRemove: () => this.setDraft({
+          photoCount: Math.max(1, d.photoCount - 1),
+          cover: d.cover >= Math.max(1, d.photoCount - 1) ? 0 : d.cover,
+        }),
+        style: {
+          position: "relative", display: "grid", placeItems: "center", height: "112px",
+          borderRadius: "16px", overflow: "hidden", background: "#eae5da",
+          fontFamily: "'JetBrains Mono',monospace", fontSize: "10px", letterSpacing: ".08em", color: "#a8a196",
+          border: i === d.cover ? "1.5px solid #b4552d" : "1px solid #ded8cb",
+        },
+      })),
+      onSave: () => this.saveDraft(visit),
+      onCancel: () => {
+        if (d.isNew) {
+          this.data = this.data.filter((r) => r.id !== visit.id);
+          this.lastFit = null;
+          this.setState({ editing: false, draft: null, visitId: null, placeKey: null });
+        } else {
+          this.setState({ editing: false, draft: null });
+        }
+      },
+      isNew: !!d.isNew,
+      nameValue: d.name,
+      regionValue: d.region,
+      addressValue: d.address,
+      onName: (e) => this.setDraft({ name: e.target.value }),
+      onRegion: (e) => this.setDraft({ region: e.target.value }),
+      onAddress: (e) => this.setDraft({ address: e.target.value }),
+      categoryChips: Object.keys(CATEGORY_COLORS).map((c) => ({
+        label: c, onClick: () => this.setDraft({ category: c }), style: this.chip(d.category === c),
+      })),
+    };
+
+    const g = st.geo;
+
+    return {
+      clock: st.clock,
+      mapRef: (el) => { this.mapEl = el; if (el && window.L && !this.map) this.initMap(); },
+      videoRef: (el) => { this.video = el; if (el && this.stream) { el.srcObject = this.stream; el.play().catch(() => {}); } },
+
+      sheetTitle: st.kind === "cafe" ? "카페 기록" : "맛집 기록",
+      sheetH: this.sheetH ?? SNAP[st.snap],
+      fabBottom: (this.sheetH ?? SNAP[st.snap]) + 16,
+      plusBottom: (this.sheetH ?? SNAP[st.snap]) + 20,
+      onDragStart: this.onDragStart,
+      onHandleTap: this.onHandleTap,
+      countLabel: "가게 " + rows.length + " · 기록 " + inKind.length,
+      isEmpty: rows.length === 0,
+
+      kindTabs: [
+        { label: "맛집", style: tab(st.kind === "restaurant"), onClick: () => this.setState({ kind: "restaurant", categories: [], keywords: [], placeKey: null, visitId: null }) },
+        { label: "카페", style: tab(st.kind === "cafe"), onClick: () => this.setState({ kind: "cafe", categories: [], keywords: [], placeKey: null, visitId: null }) },
+      ],
+      sortButtons: SORTS.map((s) => ({
+        label: s.label, style: sortStyle(st.sort === s.value), onClick: () => this.setState({ sort: s.value }),
+      })),
+
+      mapQuery: st.mapQuery,
+      onMapQuery: (e) => this.setState({ mapQuery: e.target.value }),
+      onMapKeyDown: (e) => { if (e.key === "Enter") this.mapSearch(); },
+      onMapSearch: () => this.mapSearch(),
+      onAddManual: this.addManual,
+
+      query: st.q,
+      hasQuery: st.q.length > 0,
+      onQuery: (e) => this.setState({ q: e.target.value }),
+      onClearQuery: () => this.setState({ q: "" }),
+
+      onOpenFilters: () => this.setState({ filtersOpen: true }),
+      onCloseFilters: () => this.setState({ filtersOpen: false }),
+      onResetFilters: () => this.setState({ categories: [], keywords: [], revisitOnly: false, verifiedOnly: false }),
+      showFilters: st.filtersOpen,
+      applyLabel: rows.length + "곳 보기",
+      filterBtnLabel: activeFilters ? "필터 " + activeFilters : "필터",
+      filterBtnStyle: {
+        minHeight: "38px", padding: "0 15px", borderRadius: "19px", fontSize: "12.5px", cursor: "pointer",
+        border: activeFilters ? "none" : "1px solid #ded8cb",
+        background: activeFilters ? "#1c1a17" : PAPER,
+        color: activeFilters ? PAPER : "#6b665e",
+      },
+      categoryChips: uniq(inKind.map((r) => r.category)).map((c) => ({
+        label: c, style: this.chip(st.categories.includes(c)), onClick: () => this.toggle("categories", c),
+      })),
+      keywordChips: uniq(inKind.flatMap((r) => r.keywords || [])).map((k) => ({
+        label: k, style: this.chip(st.keywords.includes(k)), onClick: () => this.toggle("keywords", k),
+      })),
+      onToggleRevisit: () => this.setState({ revisitOnly: !st.revisitOnly }),
+      onToggleVerified: () => this.setState({ verifiedOnly: !st.verifiedOnly }),
+      revisitStyle: this.chip(st.revisitOnly),
+      verifiedStyle: this.chip(st.verifiedOnly),
+
+      places: rows.map((r) => ({
+        name: r.name,
+        catRegion: r.category + " · 서울 " + r.region,
+        ratingText: r.rating != null ? r.rating.toFixed(1) : "—",
+        starStyle: this.starStyle(r.rating),
+        pigs: this.pigs(r),
+        summary: [r.menu, r.review].filter(Boolean).join(" · ") || "기록을 아직 쓰지 않았습니다",
+        hasMany: r.visits.length > 1,
+        visitBadge: "기록 " + r.visits.length,
+        revisit: r.revisit,
+        verified: r.verified,
+        thumbLabel: r.photo ? "" : String(r.visits.length) + "장",
+        onOpen: () => this.openPlace(r.key),
+        cardStyle: {
+          display: "flex", gap: "12px", width: "100%", padding: "12px",
+          border: "1px solid " + (r.verified ? "#e0c3b1" : "#ded8cb"),
+          borderRadius: "20px", background: PAPER, cursor: "pointer",
+          boxShadow: "0 3px 12px rgba(28,26,23,.04)",
+        },
+        thumbStyle: {
+          ...this.photoFill(r.photo, r.category),
+          position: "relative", flexShrink: 0, width: "74px", height: "74px",
+          borderRadius: "15px", display: "grid", placeItems: "center",
+        },
+      })),
+
+      showPlace: !!place && !visit,
+      place: place ? {
+        no: String(place.latestId).slice(-3).padStart(3, "0"),
+        name: place.name,
+        category: place.category,
+        regionFull: "서울 " + place.region,
+        address: place.address,
+        ratingText: place.rating != null ? place.rating.toFixed(1) : "—",
+        starStyle: this.starStyle(place.rating),
+        pigs: this.pigs(place),
+        feltLabel: FELT_PRICE[feltLevel(place) - 1] || "",
+        keywords: place.keywords,
+        visitCountLabel: "기록 " + place.visits.length + "개",
+        heroLabel: place.photo ? "" : place.category + " · " + place.visits.length + "번 방문",
+        heroStyle: {
+          ...this.photoFill(place.photo, place.category),
+          position: "relative", flexShrink: 0, height: "210px",
+        },
+        history: place.visits.map((v) => ({
+          dateFull: dots(v.visited_at),
+          ratingText: v.rating != null ? v.rating.toFixed(1) : "—",
+          starStyle: this.starStyle(v.rating),
+          menu: v.menu || "메뉴를 쓰지 않았습니다",
+          review: v.review || "메모가 비어 있습니다",
+          photoBadge: Math.min(v.photoCount || 1, 5) + "장",
+          coverLabel: "PHOTO " + ((st.covers[v.id] ?? 0) + 1),
+          onOpen: () => this.setState((s) => ({ visitId: v.id, photoIndex: s.covers[v.id] ?? 0 })),
+          style: {
+            width: "100%", padding: "13px 15px", borderRadius: "18px", cursor: "pointer",
+            border: "1px solid " + (v.verified ? "#e0c3b1" : "#e2dccf"),
+            background: PAPER,
+          },
+        })),
+      } : {},
+      onClosePlace: () => this.setState({ placeKey: null, visitId: null }),
+
+      showRecord: !!record && !edit,
+      record: record || {},
+      showEdit: !!edit,
+      edit: edit || {},
+
+      showShoot: st.flow === "shoot",
+      showPick: st.flow === "pick",
+      showDone: st.flow === "done",
+      onShoot: () => this.setState({ flow: "shoot" }),
+      onCancelFlow: () => this.setState({ flow: null, shot: null, pickedPlace: null }),
+      onCapture: this.onCapture,
+      onFilePick: this.onFilePick,
+      onFlip: this.onFlip,
+      onRetryCam: () => this.startCam(),
+      camBlocked: !!st.camErr,
+      camError: st.camErr || "",
+      camStatus: st.camErr ? "카메라를 열 수 없습니다" : st.camLive ? "찍고 나서 가게를 고르면 돼요" : "카메라를 여는 중입니다…",
+      shotThumbStyle: {
+        ...this.photoFill(st.shot, "한식"),
+        position: "relative", flexShrink: 0, width: "74px", height: "74px", borderRadius: "18px",
+      },
+      donePhotoStyle: {
+        ...this.photoFill(st.shot, "한식"),
+        position: "relative", height: "296px", borderRadius: "22px", overflow: "hidden",
+      },
+      geoStatus: g ? "지금 위치에서 가까운 곳입니다 (정확도 " + g.acc + "m)" : st.geoErr ? st.geoErr : "위치를 읽는 중입니다…",
+      geoNote: g
+        ? "읽은 좌표 " + g.lat.toFixed(5) + ", " + g.lng.toFixed(5) + " — 이 기기에만 남습니다."
+        : "위치는 사진 찍는 순간 한 번만 읽고, 좌표는 남기지 않습니다.",
+      candidates: NEARBY.map((c, i) => ({
+        name: c.name,
+        sub: c.category + " · " + c.address,
+        dist: g ? (12 + i * 26) + "m" : "—",
+        onPick: () => this.setState({ flow: "done", pickedPlace: c }),
+        style: {
+          display: "flex", alignItems: "center", gap: "12px", width: "100%", minHeight: "62px",
+          padding: "13px 15px", borderRadius: "20px", background: PAPER, cursor: "pointer",
+          border: i === 0 ? "1.5px solid #b4552d" : "1px solid #ded8cb",
+          boxShadow: i === 0 ? "0 4px 14px rgba(180,85,45,.1)" : "none",
+        },
+        distStyle: {
+          display: "grid", placeItems: "center", flexShrink: 0, width: "34px", height: "34px",
+          borderRadius: "50%", background: i === 0 ? "#f7ece5" : "#f1ede4",
+          fontFamily: "'JetBrains Mono',monospace", fontSize: "9.5px", color: i === 0 ? "#b4552d" : "#6b665e",
+        },
+      })),
+      doneLine: (st.pickedPlace ? st.pickedPlace.name : NEARBY[0].name) + " · " + dots(iso(st.shotAt || new Date())) + " " + hhmm(st.shotAt || new Date()),
+      onWriteNow: this.onWriteNow,
+      onWriteLater: this.onWriteLater,
+
+      showLabels: st.labelsOpen,
+      onOpenLabels: () => this.setState({ labelsOpen: true }),
+      onCloseLabels: () => this.setState({ labelsOpen: false }),
+      labelCount: "모은 라벨 6 / 12",
+      labels: LABELS.map((l) => ({
+        glyph: l.glyph, name: l.name, desc: l.desc,
+        shapeStyle: this.labelShape(l),
+        glyphStyle: l.kind === "diamond" ? { transform: "rotate(-45deg)" } : null,
+        titleStyle: { fontFamily: "'Gowun Batang',serif", fontSize: "13px", fontWeight: 700, color: l.color ? "#1c1a17" : "#8a8377" },
+      })),
+    };
+  }
+}
+</script>
+</body>
+</html>

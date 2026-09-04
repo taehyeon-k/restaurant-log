@@ -34,3 +34,33 @@ export async function reverseGeocode(
   ).catch(() => []);
   return places[0] ?? null;
 }
+
+export type NearbyPlace = Place & {
+  /** 읽은 좌표에서의 거리(m) */
+  distance: number;
+  category: string | null;
+};
+
+/**
+ * 좌표 둘레의 음식점·카페. 방문인증 흐름에서 "여기 어디예요?" 후보로 씁니다.
+ * 좌표는 후보를 찾는 요청에만 쓰고 저장하지 않습니다.
+ */
+export async function nearbyPlaces(
+  lat: number,
+  lng: number,
+  kind: "restaurant" | "cafe",
+  signal?: AbortSignal
+): Promise<NearbyPlace[]> {
+  const res = await fetch(
+    `/api/geocode?${new URLSearchParams({
+      near: "1",
+      lat: String(lat),
+      lng: String(lng),
+      kind,
+    })}`,
+    { signal }
+  );
+  if (!res.ok) return [];
+  const json = (await res.json()) as { places?: NearbyPlace[] };
+  return json.places ?? [];
+}
