@@ -37,8 +37,9 @@ export default function LocationPickerMap({
         keyboard: false,
       }).setView([37.5665, 126.978], 13);
 
-      L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        maxZoom: 19,
+      L.tileLayer("https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png", {
+        maxZoom: 20,
+        subdomains: "abcd",
         className: "paper-tiles",
         attribution:
           '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',

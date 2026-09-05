@@ -110,8 +110,9 @@ const MobileMap = forwardRef<
         keyboard: false,
       }).setView([37.5605, 126.982], 12);
 
-      L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        maxZoom: 19,
+      L.tileLayer("https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png", {
+        maxZoom: 20,
+        subdomains: "abcd",
         className: "paper-tiles",
       }).addTo(map);
 

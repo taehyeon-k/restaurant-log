@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { CATEGORIES, type Kind, type Restaurant } from "@/lib/types";
+import { CATEGORIES, type Kind, type MenuItem, type Restaurant } from "@/lib/types";
 import { FELT_PRICE, feltLevel } from "@/lib/price";
 import { forwardGeocode } from "@/lib/geocode";
 import { regionFromAddress } from "@/lib/regions";
@@ -57,10 +57,10 @@ export default function EditScreen({
 
   const [visitedAt, setVisitedAt] = useState(record?.visited_at ?? today());
   const [rating, setRating] = useState(record?.rating ?? 0);
-  const [menu, setMenu] = useState(record?.menu ?? "");
-  const [price, setPrice] = useState(
-    record?.price_range == null ? "" : String(record.price_range)
-  );
+  const [menus, setMenus] = useState<MenuItem[]>(() => record?.menus?.length ? record.menus : (record?.menu ?? "").split(",").map((name) => ({ name: name.trim(), price: null })).filter((m) => m.name).concat([{ name: "", price: null }]).slice(0, Math.max(1, (record?.menu ?? "").split(",").filter((s) => s.trim()).length)));
+  const [price, setPrice] = useState(record?.price_range == null ? "" : String(record.price_range));
+  const menuTotal = menus.reduce((sum, m) => sum + (m.price ?? 0), 0);
+  const setMenuAt = (i: number, patch: Partial<MenuItem>) => setMenus((p) => p.map((m, n) => n === i ? { ...m, ...patch } : m));
   const [review, setReview] = useState(record?.review ?? "");
   const [revisit, setRevisit] = useState(record?.revisit ?? false);
 
@@ -104,10 +104,9 @@ export default function EditScreen({
 
   const shared = () => ({
     rating: rating || null,
-    menu: menu.trim() || null,
-    // 한 줄 입력이라 메뉴/가격 쌍은 건드리지 않고, 글이 바뀌면 비웁니다.
-    menus: menu.trim() === (record?.menu ?? "") ? (record?.menus ?? []) : [],
-    price_range: Number.isNaN(priceNum) ? null : priceNum,
+    menu: menus.map((m) => m.name.trim()).filter(Boolean).join(", ") || null,
+    menus: menus.filter((m) => m.name.trim()).map((m) => ({ name: m.name.trim(), price: m.price })),
+    price_range: menuTotal || (Number.isNaN(priceNum) ? null : priceNum),
     review: review.trim() || null,
     revisit,
     visited_at: visitedAt || null,
@@ -374,15 +373,19 @@ export default function EditScreen({
             </div>
           </div>
 
-          <label className="block">
-            <Eyebrow>메뉴</Eyebrow>
-            <input
-              value={menu}
-              onChange={(e) => setMenu(e.target.value)}
-              placeholder="먹은 것과 가격"
-              className={fieldClass}
-            />
-          </label>
+          <div>
+            <div className="flex items-center justify-between"><Eyebrow>메뉴</Eyebrow>{menuTotal > 0 && <span className="font-mono text-[11px] text-faint">{menus.filter((m) => m.name.trim()).length}개 · {menuTotal.toLocaleString("ko-KR")}원</span>}</div>
+            <div className="mt-2 flex flex-col gap-2">
+              {menus.map((m, i) => (
+                <div key={i} className="flex min-h-[46px] items-center gap-1.5">
+                  <input value={m.name} onChange={(e) => setMenuAt(i, { name: e.target.value })} placeholder="먹은 것" className="mt-0 min-h-12 min-w-0 flex-1 rounded-[16px] border border-[#ded8cb] bg-card px-[15px] text-[13.5px] text-ink outline-none focus:border-brick" />
+                  <div className="relative w-24 shrink-0"><input inputMode="numeric" value={m.price == null ? "" : m.price.toLocaleString("ko-KR")} onChange={(e) => { const raw = e.target.value.replace(/[^0-9]/g, "").slice(0, 9); setMenuAt(i, { price: raw ? Number(raw) : null }); }} placeholder="가격" className="mt-0 min-h-12 w-full rounded-[16px] border border-[#ded8cb] bg-card px-[15px] pr-7 text-right font-mono text-[13px] text-ink outline-none focus:border-brick" /><span className="pointer-events-none absolute top-1/2 right-2 -translate-y-1/2 text-[12px] text-[#a29a8c]">원</span></div>
+                  {menus.length > 1 && <button type="button" onClick={() => setMenus((p) => p.filter((_, n) => n !== i))} aria-label="메뉴 삭제" className="grid size-[34px] shrink-0 cursor-pointer place-items-center border-none bg-transparent text-[#a29a8c] hover:text-[#9a4a52]">✕</button>}
+                </div>
+              ))}
+              <button type="button" onClick={() => setMenus((p) => [...p, { name: "", price: null }])} className="min-h-11 cursor-pointer border border-dashed border-[#cdc6b8] bg-transparent text-[12px] text-muted hover:border-brick hover:text-brick">+ 메뉴 추가</button>
+            </div>
+          </div>
 
           <label className="block">
             <Eyebrow>1인 기준 가격</Eyebrow>
@@ -408,17 +411,10 @@ export default function EditScreen({
             />
           </label>
 
-          <button
-            type="button"
-            onClick={() => setRevisit((v) => !v)}
-            className={`min-h-[50px] w-full cursor-pointer rounded-[18px] border text-[13px] ${
-              revisit
-                ? "border-brick bg-brick-soft text-brick"
-                : "border-[#ded8cb] bg-transparent text-muted"
-            }`}
-          >
-            {revisit ? "재방문한 곳으로 표시됨" : "재방문한 곳으로 표시"}
-          </button>
+          <div className="flex min-h-14 items-center justify-between border-y border-[#e6e0d3] py-3">
+            <div><div className="text-[14px]">다시 오고 싶은 곳</div><div className="mt-1 text-[12px] text-[#8a8377]">{revisit ? "다시 갈 곳으로 표시됩니다 — 지도 핀도 색이 찹니다." : "켜면 목록의 재방문 필터와 지도 핀에 함께 반영됩니다."}</div></div>
+            <button type="button" role="switch" aria-checked={revisit} aria-label="재방문 표시" onClick={() => setRevisit((v) => !v)} className={`relative h-6 w-11 shrink-0 rounded-full border-none ${revisit ? "bg-brick" : "bg-[#d8d3c8]"}`}><span className={`absolute top-0.5 size-5 rounded-full bg-white ${revisit ? "left-6" : "left-0.5"}`} /></button>
+          </div>
 
           {error && <p className="text-[12.5px] text-[#a8412a]">{error}</p>}
         </div>

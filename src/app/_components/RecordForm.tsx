@@ -147,16 +147,9 @@ useEffect(() => {
         place_key: `${name}|${address ?? ""}`.toLowerCase(),
         rating: rating || null,
         menus: cleanMenus,
-        menu:
-          cleanMenus
-           .map((m) =>
-            m.price ? `${m.name} ${m.price.toLocaleString("ko-KR")}원` : m.name
-            )
-           .join(", ") || null,
+        menu: cleanMenus.map((m) => m.name).join(", ") || null,
         price_level: priceLevel || null,
-        price_range: prices.length
-          ? Math.round(prices.reduce((a, b) => a + b, 0) / prices.length)
-          : null,
+        price_range: prices.length ? prices.reduce((a, b) => a + b, 0) : null,
         review: review || null,
         keywords,
         revisit,
@@ -418,6 +411,7 @@ useEffect(() => {
             </div>
           </Field>
 
+          <div className="flex min-h-14 items-center justify-between border-y border-[#e6e0d3] py-3"><div><div className="text-[14px]">다시 오고 싶은 곳</div><div className="mt-1 text-[12px] text-[#8a8377]">{revisit ? "다시 갈 곳으로 표시됩니다 — 지도 핀도 색이 찹니다." : "켜면 목록의 재방문 필터와 지도 핀에 함께 반영됩니다."}</div></div><button type="button" role="switch" aria-checked={revisit} aria-label="재방문 표시" onClick={() => setRevisit((v) => !v)} className={`relative h-6 w-11 shrink-0 rounded-full border-none ${revisit ? "bg-brick" : "bg-[#d8d3c8]"}`}><span className={`absolute top-0.5 size-5 rounded-full bg-white ${revisit ? "left-6" : "left-0.5"}`} /></button></div>
           <Field label="MENU">
             <div className="flex flex-col gap-2">
               {menus.map((m, i) => (

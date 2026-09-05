@@ -51,8 +51,9 @@ export default function MapPane({
   keyboard: false,
 }).setView([37.5665, 126.978], 12);
 
-      L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        maxZoom: 19,
+      L.tileLayer("https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png", {
+        maxZoom: 20,
+        subdomains: "abcd",
         className: "paper-tiles",
         attribution:
           '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
@@ -192,13 +193,13 @@ export default function MapPane({
     title.style.whiteSpace = "nowrap";
 
     const cta = document.createElement("div");
-    cta.textContent = "+ 기록 추가";
+    cta.textContent = "+ 여기에 기록 추가";
     cta.style.fontSize = "11px";
     cta.style.color = "#b4552d";
     cta.style.marginTop = "1px";
 
     label.append(title, cta);
-    label.addEventListener("dblclick", (e) => {
+    label.addEventListener("click", (e) => {
       e.stopPropagation();
       handlers.current.router.push(href);
     });
@@ -211,7 +212,7 @@ export default function MapPane({
       className: "restaurant-map-tooltip",
     });
 
-    ghost.on("dblclick", () => handlers.current.router.push(href));
+    ghost.on("click", () => handlers.current.router.push(href));
 
     ghostRef.current = ghost;
     map.flyTo([place.lat, place.lng], 16, { duration: 0.8 });

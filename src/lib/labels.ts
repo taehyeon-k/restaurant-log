@@ -13,11 +13,11 @@ export type LabelShape =
   | "hex"
   | "diamond"
   | "oct"
-  | "burst";
+  | "seal";
 
 export type LabelDef = {
   id: string;
-  glyph: string;
+  glyph?: string;
   shape: LabelShape;
   color: string;
   name: string;
@@ -63,7 +63,6 @@ const streak = (rows: Restaurant[]) => {
 export const LABELS: LabelDef[] = [
   {
     id: "verified",
-    glyph: "✓",
     shape: "check",
     color: "#b4552d",
     name: "인증 기록자",
@@ -73,7 +72,6 @@ export const LABELS: LabelDef[] = [
   },
   {
     id: "gold",
-    glyph: "★",
     shape: "scallop",
     color: "#b58a2b",
     name: "골드 라벨",
@@ -84,7 +82,6 @@ export const LABELS: LabelDef[] = [
   },
   {
     id: "regular",
-    glyph: "常",
     shape: "shield",
     color: "#a8412a",
     name: "레드 라벨",
@@ -95,8 +92,7 @@ export const LABELS: LabelDef[] = [
   },
   {
     id: "hundred",
-    glyph: "百",
-    shape: "hex",
+    shape: "seal",
     color: "#2f3a47",
     name: "백 그릇",
     desc: "방문 100회",
@@ -105,7 +101,6 @@ export const LABELS: LabelDef[] = [
   },
   {
     id: "midnight",
-    glyph: "夜",
     shape: "diamond",
     color: "#2f3a47",
     name: "한밤의 기록",
@@ -119,7 +114,6 @@ export const LABELS: LabelDef[] = [
   },
   {
     id: "first",
-    glyph: "初",
     shape: "oct",
     color: "#6f7350",
     name: "첫 한 끼",
@@ -129,8 +123,7 @@ export const LABELS: LabelDef[] = [
   },
   {
     id: "regions",
-    glyph: "十",
-    shape: "burst",
+    shape: "hex",
     color: "#7a5c42",
     name: "열 동네",
     desc: "지역 10곳",
@@ -139,7 +132,6 @@ export const LABELS: LabelDef[] = [
   },
   {
     id: "years",
-    glyph: "三",
     shape: "shield",
     color: "#4f7a6a",
     name: "세 해의 기록",
@@ -147,6 +139,7 @@ export const LABELS: LabelDef[] = [
     need: 3,
     count: streak,
   },
+  { id: "revisit", shape: "seal", color: "#b4552d", name: "다시 그 집", desc: "재방문 20곳", need: 20, count: (rows) => distinct(rows.filter((r) => r.revisit).map((r) => r.place_key ?? r.name)).size },
 ];
 
 export type EarnedLabel = LabelDef & { have: number; earned: boolean };

@@ -1,9 +1,12 @@
 "use client";
 
+import type { Kind } from "@/lib/types";
 import { chipClass, Eyebrow } from "./ui";
 
 /** 아래에서 올라오는 "골라 보기" 시트. */
 export default function FilterSheet({
+  kind,
+  onKindChange,
   categories,
   keywords,
   selectedCategories,
@@ -21,6 +24,8 @@ export default function FilterSheet({
   categories: string[];
   keywords: string[];
   selectedCategories: string[];
+  kind: Kind;
+  onKindChange: (kind: Kind) => void;
   selectedKeywords: string[];
   revisitOnly: boolean;
   verifiedOnly: boolean;
@@ -53,6 +58,7 @@ export default function FilterSheet({
           </button>
         </div>
 
+        <><div className="mt-4"><Eyebrow>종류</Eyebrow></div><div className="mt-[9px] flex gap-[7px]">{(["restaurant", "cafe"] as Kind[]).map((k) => <button key={k} type="button" onClick={() => onKindChange(k)} className={chipClass(kind === k)}>{k === "restaurant" ? "맛집" : "카페"}</button>)}</div></>
         {categories.length > 0 && (
           <>
             <div className="mt-4">

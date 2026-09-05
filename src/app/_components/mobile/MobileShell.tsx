@@ -347,88 +347,13 @@ export default function MobileShell({ rows }: { rows: Restaurant[] }) {
           <div className="mx-auto h-1 w-[42px] rounded-sm bg-[#cfc8ba]" />
         </div>
 
-        <div className="flex shrink-0 items-end justify-between gap-3 px-5 pb-2.5">
-          <div>
-            <div className="font-serif text-[19px] font-bold">
-              {kind === "cafe" ? "카페 기록" : "맛집 기록"}
-            </div>
-            <div className="mt-[3px] font-mono text-[10.5px] text-faint">
-              가게 {filtered.length} · 기록 {inKind.length}
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => setFiltersOpen(true)}
-            className={`min-h-[38px] cursor-pointer rounded-[19px] px-[15px] text-[12.5px] ${
-              activeFilters
-                ? "border-none bg-ink text-card"
-                : "border border-[#ded8cb] bg-card text-muted"
-            }`}
-          >
-            {activeFilters ? `필터 ${activeFilters}` : "필터"}
-          </button>
+        <div className="flex shrink-0 items-center gap-3 px-5 pb-2.5">
+          <div className="min-w-0 shrink-0"><div className="font-serif text-[18px] font-bold">{kind === "cafe" ? "카페 기록" : "맛집 기록"}</div><div className="mt-[3px] font-mono text-[10.5px] text-faint">가게 {filtered.length} · 기록 {inKind.length}</div></div>
+          <div className="flex h-10 min-w-0 flex-1 items-center gap-2 rounded-[20px] border border-[#ded8cb] bg-card px-3"><SearchIcon size={14} /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="가게 · 지역 · 메뉴 · 메모" className="min-w-0 flex-1 bg-transparent text-[12.5px] text-ink outline-none placeholder:text-[#a8a196]" /></div>
         </div>
-
-        <div className="flex shrink-0 items-center px-4 pb-2.5">
-          <div className="flex items-center gap-1 rounded-[21px] bg-[#ece7dc] p-[3px]">
-            {(["restaurant", "cafe"] as Kind[]).map((k) => (
-              <button
-                key={k}
-                type="button"
-                onClick={() => {
-                  setKind(k);
-                  setCategories([]);
-                  setKeywords([]);
-                  closeAll();
-                }}
-                className={`min-h-9 cursor-pointer rounded-[18px] border-none px-5 text-[13.5px] font-medium ${
-                  kind === k ? "bg-ink text-paper" : "bg-transparent text-muted"
-                }`}
-              >
-                {k === "restaurant" ? "맛집" : "카페"}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="shrink-0 px-4 pb-2.5">
-          <div className="flex h-[42px] items-center gap-[9px] rounded-[21px] border border-[#ded8cb] bg-card px-[15px]">
-            <SearchIcon size={14} />
-            <input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="가게 · 지역 · 메뉴 · 메모"
-              className="min-w-0 flex-1 bg-transparent text-[13px] text-ink outline-none placeholder:text-[#a8a196]"
-            />
-            {q && (
-              <button
-                type="button"
-                onClick={() => setQ("")}
-                aria-label="검색어 지우기"
-                className="cursor-pointer border-none bg-transparent text-[14px] text-[#a29a8c]"
-              >
-                ✕
-              </button>
-            )}
-          </div>
-        </div>
-
-        <div className="flex shrink-0 items-center gap-4 border-b border-[#e6e0d3] px-5 pb-2.5">
-          {SORTS.map((s) => (
-            <button
-              key={s.value}
-              type="button"
-              onClick={() => setSort(s.value)}
-              className={`cursor-pointer border-none bg-transparent pb-[3px] text-[12.5px] ${
-                sort === s.value
-                  ? "border-b border-ink font-medium text-ink"
-                  : "border-b border-transparent text-[#a8a196]"
-              }`}
-            >
-              {s.label}
-            </button>
-          ))}
+        <div className="flex shrink-0 items-center justify-between border-b border-[#e6e0d3] px-5 pb-2.5">
+          <div className="flex items-center gap-4">{SORTS.map((s) => <button key={s.value} type="button" onClick={() => setSort(s.value)} className={`cursor-pointer border-none bg-transparent pb-[3px] text-[12.5px] ${sort === s.value ? "border-b border-ink font-medium text-ink" : "border-b border-transparent text-[#a8a196]"}`}>{s.label}</button>)}</div>
+          <button type="button" onClick={() => setFiltersOpen(true)} className={`min-h-[38px] cursor-pointer rounded-[19px] px-[15px] text-[12.5px] ${activeFilters ? "border-none bg-ink text-card" : "border border-[#ded8cb] bg-card text-muted"}`}>{activeFilters ? `필터 ${activeFilters}` : "필터"}</button>
         </div>
 
         <div
@@ -453,6 +378,8 @@ export default function MobileShell({ rows }: { rows: Restaurant[] }) {
 
       {filtersOpen && (
         <FilterSheet
+          kind={kind}
+          onKindChange={(k) => { setKind(k); setCategories([]); setKeywords([]); closeAll(); }}
           categories={uniq(inKind.map((r) => r.category))}
           keywords={uniq(inKind.flatMap((r) => r.keywords))}
           selectedCategories={categories}

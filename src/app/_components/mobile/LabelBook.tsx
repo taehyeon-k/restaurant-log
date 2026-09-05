@@ -2,7 +2,7 @@
 
 import { earnedLabels, type EarnedLabel } from "@/lib/labels";
 import type { Restaurant } from "@/lib/types";
-import { CLIP, Eyebrow } from "./ui";
+import { Eyebrow } from "./ui";
 
 /**
  * 라벨첩. 획득 조건은 아직 확정 전이라 `src/lib/labels.ts` 의 잠정 규칙을 씁니다.
@@ -71,51 +71,12 @@ export default function LabelBook({
 }
 
 /** 도형은 clip-path — 물결과 45° 회전 사각만 예외입니다. */
+/** 통일된 도장 배지와 라벨별 인라인 선 그림. */
 function Shape({ label }: { label: EarnedLabel }) {
-  const on = label.earned;
+  const progress = Math.min(1, label.have / label.need);
+  const color = label.earned ? label.color : "#eae5da";
 
-  const base: React.CSSProperties = {
-    width: 76,
-    height: 76,
-    fontSize: 26,
-    color: on ? "#fbfaf6" : "#6f695f",
-    background: on ? label.color : "#dbd4c5",
-  };
-
-  let style: React.CSSProperties = base;
-  let glyphStyle: React.CSSProperties | undefined;
-
-  if (label.shape === "diamond") {
-    style = {
-      ...base,
-      width: 60,
-      height: 60,
-      fontSize: 22,
-      borderRadius: 16,
-      transform: "rotate(45deg)",
-      margin: "8px 0",
-    };
-    glyphStyle = { transform: "rotate(-45deg)" };
-  } else if (label.shape === "scallop") {
-    style = { ...base, borderRadius: "42% 58% 45% 55% / 50% 46% 54% 50%" };
-  } else if (label.shape === "check") {
-    style = {
-      ...base,
-      clipPath: CLIP.check,
-      fontSize: 34,
-      fontWeight: 400,
-      paddingBottom: 3,
-    };
-  } else {
-    style = { ...base, clipPath: CLIP[label.shape] };
-  }
-
-  return (
-    <div
-      className="grid place-items-center font-serif leading-none font-bold"
-      style={style}
-    >
-      <span style={glyphStyle}>{label.glyph}</span>
-    </div>
-  );
+  return <div className={`label-badge label-badge-${label.id} grid size-[92px] place-items-center rounded-full p-1`} style={{ background: `conic-gradient(${label.color} ${progress * 360}deg, #ded8cb 0)`, filter: label.earned ? "drop-shadow(0 4px 12px rgba(28,26,23,.12))" : undefined }}>
+    <div className="grid size-[84px] place-items-center rounded-full border border-dashed border-[#cfc7b6] font-serif text-[30px] font-bold" style={{ background: color, color: label.earned ? "#fbfaf6" : "#b3aa9a", boxShadow: "inset 0 0 0 1px rgba(251,250,246,.45)" }}><svg aria-label={label.name} width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="16" cy="16" r="9" />{label.id === "verified" ? <path d="m11 16 3 3 7-7" /> : <path d="M11 21h10M13 18h6M14 14h4" />}</svg></div>
+  </div>;
 }
