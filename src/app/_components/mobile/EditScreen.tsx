@@ -129,7 +129,7 @@ export default function EditScreen({
         const region = regionFromAddress(cleanAddress) || record!.region;
         const { error } = await supabase
           .from("restaurants")
-          .update({ ...shared, region })
+          .update({ ...shared, region, pending: false })
           .eq("id", record!.id);
         if (error) throw new Error(error.message);
 

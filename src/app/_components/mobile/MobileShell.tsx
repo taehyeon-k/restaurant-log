@@ -13,8 +13,10 @@ import RecordScreen from "./RecordScreen";
 import EditScreen, { type EditTarget } from "./EditScreen";
 import CaptureFlow, { type Verified } from "./CaptureFlow";
 import LabelBook from "./LabelBook";
+import DraftsScreen from "./DraftsScreen";
+import TabBar, { type Tab } from "./TabBar";
 import MobilePlaceSearch, { type PickedPlace } from "./PlaceSearch";
-import { BURST, CameraIcon, PlusIcon, SearchIcon } from "./ui";
+import { BURST, DraftsBoxIcon, PlusIcon, SearchIcon } from "./ui";
 
 /** 이미 기록한 가게인지 — 이름이 같거나, 150m 안에 있으면 같은 곳으로 봅니다. */
 const norm = (s: string) => s.replace(/\s+/g, "").toLowerCase();
@@ -28,7 +30,7 @@ function metersBetween(aLat: number, aLng: number, bLat: number, bLng: number) {
 }
 
 /** 시트가 멈추는 높이. 화면이 낮으면 그만큼 줄여 잡습니다. */
-const SNAP_MAX = { peek: 192, half: 462, full: 742 };
+const SNAP_MAX = { peek: 192, half: 462, full: 668 };
 const ORDER = ["peek", "half", "full"] as const;
 export type Snap = (typeof ORDER)[number];
 
@@ -69,6 +71,8 @@ export default function MobileShell({ rows }: { rows: Restaurant[] }) {
   const [editing, setEditing] = useState<EditTarget | null>(null);
   const [flow, setFlow] = useState(false);
   const [labelsOpen, setLabelsOpen] = useState(false);
+  const [tab, setTab] = useState<Tab>("map");
+  const [draftsOpen, setDraftsOpen] = useState(false);
 
   const mapRef = useRef<MapHandle>(null);
 
@@ -102,15 +106,22 @@ export default function MobileShell({ rows }: { rows: Restaurant[] }) {
 
   /* ── 데이터 ────────────────────────────────────── */
 
+  /** 작성 전(pending) 기록 — 보관함에만 보이고, 목록·지도·필터에는 넘기지 않습니다. */
+  const pendingRows = useMemo(() => rows.filter((r) => r.pending), [rows]);
+  const visibleRows = useMemo(() => rows.filter((r) => !r.pending), [rows]);
+
   const placesByKind = useMemo(
     () => ({
-      restaurant: groupPlaces(rows.filter((r) => r.kind === "restaurant")),
-      cafe: groupPlaces(rows.filter((r) => r.kind === "cafe")),
+      restaurant: groupPlaces(visibleRows.filter((r) => r.kind === "restaurant")),
+      cafe: groupPlaces(visibleRows.filter((r) => r.kind === "cafe")),
     }),
-    [rows]
+    [visibleRows]
   );
 
-  const inKind = useMemo(() => rows.filter((r) => r.kind === kind), [rows, kind]);
+  const inKind = useMemo(
+    () => visibleRows.filter((r) => r.kind === kind),
+    [visibleRows, kind]
+  );
   const allPlaces = placesByKind[kind];
 
   const filtered = useMemo(() => {
@@ -176,7 +187,7 @@ export default function MobileShell({ rows }: { rows: Restaurant[] }) {
     const needle = norm(p.name || "");
 
     if (needle) {
-      const byName = rows.find((r) => {
+      const byName = visibleRows.find((r) => {
         const n = norm(r.name);
         return n === needle || n.includes(needle) || needle.includes(n);
       });
@@ -184,7 +195,7 @@ export default function MobileShell({ rows }: { rows: Restaurant[] }) {
     }
 
     return (
-      rows.find(
+      visibleRows.find(
         (r) =>
           r.lat !== null &&
           r.lng !== null &&
@@ -270,7 +281,13 @@ export default function MobileShell({ rows }: { rows: Restaurant[] }) {
     }
   }
 
-  const overlayOpen = editing !== null || flow || labelsOpen;
+  const overlayOpen = editing !== null || flow || labelsOpen || draftsOpen || tab !== "map";
+
+  const TAB_TITLE: Record<Exclude<Tab, "map">, string> = {
+    calendar: "월력",
+    community: "커뮤니티",
+    account: "내계정",
+  };
 
   return (
     <div className="relative h-dvh overflow-hidden bg-map">
@@ -334,15 +351,26 @@ export default function MobileShell({ rows }: { rows: Restaurant[] }) {
         </button>
       </div>
 
-      {/* 카메라 방문인증 */}
+      {/* 보관함 — 예전 카메라 FAB 자리, 이제 카메라는 하단 바 가운데로 옮겼습니다 */}
       <button
         type="button"
-        onClick={() => setFlow(true)}
-        aria-label="사진으로 방문 인증"
-        className="absolute right-4 z-[1000] grid size-15 cursor-pointer place-items-center rounded-full border-none bg-brick shadow-[0_8px_20px_rgba(180,85,45,.34)]"
-        style={{ bottom: sheetH + 16, transition: `bottom .26s ${EASE}` }}
+        onClick={() => setDraftsOpen(true)}
+        aria-label="보관함"
+        className="absolute right-4 z-[1000] grid size-14 cursor-pointer place-items-center rounded-full border border-line bg-card shadow-[0_6px_18px_rgba(28,26,23,.16)] hover:border-brick"
+        style={{
+          bottom: Math.min(sheetH + 74 + 14, 700),
+          transition: `bottom .26s ${EASE}`,
+        }}
       >
-        <CameraIcon />
+        <DraftsBoxIcon />
+        {pendingRows.length > 0 && (
+          <span
+            className="absolute -top-[3px] -right-[3px] grid min-w-[21px] place-items-center rounded-[11px] border-2 border-paper bg-brick px-[5px] font-mono text-[10.5px] leading-none text-card"
+            style={{ height: 21 }}
+          >
+            {pendingRows.length}
+          </span>
+        )}
       </button>
 
       {/* 인증 없이 직접 쓰기 */}
@@ -350,15 +378,18 @@ export default function MobileShell({ rows }: { rows: Restaurant[] }) {
         type="button"
         onClick={() => setEditing({ mode: "new", kind })}
         aria-label="기록 직접 쓰기"
-        className="absolute right-[88px] z-[1000] grid size-13 cursor-pointer place-items-center rounded-full border border-line bg-card shadow-[0_6px_16px_rgba(28,26,23,.14)]"
-        style={{ bottom: sheetH + 20, transition: `bottom .26s ${EASE}` }}
+        className="absolute right-[84px] z-[1000] grid size-13 cursor-pointer place-items-center rounded-full border border-line bg-card shadow-[0_6px_16px_rgba(28,26,23,.14)]"
+        style={{
+          bottom: Math.min(sheetH + 74 + 16, 702),
+          transition: `bottom .26s ${EASE}`,
+        }}
       >
         <PlusIcon />
       </button>
 
-      {/* 바텀시트 */}
+      {/* 바텀시트 — 하단 바(74px) 위에 얹힙니다 */}
       <div
-        className="absolute inset-x-0 bottom-0 z-[1100] flex flex-col rounded-t-[28px] bg-paper shadow-[0_-8px_30px_rgba(28,26,23,.16)]"
+        className="absolute inset-x-0 bottom-[74px] z-[1100] flex flex-col rounded-t-[28px] bg-paper shadow-[0_-8px_30px_rgba(28,26,23,.16)]"
         style={{
           height: sheetH,
           transition: dragH === null ? `height .26s ${EASE}` : undefined,
@@ -399,6 +430,16 @@ export default function MobileShell({ rows }: { rows: Restaurant[] }) {
           )}
         </div>
       </div>
+
+      {/* 아직 만들지 않은 탭 — 지도 탭에서만 지도·시트가 보입니다 */}
+      {tab !== "map" && (
+        <div className="absolute inset-x-0 top-0 bottom-[74px] z-[1160] flex flex-col items-center justify-center gap-2.5 bg-paper">
+          <div className="font-serif text-[19px] font-bold">{TAB_TITLE[tab]}</div>
+          <div className="text-[12.5px] text-faint">이 화면은 아직 만들지 않았습니다</div>
+        </div>
+      )}
+
+      <TabBar tab={tab} onChange={setTab} onShoot={() => setFlow(true)} />
 
       {filtersOpen && (
         <FilterSheet
@@ -485,6 +526,21 @@ export default function MobileShell({ rows }: { rows: Restaurant[] }) {
       )}
 
       {labelsOpen && <LabelBook rows={rows} onClose={() => setLabelsOpen(false)} />}
+
+      {draftsOpen && (
+        <DraftsScreen
+          drafts={pendingRows}
+          onClose={() => setDraftsOpen(false)}
+          onWrite={(record) => {
+            setDraftsOpen(false);
+            setKind(record.kind);
+            setPlaceKey(null);
+            setVisitId(null);
+            setEditing({ mode: "edit", record });
+          }}
+          onDeleted={refresh}
+        />
+      )}
     </div>
   );
 }

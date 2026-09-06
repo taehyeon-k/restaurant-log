@@ -160,6 +160,31 @@ export const PlusIcon = () => (
   </svg>
 );
 
+/** 보관함(사진 상자) — 지도 우하단 단추와 보관함 카드 사진이 함께 씁니다. */
+export const DraftsBoxIcon = ({
+  size = 23,
+  stroke = "#1c1a17",
+}: {
+  size?: number;
+  stroke?: string;
+}) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke={stroke}
+    strokeWidth="1.6"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <rect x="3.2" y="6.6" width="17.6" height="13.4" rx="2.6" />
+    <path d="M3.2 10.6h17.6" />
+    <circle cx="12" cy="15.3" r="2.7" />
+    <path d="M8.8 6.6 9.9 4.2h4.2l1.1 2.4" />
+  </svg>
+);
+
 export const PinIcon = () => (
   <svg
     width="15"

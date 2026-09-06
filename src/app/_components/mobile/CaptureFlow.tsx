@@ -313,6 +313,7 @@ export default function CaptureFlow({
           cover_index: 0,
           verified: true,
           acc: geo?.acc ?? null,
+          pending: !writeNow,
         })
         .select("*")
         .single();

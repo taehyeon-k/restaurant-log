@@ -29,6 +29,8 @@ export type Restaurant = {
   verified: boolean;
   /** 인증 촬영 시 위치 정확도(m). 좌표 자체는 남기지 않습니다. */
   acc: number | null;
+  /** 사진만 찍고 본문을 아직 쓰지 않은 기록 — 보관함에만 보입니다 */
+  pending: boolean;
 };
 
 export const CATEGORIES: Record<Kind, string[]> = {
