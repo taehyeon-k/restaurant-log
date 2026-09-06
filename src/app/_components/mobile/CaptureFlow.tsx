@@ -588,7 +588,7 @@ export default function CaptureFlow({
           <div className="absolute top-3.5 left-3.5 rounded-[14px] bg-[rgba(28,26,23,.55)] px-[11px] py-1 font-mono text-[9.5px] tracking-[0.1em] text-card">
             {hhmm(at)}
           </div>
-          <div className="absolute right-3.5 bottom-3.5">
+          <div className="absolute right-4 bottom-4">
             <VerifiedMark size={52} shadow />
           </div>
         </div>

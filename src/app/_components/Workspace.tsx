@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState } from "react";
+import { createContext, useContext, useRef, useState } from "react";
 import type { Restaurant } from "@/lib/types";
 import type { Place } from "@/lib/places";
 import MapPane from "./MapPane";
@@ -30,6 +30,16 @@ const PlaceContext = createContext<{
 
 export const usePlace = () => useContext(PlaceContext);
 
+export type MapView = { lat: number; lng: number; zoom: number };
+
+/**
+ * 지도의 최신 중심·확대값을 리렌더 없이 들고 있습니다 — "+ 기록 추가"를
+ * 누른 순간의 값을 읽어 /add 로 넘기기 위한 것으로, 값 자체는 반응형일 필요가 없습니다.
+ */
+const MapViewRef = createContext<{ current: MapView | null }>({ current: null });
+
+export const useMapViewRef = () => useContext(MapViewRef);
+
 export default function Workspace({
   places,
   record,
@@ -47,10 +57,12 @@ export default function Workspace({
 }) {
   const [hover, setHover] = useState<string | null>(null);
   const [place, setPlace] = useState<PickedPlace>(null);
+  const mapViewRef = useRef<MapView | null>(null);
 
   return (
     <HoverContext.Provider value={{ hover, setHover }}>
       <PlaceContext.Provider value={{ place, setPlace }}>
+        <MapViewRef.Provider value={mapViewRef}>
         <div className="relative flex-1 overflow-hidden bg-map">
           <MapPane places={places} selectedKey={selectedKey} />
           {mapOverlay}
@@ -67,6 +79,7 @@ export default function Workspace({
             <ResultList places={places} />
           )}
         </aside>
+        </MapViewRef.Provider>
       </PlaceContext.Provider>
     </HoverContext.Provider>
   );

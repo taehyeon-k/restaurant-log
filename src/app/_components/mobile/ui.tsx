@@ -5,7 +5,9 @@
 import { pinColor } from "@/lib/types";
 import { feltLevel, type PriceRow } from "@/lib/price";
 
-/** 인증 뱃지 = 24각 버스트 */
+export { default as VerifiedMark } from "../VerifiedMark";
+
+/** 라벨첩 버튼 아이콘 = 24각 버스트 (인증 뱃지와는 다른 모양입니다) */
 export const BURST =
   "polygon(50.0% 0.0%, 60.6% 10.4%, 75.0% 6.7%, 79.0% 21.0%, 93.3% 25.0%, 89.6% 39.4%, 100.0% 50.0%, 89.6% 60.6%, 93.3% 75.0%, 79.0% 79.0%, 75.0% 93.3%, 60.6% 89.6%, 50.0% 100.0%, 39.4% 89.6%, 25.0% 93.3%, 21.0% 79.0%, 6.7% 75.0%, 10.4% 60.6%, 0.0% 50.0%, 10.4% 39.4%, 6.7% 25.0%, 21.0% 21.0%, 25.0% 6.7%, 39.4% 10.4%)";
 
@@ -16,40 +18,6 @@ export const CLIP = {
   shield: "polygon(50% 0%, 100% 17%, 100% 60%, 50% 100%, 0% 60%, 0% 17%)",
   oct: "polygon(30.9% 3.8%, 69.1% 3.8%, 96.2% 30.9%, 96.2% 69.1%, 69.1% 96.2%, 30.9% 96.2%, 3.8% 69.1%, 3.8% 30.9%)",
 } as const;
-
-/** 인증 도형 + 체크. size 에 맞춰 체크 굵기를 얇게 잡습니다. */
-export function VerifiedMark({
-  size,
-  shadow = false,
-}: {
-  size: number;
-  shadow?: boolean;
-}) {
-  return (
-    <span
-      className="grid shrink-0 place-items-center bg-brick"
-      style={{
-        width: size,
-        height: size,
-        clipPath: BURST,
-        boxShadow: shadow ? "0 4px 12px rgba(28,26,23,.26)" : undefined,
-      }}
-    >
-      <svg
-        width={size * 0.42}
-        height={size * 0.42}
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="#fbfaf6"
-        strokeWidth={size > 30 ? 2.7 : 3.2}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d="M5 12.6L9.6 17.2L19 7.4" />
-      </svg>
-    </span>
-  );
-}
 
 /** 부분 채움 별점 — 데스크톱 Stars 와 같은 방식, 모바일 자간으로. */
 export function MobileStars({

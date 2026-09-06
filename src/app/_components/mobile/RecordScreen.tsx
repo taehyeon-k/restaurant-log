@@ -83,7 +83,7 @@ export default function RecordScreen({
 
         {record.verified && (
           <span className="absolute right-4 bottom-4">
-            <VerifiedMark size={50} shadow />
+            <VerifiedMark size={52} shadow />
           </span>
         )}
       </div>

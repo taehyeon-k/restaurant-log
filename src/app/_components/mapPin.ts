@@ -10,7 +10,9 @@ const escapeHtml = (value: string) => value.replace(/[&<>'"]/g, (char) => ({
   "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;",
 })[char]!);
 
-const labelHtml = (name: string, rating?: number | null, cta?: string) =>
+export const LABEL_ZOOM = 15;
+
+export const labelHtml = (name: string, rating?: number | null, cta?: string) =>
   '<div data-label style="position:absolute;left:50%;bottom:42px;transform:translateX(-50%);display:block;min-width:max-content;padding:7px 12px 6px;border:1px solid #d8d3c8;border-radius:14px 14px 14px 3px;background:#fbfaf6;color:#1c1a17;box-shadow:0 4px 12px rgba(28,26,23,.09);font-family:inherit;font-size:13px;line-height:1.25;text-align:left;white-space:nowrap;pointer-events:none">' +
   '<div style="font-weight:600">' + escapeHtml(name) + "</div>" +
   (rating !== undefined ? '<div style="font-size:11px;opacity:.65">★ ' + (rating == null ? "—" : rating.toFixed(1)) + "</div>" : "") +

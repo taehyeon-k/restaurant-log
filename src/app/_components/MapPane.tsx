@@ -5,11 +5,10 @@ import { useRouter } from "next/navigation";
 import type { Place } from "@/lib/places";
 import { useSearchState } from "@/lib/useSearchState";
 import { loadNaverMaps } from "@/lib/loadNaverMaps";
-import { applyActive, ghostIcon, pinIcon, setLabelVisible } from "./mapPin";
-import { useHover, usePlace } from "./Workspace";
+import { applyActive, ghostIcon, LABEL_ZOOM, pinIcon, setLabelVisible } from "./mapPin";
+import { useHover, useMapViewRef, usePlace } from "./Workspace";
 
 type Placed = Place & { lat: number; lng: number };
-const LABEL_ZOOM = 15;
 const placed = (places: Place[]) => places.filter((r): r is Placed => r.lat !== null && r.lng !== null);
 
 export default function MapPane({ places, selectedKey }: { places: Place[]; selectedKey: string | null }) {
@@ -17,6 +16,7 @@ export default function MapPane({ places, selectedKey }: { places: Place[]; sele
   const { hover, setHover } = useHover();
   const { place } = usePlace();
   const { set } = useSearchState();
+  const mapView = useMapViewRef();
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<naver.maps.Map | null>(null);
   const markerRefs = useRef<Map<string, naver.maps.Marker>>(new Map());
@@ -45,6 +45,13 @@ export default function MapPane({ places, selectedKey }: { places: Place[]; sele
         const visible = map.getZoom() >= LABEL_ZOOM;
         for (const marker of markerRefs.current.values()) setLabelVisible(marker, visible);
       });
+      // "+ 기록 추가" 로 넘어갈 때 지금 보고 있는 자리를 그대로 넘기기 위해 기록해 둡니다.
+      const rememberView = () => {
+        const center = map.getCenter() as naver.maps.LatLng;
+        mapView.current = { lat: center.lat(), lng: center.lng(), zoom: map.getZoom() };
+      };
+      rememberView();
+      maps.Event.addListener(map, "idle", rememberView);
       syncRef.current?.();
     }).catch((error: unknown) => console.error(error));
 
@@ -58,7 +65,7 @@ export default function MapPane({ places, selectedKey }: { places: Place[]; sele
       mapRef.current?.destroy();
       mapRef.current = null;
     };
-  }, []);
+  }, [mapView]);
 
   useEffect(() => {
     const sync = () => {
@@ -163,7 +170,7 @@ export default function MapPane({ places, selectedKey }: { places: Place[]; sele
   };
 
   return <>
-    <div ref={containerRef} className="absolute inset-0 h-full w-full" />
+    <div ref={containerRef} className="naver-map-tone absolute inset-0 h-full w-full" />
     <button onClick={searchHere} className="absolute top-27 left-8 z-[1000] flex cursor-pointer items-center gap-1.75 rounded-[20px] border border-line bg-card px-3.75 py-2 text-[12px] whitespace-nowrap text-[#4a453d] shadow-[0_4px_12px_rgba(28,26,23,0.07)] hover:border-brick hover:text-brick">
       이 지역에서 다시 검색
     </button>

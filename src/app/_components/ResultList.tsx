@@ -7,6 +7,7 @@ import { shortDate, coverPhoto } from "@/lib/types";
 import type { Place } from "@/lib/places";
 import PriceLevel from "./PriceLevel";
 import Stars from "./Stars";
+import VerifiedMark from "./VerifiedMark";
 import { useHover } from "./Workspace";
 
 export default function ResultList({ places }: { places: Place[] }) {
@@ -57,18 +58,25 @@ function PlaceCard({ place }: { place: Place }) {
     >
       <Link href={href} scroll={false} className="block">
         <div className="flex items-start gap-4">
-          {cover ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={cover}
-              alt=""
-              className="size-21 shrink-0 border border-[#ded8cb] object-cover"
-            />
-          ) : (
-            <div className="flex size-21 shrink-0 items-center justify-center border border-[#ded8cb] bg-[#eae5da] font-mono text-[10px] tracking-[0.1em] text-[#a8a196]">
-              PHOTO
-            </div>
-          )}
+          <div className="relative size-21 shrink-0">
+            {cover ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={cover}
+                alt=""
+                className="size-full border border-[#ded8cb] object-cover"
+              />
+            ) : (
+              <div className="flex size-full items-center justify-center border border-[#ded8cb] bg-[#eae5da] font-mono text-[10px] tracking-[0.1em] text-[#a8a196]">
+                PHOTO
+              </div>
+            )}
+            {place.verified && (
+              <span className="absolute -right-1 -bottom-1">
+                <VerifiedMark size={26} shadow />
+              </span>
+            )}
+          </div>
 
           <div className="flex min-w-0 flex-1 flex-col gap-1.75">
             <div className="flex items-baseline justify-between gap-2.5">

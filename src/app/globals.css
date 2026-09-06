@@ -55,6 +55,14 @@ body {
 
 /* ── 지도 ─────────────────────────────────────────── */
 
+/**
+ * 네이버 지도 타일은 색을 직접 못 바꾸니(커스텀 스타일은 NCP 콘솔 등록이 필요),
+ * 필터로 채도를 낮추고 종이색 쪽으로 데워 사이트 톤에 맞춥니다.
+ */
+.naver-map-tone {
+  filter: saturate(0.55) sepia(0.22) hue-rotate(-8deg) brightness(1.04) contrast(0.96);
+}
+
 .restaurant-map-pin {
   background: transparent !important;
   border: none !important;

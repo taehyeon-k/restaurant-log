@@ -33,8 +33,8 @@ export default function PlaceCard({
           </span>
         )}
         {place.verified && (
-          <span className="absolute -right-[3px] -bottom-[3px]">
-            <VerifiedMark size={24} />
+          <span className="absolute -right-1 -bottom-1">
+            <VerifiedMark size={26} shadow />
           </span>
         )}
       </div>

@@ -4,6 +4,7 @@ import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
 import type { Place } from "@/lib/places";
 import { pinColor } from "@/lib/types";
 import { loadNaverMaps } from "@/lib/loadNaverMaps";
+import { ghostIcon, LABEL_ZOOM, labelHtml, setLabelVisible } from "../mapPin";
 
 export type Placed = Place & { lat: number; lng: number };
 export const placed = (places: Place[]) => places.filter((p): p is Placed => p.lat !== null && p.lng !== null);
@@ -24,20 +25,28 @@ function pinHtml(row: Place, active: boolean) {
   return '<div data-pin style="position:absolute;left:50%;bottom:8px;width:' + size + 'px;height:' + size + 'px;box-sizing:border-box;transform:translateX(-50%) rotate(-45deg);border-radius:50% 50% 50% 0;background:' + fill + ';border:' + (active ? 2 : 1.5) + 'px solid ' + stroke + ';box-shadow:1px -1px 5px rgba(28,26,23,.18);display:flex;align-items:center;justify-content:center"><div style="width:' + dot + 'px;height:' + dot + 'px;border-radius:50%;background:' + core + ';transform:rotate(45deg)"></div></div><div style="position:absolute;left:50%;bottom:4px;width:9px;height:3px;transform:translateX(-50%);border-radius:50%;background:rgba(28,26,23,.16)"></div>';
 }
 
+export type Ghost = { name: string; lat: number; lng: number } | null;
+
 const MobileMap = forwardRef<MapHandle, {
   places: Place[];
   selectedKey: string | null;
   onSelect: (key: string) => void;
   frozen: boolean;
-}>(function MobileMap({ places, selectedKey, onSelect, frozen }, ref) {
+  /** 검색으로 고른, 아직 기록에는 없는 자리 — 지도에 흐린 핀으로만 보여줍니다. */
+  ghost?: Ghost;
+  onGhostClick?: () => void;
+}>(function MobileMap({ places, selectedKey, onSelect, frozen, ghost = null, onGhostClick }, ref) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<naver.maps.Map | null>(null);
   const markers = useRef(new Map<string, naver.maps.Marker>());
+  const ghostRef = useRef<naver.maps.Marker | null>(null);
   const readyRef = useRef(false);
   const syncRef = useRef<(() => void) | null>(null);
   const lastFit = useRef("");
   const onSelectRef = useRef(onSelect);
+  const onGhostClickRef = useRef(onGhostClick);
   useEffect(() => { onSelectRef.current = onSelect; }, [onSelect]);
+  useEffect(() => { onGhostClickRef.current = onGhostClick; }, [onGhostClick]);
 
   useImperativeHandle(ref, () => ({
     flyTo: (lat, lng, zoom = 15) => {
@@ -66,6 +75,12 @@ const MobileMap = forwardRef<MapHandle, {
         zoomControlOptions: { position: naver.maps.Position.BOTTOM_RIGHT },
       });
       readyRef.current = true;
+      naver.maps.Event.addListener(mapRef.current, "zoom_changed", () => {
+        const map = mapRef.current;
+        if (!map) return;
+        const visible = map.getZoom() >= LABEL_ZOOM;
+        for (const marker of markers.current.values()) setLabelVisible(marker, visible);
+      });
       syncRef.current?.();
       window.setTimeout(() => { if (!cancelled) { mapRef.current?.autoResize(); lastFit.current = ""; syncRef.current?.(); } }, 80);
     }).catch((error: unknown) => console.error(error));
@@ -73,11 +88,32 @@ const MobileMap = forwardRef<MapHandle, {
       cancelled = true;
       for (const marker of markers.current.values()) marker.setMap(null);
       markers.current.clear();
+      ghostRef.current?.setMap(null);
+      ghostRef.current = null;
       readyRef.current = false;
       mapRef.current?.destroy();
       mapRef.current = null;
     };
   }, []);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const maps = naver.maps;
+    ghostRef.current?.setMap(null);
+    ghostRef.current = null;
+    if (!ghost) return;
+    const marker = new maps.Marker({
+      position: new maps.LatLng(ghost.lat, ghost.lng),
+      map,
+      icon: ghostIcon(maps, { name: ghost.name, cta: "+ 여기에 기록 추가" }),
+      zIndex: 1200,
+      clickable: true,
+    });
+    maps.Event.addListener(marker, "click", () => onGhostClickRef.current?.());
+    ghostRef.current = marker;
+    map.morph(new maps.LatLng(ghost.lat, ghost.lng), 16, { duration: 700 });
+  }, [ghost]);
 
   useEffect(() => {
     const sync = () => {
@@ -91,7 +127,8 @@ const MobileMap = forwardRef<MapHandle, {
       for (const p of visible) {
         const active = selectedKey === p.key;
         let marker = markers.current.get(p.key);
-        const icon: naver.maps.HtmlIcon = { content: '<div class="restaurant-map-pin" style="position:relative;width:44px;height:44px">' + pinHtml(p, active) + "</div>", size: new naver.maps.Size(44, 44), anchor: new naver.maps.Point(22, 38) };
+        const content = '<div class="restaurant-map-pin" style="position:relative;width:44px;height:44px">' + labelHtml(p.name, p.rating) + pinHtml(p, active) + "</div>";
+        const icon: naver.maps.HtmlIcon = { content, size: new naver.maps.Size(44, 44), anchor: new naver.maps.Point(22, 38) };
         if (!marker) {
           marker = new naver.maps.Marker({ position: new naver.maps.LatLng(p.lat, p.lng), map, icon, clickable: true });
           naver.maps.Event.addListener(marker, "click", () => onSelectRef.current(p.key));
@@ -100,6 +137,7 @@ const MobileMap = forwardRef<MapHandle, {
           marker.setPosition(new naver.maps.LatLng(p.lat, p.lng));
           marker.setIcon(icon);
         }
+        setLabelVisible(marker, map.getZoom() >= LABEL_ZOOM);
         marker.setZIndex(active ? 1000 : 0);
       }
       if (frozen || !visible.length) return;
@@ -115,7 +153,7 @@ const MobileMap = forwardRef<MapHandle, {
     if (readyRef.current) sync();
   }, [places, selectedKey, frozen]);
 
-  return <div ref={containerRef} className="absolute inset-x-0 top-0 h-[620px] w-full" />;
+  return <div ref={containerRef} className="naver-map-tone absolute inset-x-0 top-0 h-[620px] w-full" />;
 });
 
 export default MobileMap;

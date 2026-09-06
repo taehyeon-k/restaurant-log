@@ -15,6 +15,7 @@ import FilterPanel from "./_components/FilterPanel";
 import SortRow from "./_components/SortRow";
 import Workspace from "./_components/Workspace";
 import Shell from "./_components/Shell";
+import AddRecordLink from "./_components/AddRecordLink";
 
 const toArray = (v: string | string[] | undefined) =>
   v == null ? [] : Array.isArray(v) ? v : [v];
@@ -125,12 +126,9 @@ export default async function Home({
           record || selectedPlace ? null : (
             <>
               <div className="flex items-center gap-3.5 px-8 pt-5.5">
-                <Link
-                  href="/add"
-                  className="shrink-0 border-b border-[#e2c9bb] text-[13px] whitespace-nowrap text-brick"
-                >
+                <AddRecordLink className="shrink-0 border-b border-[#e2c9bb] text-[13px] whitespace-nowrap text-brick">
                   + 기록 추가
-                </Link>
+                </AddRecordLink>
 
                 <SearchBar defaultValue={q} />
 

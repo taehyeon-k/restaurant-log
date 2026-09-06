@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { groupPlaces, type Place } from "@/lib/places";
 import type { Kind, Restaurant, Sort } from "@/lib/types";
+import type { Place as GeocodePlace } from "@/lib/geocode";
 import MobileMap, { type MapHandle } from "./MobileMap";
 import PlaceCard from "./PlaceCard";
 import FilterSheet from "./FilterSheet";
@@ -12,7 +13,19 @@ import RecordScreen from "./RecordScreen";
 import EditScreen, { type EditTarget } from "./EditScreen";
 import CaptureFlow, { type Verified } from "./CaptureFlow";
 import LabelBook from "./LabelBook";
+import MobilePlaceSearch, { type PickedPlace } from "./PlaceSearch";
 import { BURST, CameraIcon, PlusIcon, SearchIcon } from "./ui";
+
+/** 이미 기록한 가게인지 — 이름이 같거나, 150m 안에 있으면 같은 곳으로 봅니다. */
+const norm = (s: string) => s.replace(/\s+/g, "").toLowerCase();
+function metersBetween(aLat: number, aLng: number, bLat: number, bLng: number) {
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const dLat = toRad(bLat - aLat);
+  const dLng = toRad(bLng - aLng);
+  const lat = toRad((aLat + bLat) / 2);
+  const x = dLng * Math.cos(lat);
+  return Math.sqrt(dLat * dLat + x * x) * 6371000;
+}
 
 /** 시트가 멈추는 높이. 화면이 낮으면 그만큼 줄여 잡습니다. */
 const SNAP_MAX = { peek: 192, half: 462, full: 742 };
@@ -41,6 +54,7 @@ export default function MobileShell({ rows }: { rows: Restaurant[] }) {
   const [sort, setSort] = useState<Sort>("recent");
   const [q, setQ] = useState("");
   const [mapQuery, setMapQuery] = useState("");
+  const [pickedPlace, setPickedPlace] = useState<PickedPlace>(null);
   const [categories, setCategories] = useState<string[]>([]);
   const [keywords, setKeywords] = useState<string[]>([]);
   const [revisitOnly, setRevisitOnly] = useState(false);
@@ -155,46 +169,51 @@ export default function MobileShell({ rows }: { rows: Restaurant[] }) {
 
   const refresh = useCallback(() => router.refresh(), [router]);
 
-  /* ── 지도 검색 ─────────────────────────────────── */
+  /* ── 지도 검색 (PC 의 PlaceSearch 와 같은 방식) ──────── */
 
-  function runMapSearch() {
-    const needle = mapQuery.trim().toLowerCase();
-    if (!needle) return;
+  /** 이미 기록한 가게인지 — 이름이 같거나, 150m 안에 있으면 같은 곳으로 봅니다. */
+  function findRecord(p: GeocodePlace): Restaurant | null {
+    const needle = norm(p.name || "");
 
-    const hits = rows.filter((r) =>
-      [r.name, r.region, r.address, r.category].some((f) =>
-        (f ?? "").toLowerCase().includes(needle)
-      )
+    if (needle) {
+      const byName = rows.find((r) => {
+        const n = norm(r.name);
+        return n === needle || n.includes(needle) || needle.includes(n);
+      });
+      if (byName) return byName;
+    }
+
+    return (
+      rows.find(
+        (r) =>
+          r.lat !== null &&
+          r.lng !== null &&
+          metersBetween(r.lat, r.lng, p.lat, p.lng) < 150
+      ) ?? null
     );
-    if (!hits.length) return;
+  }
 
-    const hitKind = hits[0].kind;
-    const keys = uniq(
-      hits.map(
-        (r) => r.place_key ?? `${r.name}|${r.address ?? ""}`.toLowerCase()
-      )
-    );
+  function handleChoosePlace(p: GeocodePlace) {
+    const hit = findRecord(p);
 
-    if (keys.length === 1) {
-      setQ("");
-      setCategories([]);
-      setKeywords([]);
-      const target = placesByKind[hitKind].find((p) => p.key === keys[0]);
-      if (target?.lat != null && target.lng != null) {
-        mapRef.current?.flyTo(target.lat, target.lng, 15);
+    if (hit) {
+      setPickedPlace(null);
+      const target = placesByKind[hit.kind].find((pl) =>
+        pl.visits.some((v) => v.id === hit.id)
+      );
+      if (target) {
+        setKind(hit.kind);
+        openPlace(target.key, hit.kind);
+        if (target.lat != null && target.lng != null) {
+          mapRef.current?.flyTo(target.lat, target.lng, 15);
+        }
       }
-      openPlace(keys[0], hitKind);
       return;
     }
 
-    setKind(hitKind);
-    setQ(mapQuery);
     closeAll();
-
-    const points = hits
-      .filter((r) => r.lat != null && r.lng != null)
-      .map((r) => [r.lat as number, r.lng as number] as [number, number]);
-    mapRef.current?.fitTo(points);
+    setPickedPlace({ name: p.name || p.address, address: p.address, lat: p.lat, lng: p.lng });
+    mapRef.current?.flyTo(p.lat, p.lng, 16);
   }
 
   /* ── 시트 끌기 ─────────────────────────────────── */
@@ -261,6 +280,15 @@ export default function MobileShell({ rows }: { rows: Restaurant[] }) {
         selectedKey={placeKey}
         onSelect={(key) => openPlace(key)}
         frozen={overlayOpen}
+        ghost={pickedPlace}
+        onGhostClick={() =>
+          pickedPlace &&
+          setEditing({
+            mode: "new",
+            kind,
+            preset: { name: pickedPlace.name, address: pickedPlace.address, lat: pickedPlace.lat, lng: pickedPlace.lng },
+          })
+        }
       />
 
       {/* 위쪽을 눕히는 종이색 그라데이션 */}
@@ -274,28 +302,24 @@ export default function MobileShell({ rows }: { rows: Restaurant[] }) {
 
       {/* 지도 검색줄 + 라벨첩 */}
       <div
-        className="absolute inset-x-4 z-[1000] flex items-center gap-[9px]"
+        className="absolute inset-x-4 z-[1000] flex items-start gap-[9px]"
         style={{ top: SAFE_TOP }}
       >
-        <div className="flex h-[46px] min-w-0 flex-1 items-center gap-[9px] rounded-[23px] border border-line bg-card px-[15px] shadow-[0_4px_14px_rgba(28,26,23,.08)]">
-          <SearchIcon />
-          <input
-            value={mapQuery}
-            onChange={(e) => setMapQuery(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") runMapSearch();
-            }}
-            placeholder="음식점이나 지역 찾기"
-            className="min-w-0 flex-1 bg-transparent text-[13.5px] text-ink outline-none placeholder:text-[#a8a196]"
-          />
-          <button
-            type="button"
-            onClick={runMapSearch}
-            className="shrink-0 cursor-pointer border-none bg-transparent py-1.5 text-[12px] text-brick"
-          >
-            찾기
-          </button>
-        </div>
+        <MobilePlaceSearch
+          value={mapQuery}
+          onChange={setMapQuery}
+          onChoose={handleChoosePlace}
+          picked={pickedPlace}
+          onAddHere={() =>
+            pickedPlace &&
+            setEditing({
+              mode: "new",
+              kind,
+              preset: { name: pickedPlace.name, address: pickedPlace.address, lat: pickedPlace.lat, lng: pickedPlace.lng },
+            })
+          }
+          onClearPicked={() => setPickedPlace(null)}
+        />
 
         <button
           type="button"

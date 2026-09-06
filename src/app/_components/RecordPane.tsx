@@ -8,6 +8,7 @@ import { coverPhoto, type Restaurant } from "@/lib/types";
 import type { Place } from "@/lib/places";
 import Stars from "./Stars";
 import PriceLevel from "./PriceLevel";
+import VerifiedMark from "./VerifiedMark";
 
 export default function RecordPane({
   record,
@@ -93,7 +94,7 @@ export default function RecordPane({
           </span>
         </div>
 
-        <div className="mt-6 aspect-[4/3] border border-line bg-[#eae5da]">
+        <div className="relative mt-6 aspect-[4/3] border border-line bg-[#eae5da]">
           {cover ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={cover} alt={record.name} className="size-full object-cover" />
@@ -101,6 +102,11 @@ export default function RecordPane({
             <div className="flex size-full items-center justify-center font-mono text-[11px] tracking-[0.1em] text-[#a8a196]">
               NO PHOTO
             </div>
+          )}
+          {record.verified && (
+            <span className="absolute right-4 bottom-4">
+              <VerifiedMark size={52} shadow />
+            </span>
           )}
         </div>
 

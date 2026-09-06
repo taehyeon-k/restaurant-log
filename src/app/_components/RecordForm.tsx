@@ -39,6 +39,17 @@ export default function RecordForm({ initial }: { initial?: Restaurant }) {
   const presetLat = initial || !sp.get("lat") ? null : Number(sp.get("lat"));
   const presetLng = initial || !sp.get("lng") ? null : Number(sp.get("lng"));
 
+  // 홈 화면 지도에서 보던 자리 그대로 — "+ 기록 추가" 를 눌렀을 때 지도가 갑자기
+  // 서울 시내 기본값으로 축소되지 않도록, 누른 순간의 중심·확대값을 넘겨받습니다.
+  const initialView =
+    !initial && sp.get("clat") && sp.get("clng") && sp.get("czoom")
+      ? {
+          lat: Number(sp.get("clat")),
+          lng: Number(sp.get("clng")),
+          zoom: Number(sp.get("czoom")),
+        }
+      : undefined;
+
   const [kind, setKind] = useState<Kind>(initial?.kind ?? "restaurant");
   const [name, setName] = useState(initial?.name ?? presetName);
   const [category, setCategory] = useState(
@@ -205,6 +216,7 @@ useEffect(() => {
           category={category}
           revisit={revisit}
           onChange={handleLocationChange}
+          initialView={initialView}
         />
 
         <div className="absolute inset-x-0 top-0 z-[1000] flex items-center gap-5 p-8">
