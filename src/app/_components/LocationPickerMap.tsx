@@ -1,14 +1,11 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import type { Map as LeafletMap, Marker } from "leaflet";
+import { loadNaverMaps } from "@/lib/loadNaverMaps";
 import { pinIcon } from "./mapPin";
 
 export default function LocationPickerMap({
-  center,
-  category,
-  revisit,
-  onChange,
+  center, category, revisit, onChange,
 }: {
   center: { lat: number; lng: number } | null;
   category: string | null;
@@ -16,93 +13,59 @@ export default function LocationPickerMap({
   onChange: (lat: number, lng: number) => void;
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const mapRef = useRef<LeafletMap | null>(null);
-  const leafletRef = useRef<typeof import("leaflet") | null>(null);
-  const markerRef = useRef<Marker | null>(null);
-
+  const mapRef = useRef<naver.maps.Map | null>(null);
+  const markerRef = useRef<naver.maps.Marker | null>(null);
   const onChangeRef = useRef(onChange);
-  onChangeRef.current = onChange;
+
+  useEffect(() => { onChangeRef.current = onChange; }, [onChange]);
 
   useEffect(() => {
-    if (!containerRef.current) return;
-
     let cancelled = false;
-
-    (async () => {
-      const L = await import("leaflet");
+    loadNaverMaps().then(() => {
       if (cancelled || !containerRef.current || mapRef.current) return;
-
-      const map = L.map(containerRef.current, {
-        zoomControl: false,
-        keyboard: false,
-      }).setView([37.5665, 126.978], 13);
-
-      L.tileLayer("https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png", {
-        maxZoom: 20,
-        subdomains: "abcd",
-        className: "paper-tiles",
-        attribution:
-          '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-      }).addTo(map);
-
-      L.control.zoom({ position: "bottomright" }).addTo(map);
-
-      map.on("click", (event) => {
-        const { lat, lng } = event.latlng;
-        onChangeRef.current(lat, lng);
+      const maps = naver.maps;
+      const map = new maps.Map(containerRef.current, {
+        center: new maps.LatLng(37.5665, 126.978), zoom: 13,
+        keyboardShortcuts: false, zoomControl: true,
+        zoomControlOptions: { position: maps.Position.BOTTOM_RIGHT },
       });
-
-      leafletRef.current = L;
+      maps.Event.addListener(map, "click", (event: naver.maps.PointerEvent) => {
+        onChangeRef.current((event.coord as naver.maps.LatLng).lat(), (event.coord as naver.maps.LatLng).lng());
+      });
       mapRef.current = map;
-    })();
+    }).catch((error: unknown) => console.error(error));
 
     return () => {
       cancelled = true;
+      markerRef.current?.setMap(null);
       markerRef.current = null;
-      mapRef.current?.remove();
+      mapRef.current?.destroy();
       mapRef.current = null;
     };
   }, []);
 
-  // center 는 글자를 칠 때마다 새 객체로 만들어집니다. 그대로 쓰면
-  // 타이핑마다 지도가 다시 움직이므로 숫자로 꺼내 씁니다.
   const lat = center?.lat ?? null;
   const lng = center?.lng ?? null;
-
   useEffect(() => {
-    const L = leafletRef.current;
     const map = mapRef.current;
-
-    if (!L || !map) return;
-
+    if (!map) return;
+    const maps = naver.maps;
     if (lat === null || lng === null) {
-      markerRef.current?.remove();
+      markerRef.current?.setMap(null);
       markerRef.current = null;
       return;
     }
-
-    const icon = pinIcon(L, {
-      category,
-      revisit,
-    });
-
+    const position = new maps.LatLng(lat, lng);
+    const markerIcon = pinIcon(maps, { category, revisit });
     if (markerRef.current) {
-      markerRef.current.setLatLng([lat, lng]);
-      markerRef.current.setIcon(icon);
+      markerRef.current.setPosition(position);
+      markerRef.current.setIcon(markerIcon);
     } else {
-      markerRef.current = L.marker([lat, lng], {
-        icon,
-      }).addTo(map);
+      markerRef.current = new maps.Marker({ position, map, icon: markerIcon });
     }
-
-    if (map.getZoom() < 15) {
-      map.flyTo([lat, lng], 16, {
-        duration: 0.7,
-      });
-    } else {
-      map.panTo([lat, lng]);
-    }
+    if (map.getZoom() < 15) map.morph(position, 16, { duration: 700 });
+    else map.panTo(position);
   }, [lat, lng, category, revisit]);
 
-  return <div ref={containerRef} className="absolute inset-0" />;
+  return <div ref={containerRef} className="absolute inset-0 h-full w-full" />;
 }

@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=Noto+Sans+KR:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; padding: 0; background: #e8e3d8; }
+  a { color: #b4552d; text-decoration: none; }
+  a:hover { color: #8f4223; }
+</style>
+</helmet>
+
+<div style="min-height: 100vh; padding: 72px 80px 96px; background: {{ board }}; font-family: 'Noto Sans KR', sans-serif; color: #1c1a17">
+
+  <div style="max-width: 780px">
+    <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.22em; color: #8a8377">DINARY / MOBILE</span>
+    <h1 style="margin: 14px 0 0; font-family: 'Gowun Batang', serif; font-size: 40px; line-height: 1.2; font-weight: 700; letter-spacing: -0.01em">모바일 화면</h1>
+    <p style="margin: 16px 0 0; font-size: 14.5px; line-height: 1.85; color: #4a453d; text-wrap: pretty">820px 이하에서는 데스크톱 대신 이 화면이 뜹니다. 지도가 위, 기록이 아래 시트에 앉고 시트는 세 높이(192 / 462 / 742px)에 멈춥니다. 손잡이를 끌거나 눌러 높이를 바꿀 수 있고, 카드를 누르면 가게 화면이 덮어 올라옵니다.</p>
+  </div>
+
+  <div style="margin-top: 56px; display: flex; flex-wrap: wrap; gap: 64px 56px">
+
+    <div style="display: flex; flex-direction: column; gap: 20px">
+      <sc-if value="{{ show1 }}" hint-placeholder-val="{{ true }}">
+        <dc-import name="DINARY Mobile" screen="map" live-map="{{ true }}" hint-size="402px,874px"></dc-import>
+      </sc-if>
+      <sc-if value="{{ showCaptions }}" hint-placeholder-val="{{ true }}">
+        <div style="max-width: 402px">
+          <div style="font-family: 'JetBrains Mono', monospace; font-size: 10.5px; letter-spacing: 0.18em; color: #8a8377">01 · MAP + SHEET</div>
+          <div style="margin-top: 8px; font-family: 'Gowun Batang', serif; font-size: 19px; font-weight: 700">지도와 기록 시트</div>
+          <p style="margin: 8px 0 0; font-size: 13px; line-height: 1.8; color: #4a453d; text-wrap: pretty">핀은 데스크톱과 같은 물방울 모양, 크기만 23px로 줄였습니다. 이름표는 지도를 가려서 달지 않았습니다. 오른쪽 아래 벽돌색 단추가 사진 인증, 그 옆이 직접 쓰기입니다.</p>
+        </div>
+      </sc-if>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 20px">
+      <sc-if value="{{ show2 }}" hint-placeholder-val="{{ true }}">
+        <dc-import name="DINARY Mobile" screen="filters" live-map="{{ false }}" hint-size="402px,874px"></dc-import>
+      </sc-if>
+      <sc-if value="{{ showCaptions }}" hint-placeholder-val="{{ true }}">
+        <div style="max-width: 402px">
+          <div style="font-family: 'JetBrains Mono', monospace; font-size: 10.5px; letter-spacing: 0.18em; color: #8a8377">02 · FILTER SHEET</div>
+          <div style="margin-top: 8px; font-family: 'Gowun Batang', serif; font-size: 19px; font-weight: 700">골라 보기</div>
+          <p style="margin: 8px 0 0; font-size: 13px; line-height: 1.8; color: #4a453d; text-wrap: pretty">종류와 낱말은 그 종류에 실제로 쓰인 값만 올라옵니다. 재방문·인증 두 가지는 따로 두었고, 맨 아래 단추가 지금 조건에 맞는 가게 수를 그대로 말합니다.</p>
+        </div>
+      </sc-if>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 20px">
+      <sc-if value="{{ show3 }}" hint-placeholder-val="{{ true }}">
+        <dc-import name="DINARY Mobile" screen="place" live-map="{{ false }}" hint-size="402px,874px"></dc-import>
+      </sc-if>
+      <sc-if value="{{ showCaptions }}" hint-placeholder-val="{{ true }}">
+        <div style="max-width: 402px">
+          <div style="font-family: 'JetBrains Mono', monospace; font-size: 10.5px; letter-spacing: 0.18em; color: #8a8377">03 · PLACE</div>
+          <div style="margin-top: 8px; font-family: 'Gowun Batang', serif; font-size: 19px; font-weight: 700">가게 화면</div>
+          <p style="margin: 8px 0 0; font-size: 13px; line-height: 1.8; color: #4a453d; text-wrap: pretty">기록이 두 개 이상인 가게에서만 뜹니다. 별점은 방문들의 평균, 낱말은 모든 방문에서 모은 것입니다. 아래로 방문이 최신순으로 쌓입니다.</p>
+        </div>
+      </sc-if>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 20px">
+      <sc-if value="{{ show4 }}" hint-placeholder-val="{{ true }}">
+        <dc-import name="DINARY Mobile" screen="record" live-map="{{ false }}" hint-size="402px,874px"></dc-import>
+      </sc-if>
+      <sc-if value="{{ showCaptions }}" hint-placeholder-val="{{ true }}">
+        <div style="max-width: 402px">
+          <div style="font-family: 'JetBrains Mono', monospace; font-size: 10.5px; letter-spacing: 0.18em; color: #8a8377">04 · RECORD</div>
+          <div style="margin-top: 8px; font-family: 'Gowun Batang', serif; font-size: 19px; font-weight: 700">기록 하나</div>
+          <p style="margin: 8px 0 0; font-size: 13px; line-height: 1.8; color: #4a453d; text-wrap: pretty">사진이 여러 장이면 아래 줄에서 골라 크게 보고, 대표사진으로 바꿀 수 있습니다. 그 자리에서 찍어 인증된 기록에는 오른쪽 아래 인증 도장과 아래 설명이 붙습니다.</p>
+        </div>
+      </sc-if>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 20px">
+      <sc-if value="{{ show5 }}" hint-placeholder-val="{{ true }}">
+        <dc-import name="DINARY Mobile" screen="edit" live-map="{{ false }}" hint-size="402px,874px"></dc-import>
+      </sc-if>
+      <sc-if value="{{ showCaptions }}" hint-placeholder-val="{{ true }}">
+        <div style="max-width: 402px">
+          <div style="font-family: 'JetBrains Mono', monospace; font-size: 10.5px; letter-spacing: 0.18em; color: #8a8377">05 · EDIT</div>
+          <div style="margin-top: 8px; font-family: 'Gowun Batang', serif; font-size: 19px; font-weight: 700">기록 쓰기</div>
+          <p style="margin: 8px 0 0; font-size: 13px; line-height: 1.8; color: #4a453d; text-wrap: pretty">별점과 가격 아래에 <strong style="font-weight: 500">다시 오고 싶은 곳</strong> 스위치를 두었습니다. 켜면 목록의 재방문 칩과 지도 핀 색까지 함께 바뀝니다. 지도에서 점선 핀의 말풍선을 눌러 들어오면 이름·주소가 채워진 채로 열립니다.</p>
+        </div>
+      </sc-if>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 20px">
+      <sc-if value="{{ show6 }}" hint-placeholder-val="{{ true }}">
+        <dc-import name="DINARY Mobile" screen="labels" live-map="{{ false }}" hint-size="402px,874px"></dc-import>
+      </sc-if>
+      <sc-if value="{{ showCaptions }}" hint-placeholder-val="{{ true }}">
+        <div style="max-width: 402px">
+          <div style="font-family: 'JetBrains Mono', monospace; font-size: 10.5px; letter-spacing: 0.18em; color: #8a8377">06 · LABELS</div>
+          <div style="margin-top: 8px; font-family: 'Gowun Batang', serif; font-size: 19px; font-weight: 700">라벨첩</div>
+          <p style="margin: 8px 0 0; font-size: 13px; line-height: 1.8; color: #4a453d; text-wrap: pretty">모은 라벨은 색이 차고, 아직인 라벨은 회색으로 진행도를 답니다. 획득 조건은 아직 확정 전이라 저장소의 잠정 규칙을 그대로 씁니다.</p>
+        </div>
+      </sc-if>
+    </div>
+
+  </div>
+
+  <div style="margin-top: 80px; max-width: 780px; border-top: 1px solid #d8d3c8; padding-top: 28px; font-size: 12.5px; line-height: 1.9; color: #6b665e">
+    사진은 아직 없어서 종류 색의 사선 스트라이프 자리로 두었습니다 — 저장소의 photoFill 이 사진이 없을 때 쓰는 바로 그 무늬입니다. 데스크톱 화면은 <a href="DINARY v3.dc.html">DINARY v3</a> 에 있습니다.
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;showCaptions&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Board&quot;},&quot;board&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;options&quot;:[&quot;#e8e3d8&quot;,&quot;#f6f3ec&quot;,&quot;#dcd7c9&quot;],&quot;default&quot;:&quot;#e8e3d8&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Board&quot;}}">
+class Component extends DCLogic {
+  /** 다섯 화면을 한 번에 붙이면 첫 그림이 늦습니다 — 하나씩 차례로 붙입니다. */
+  state = { mounted: 1 };
+
+  componentDidMount() { this._step(); }
+
+  componentWillUnmount() { clearTimeout(this._timer); }
+
+  _step() {
+    if (this.state.mounted >= 6) return;
+    this._timer = setTimeout(() => {
+      this.setState((s) => ({ mounted: s.mounted + 1 }), () => this._step());
+    }, 320);
+  }
+
+  renderVals() {
+    const n = this.state.mounted;
+    return {
+      board: this.props.board ?? "#e8e3d8",
+      showCaptions: this.props.showCaptions ?? true,
+      show1: n >= 1, show2: n >= 2, show3: n >= 3, show4: n >= 4, show5: n >= 5, show6: n >= 6,
+    };
+  }
+}
+</script>
+</body>
+</html>

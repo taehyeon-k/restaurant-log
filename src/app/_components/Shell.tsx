@@ -7,7 +7,7 @@ import MobileShell from "./mobile/MobileShell";
 /**
  * 820px 을 넘으면 기존 데스크톱 화면, 이하면 모바일 화면.
  * 지도 인스턴스가 두 개 생기지 않게 한쪽만 마운트합니다
- * (Leaflet 은 display:none 안에서 크기 계산이 깨집니다).
+ * (지도를 display:none 안에 두면 크기 계산이 깨집니다).
  */
 export default function Shell({
   rows,

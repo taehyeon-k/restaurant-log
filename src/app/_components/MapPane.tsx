@@ -1,277 +1,171 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { useSearchState } from "@/lib/useSearchState";
 import { useRouter } from "next/navigation";
-import type { Map as LeafletMap, Marker } from "leaflet";
 import type { Place } from "@/lib/places";
-import { pinIcon, ghostIcon, applyActive } from "./mapPin";
+import { useSearchState } from "@/lib/useSearchState";
+import { loadNaverMaps } from "@/lib/loadNaverMaps";
+import { applyActive, ghostIcon, pinIcon, setLabelVisible } from "./mapPin";
 import { useHover, usePlace } from "./Workspace";
 
 type Placed = Place & { lat: number; lng: number };
+const LABEL_ZOOM = 15;
+const placed = (places: Place[]) => places.filter((r): r is Placed => r.lat !== null && r.lng !== null);
 
-const placed = (places: Place[]) =>
-  places.filter((r): r is Placed => r.lat !== null && r.lng !== null);
-
-export default function MapPane({
-  places,
-  selectedKey,
-}: {
-  places: Place[];
-  selectedKey: string | null;
-}) {
+export default function MapPane({ places, selectedKey }: { places: Place[]; selectedKey: string | null }) {
   const router = useRouter();
   const { hover, setHover } = useHover();
   const { place } = usePlace();
   const { set } = useSearchState();
-
-
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const mapRef = useRef<LeafletMap | null>(null);
-  const leafletRef = useRef<typeof import("leaflet") | null>(null);
-  const markerRefs = useRef<Map<string, Marker>>(new Map());
+  const mapRef = useRef<naver.maps.Map | null>(null);
+  const markerRefs = useRef<Map<string, naver.maps.Marker>>(new Map());
+  const ghostRef = useRef<naver.maps.Marker | null>(null);
   const readyRef = useRef(false);
   const syncRef = useRef<(() => void) | null>(null);
-
   const handlers = useRef({ router, setHover });
   handlers.current = { router, setHover };
 
-  // 1. 지도 생성 — 마운트 시 한 번만.
   useEffect(() => {
     if (!containerRef.current) return;
-
     let cancelled = false;
-
-    (async () => {
-      const L = await import("leaflet");
+    loadNaverMaps().then(() => {
       if (cancelled || !containerRef.current || mapRef.current) return;
-
-      const map = L.map(containerRef.current, {
-  zoomControl: false,
-  keyboard: false,
-}).setView([37.5665, 126.978], 12);
-
-      L.tileLayer("https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png", {
-        maxZoom: 20,
-        subdomains: "abcd",
-        className: "paper-tiles",
-        attribution:
-          '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-      }).addTo(map);
-
-      L.control.zoom({ position: "bottomright" }).addTo(map);
-
-      leafletRef.current = L;
+      const maps = naver.maps;
+      const map = new maps.Map(containerRef.current, {
+        center: new maps.LatLng(37.5665, 126.978),
+        zoom: 12,
+        keyboardShortcuts: false,
+        zoomControl: true,
+        zoomControlOptions: { position: maps.Position.BOTTOM_RIGHT },
+      });
       mapRef.current = map;
       readyRef.current = true;
-
+      maps.Event.addListener(map, "zoom_changed", () => {
+        const visible = map.getZoom() >= LABEL_ZOOM;
+        for (const marker of markerRefs.current.values()) setLabelVisible(marker, visible);
+      });
       syncRef.current?.();
-    })();
+    }).catch((error: unknown) => console.error(error));
 
     return () => {
       cancelled = true;
-      readyRef.current = false;
+      for (const marker of markerRefs.current.values()) marker.setMap(null);
       markerRefs.current.clear();
-      mapRef.current?.remove();
+      ghostRef.current?.setMap(null);
+      ghostRef.current = null;
+      readyRef.current = false;
+      mapRef.current?.destroy();
       mapRef.current = null;
     };
   }, []);
 
-  // 2. 결과 목록이 바뀔 때만 마커를 추가/제거 — 지도는 그대로 둡니다.
   useEffect(() => {
     const sync = () => {
-      const L = leafletRef.current;
       const map = mapRef.current;
-      if (!L || !map) return;
-
-       const visible = placed(places);
+      if (!map) return;
+      const maps = naver.maps;
+      const visible = placed(places);
       const next = new Set(visible.map((r) => r.key));
-
       for (const [key, marker] of markerRefs.current) {
-        if (!next.has(key)) {
-          marker.remove();
-          markerRefs.current.delete(key);
-        }
+        if (!next.has(key)) { marker.setMap(null); markerRefs.current.delete(key); }
       }
-
       for (const r of visible) {
         const active = hover === r.key || selectedKey === r.key;
         const existing = markerRefs.current.get(r.key);
-
+        const icon = pinIcon(maps, r.latest, { name: r.name, rating: r.rating });
         if (existing) {
-          existing.setLatLng([r.lat, r.lng]);
-          existing.setIcon(pinIcon(L, r.latest)); // 카테고리·재방문이 바뀌었을 수 있으니 다시 그립니다.
+          existing.setPosition(new maps.LatLng(r.lat, r.lng));
+          existing.setIcon(icon);
           applyActive(existing, active);
+          setLabelVisible(existing, map.getZoom() >= LABEL_ZOOM);
           continue;
         }
-
-        const marker = L.marker([r.lat, r.lng], {
-          icon: pinIcon(L, r.latest),
-          riseOnHover: true,
-        }).addTo(map);
-
-        const label = document.createElement("div");
-        const name = document.createElement("div");
-        name.textContent = r.name;
-        name.style.fontWeight = "600";
-        name.style.whiteSpace = "nowrap";
-        const rating = document.createElement("div");
-        rating.textContent = r.rating?.toFixed(1) ?? "—";
-        rating.style.fontSize = "11px";
-        rating.style.opacity = "0.65";
-        label.append(name, rating);
-
-        // 핀 아이콘이 tooltipAnchor 를 들고 있으므로 offset 은 0.
-        marker.bindTooltip(label, {
-          permanent: true,
-          direction: "top",
-          offset: [0, 0],
-          className: "restaurant-map-tooltip",
+        const marker = new maps.Marker({
+          position: new maps.LatLng(r.lat, r.lng),
+          map,
+          icon,
+          clickable: true,
         });
-
-        marker.on("click", () =>
-          handlers.current.router.push(
-            r.visits.length === 1
-              ? `/?rid=${r.visits[0].id}`
-              : `/?place=${encodeURIComponent(r.key)}`,
-            { scroll: false }
-          )
-        );
-        marker.on("mouseover", () => handlers.current.setHover(r.key));
-        marker.on("mouseout", () => handlers.current.setHover(null));
-
-        applyActive(marker, active);
+        maps.Event.addListener(marker, "click", () => handlers.current.router.push(
+          r.visits.length === 1 ? "/?rid=" + r.visits[0].id : "/?place=" + encodeURIComponent(r.key),
+          { scroll: false },
+        ));
+        maps.Event.addListener(marker, "mouseover", () => handlers.current.setHover(r.key));
+        maps.Event.addListener(marker, "mouseout", () => handlers.current.setHover(null));
         markerRefs.current.set(r.key, marker);
+        applyActive(marker, active);
+        setLabelVisible(marker, map.getZoom() >= LABEL_ZOOM);
       }
     };
-
     syncRef.current = sync;
     if (readyRef.current) sync();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [places]);
 
-  // 3. 호버·선택은 크기만 키웁니다 — 아이콘을 갈아끼우지 않아 전환이 이어집니다.
   useEffect(() => {
     for (const [key, marker] of markerRefs.current) {
-      const active = hover === key || selectedKey === key;
-      applyActive(marker, active);
-      marker.setZIndexOffset(active ? 1000 : 0);
+      applyActive(marker, hover === key || selectedKey === key);
     }
   }, [hover, selectedKey, places]);
 
-  // 4. 지도 검색으로 고른 장소 — 라벨을 눌러 바로 기록 추가.
-  const ghostRef = useRef<Marker | null>(null);
-
   useEffect(() => {
-    const L = leafletRef.current;
     const map = mapRef.current;
-    if (!L || !map) return;
-
-    ghostRef.current?.remove();
+    if (!map) return;
+    const maps = naver.maps;
+    ghostRef.current?.setMap(null);
     ghostRef.current = null;
-
     if (!place) return;
-
-    const href = `/add?${new URLSearchParams({
-      name: place.name,
-      address: place.address,
-      lat: String(place.lat),
-      lng: String(place.lng),
-    })}`;
-
-    const ghost = L.marker([place.lat, place.lng], {
-      icon: ghostIcon(L),
-      zIndexOffset: 1200,
-    }).addTo(map);
-
-    const label = document.createElement("div");
-    label.style.cursor = "pointer";
-
-    const title = document.createElement("div");
-    title.textContent = place.name;
-    title.style.fontWeight = "600";
-    title.style.whiteSpace = "nowrap";
-
-    const cta = document.createElement("div");
-    cta.textContent = "+ 여기에 기록 추가";
-    cta.style.fontSize = "11px";
-    cta.style.color = "#b4552d";
-    cta.style.marginTop = "1px";
-
-    label.append(title, cta);
-    label.addEventListener("click", (e) => {
-      e.stopPropagation();
-      handlers.current.router.push(href);
+    const href = "/add?" + new URLSearchParams({
+      name: place.name, address: place.address, lat: String(place.lat), lng: String(place.lng),
+    }).toString();
+    const marker = new maps.Marker({
+      position: new maps.LatLng(place.lat, place.lng),
+      map,
+      icon: ghostIcon(maps, { name: place.name, cta: "+ 여기에 기록 추가" }),
+      zIndex: 1200,
+      clickable: true,
     });
-
-    ghost.bindTooltip(label, {
-      permanent: true,
-      interactive: true,
-      direction: "top",
-      offset: [0, 0],
-      className: "restaurant-map-tooltip",
-    });
-
-    ghost.on("click", () => handlers.current.router.push(href));
-
-    ghostRef.current = ghost;
-    map.flyTo([place.lat, place.lng], 16, { duration: 0.8 });
+    maps.Event.addListener(marker, "click", () => handlers.current.router.push(href));
+    ghostRef.current = marker;
+    map.morph(new maps.LatLng(place.lat, place.lng), 16, { duration: 800 });
   }, [place]);
 
-  // 5. 화면 잡기 — 장소를 고른 동안에는 건드리지 않습니다.
   const lastFit = useRef("");
-
   useEffect(() => {
-    const L = leafletRef.current;
     const map = mapRef.current;
-    if (!L || !map || place) return;
-
-     if (selectedKey !== null) {
+    if (!map || place) return;
+    const maps = naver.maps;
+    if (selectedKey !== null) {
       const target = placed(places).find((r) => r.key === selectedKey);
-      if (target) map.flyTo([target.lat, target.lng], 15, { duration: 0.7 });
+      if (target) map.morph(new maps.LatLng(target.lat, target.lng), 15, { duration: 700 });
       return;
     }
-
     const visible = placed(places);
     if (!visible.length) return;
-
     const key = visible.map((r) => r.key).join(",");
     if (key === lastFit.current) return;
     lastFit.current = key;
-
     if (visible.length === 1) {
-      map.setView([visible[0].lat, visible[0].lng], 15);
+      map.morph(new maps.LatLng(visible[0].lat, visible[0].lng), 15, { duration: 500 });
       return;
     }
-
-    map.fitBounds(
-      L.latLngBounds(visible.map((r) => [r.lat, r.lng] as [number, number])),
-      { paddingTopLeft: [40, 120], paddingBottomRight: [40, 40], maxZoom: 15 }
-    );
+    const bounds = new maps.LatLngBounds(new maps.LatLng(visible[0].lat, visible[0].lng), new maps.LatLng(visible[0].lat, visible[0].lng));
+    for (const r of visible.slice(1)) bounds.extend(new maps.LatLng(r.lat, r.lng));
+    map.fitBounds(bounds, { top: 120, right: 40, bottom: 40, left: 40, maxZoom: 15 });
   }, [places, selectedKey, place]);
 
   const searchHere = () => {
     const map = mapRef.current;
     if (!map) return;
-    const b = map.getBounds();
-    set(
-      "bbox",
-      [b.getSouth(), b.getWest(), b.getNorth(), b.getEast()]
-        .map((n) => n.toFixed(5))
-        .join(",")
-    );
+    const bounds = map.getBounds() as naver.maps.LatLngBounds;
+    set("bbox", [bounds.south(), bounds.west(), bounds.north(), bounds.east()].map((n) => n.toFixed(5)).join(","));
   };
 
-  return (
-    <>
-      <div ref={containerRef} className="absolute inset-0" />
-      <button
-        onClick={searchHere}
-        className="absolute top-27 left-8 z-[1000] flex cursor-pointer items-center gap-1.75 rounded-[20px] border border-line bg-card px-3.75 py-2 text-[12.5px] whitespace-nowrap text-[#4a453d] shadow-[0_4px_12px_rgba(28,26,23,0.07)] hover:border-brick hover:text-brick"
-      >
-        이 지역에서 다시 검색
-      </button>
-    </>
-  );
-
+  return <>
+    <div ref={containerRef} className="absolute inset-0 h-full w-full" />
+    <button onClick={searchHere} className="absolute top-27 left-8 z-[1000] flex cursor-pointer items-center gap-1.75 rounded-[20px] border border-line bg-card px-3.75 py-2 text-[12px] whitespace-nowrap text-[#4a453d] shadow-[0_4px_12px_rgba(28,26,23,0.07)] hover:border-brick hover:text-brick">
+      이 지역에서 다시 검색
+    </button>
+  </>;
 }
