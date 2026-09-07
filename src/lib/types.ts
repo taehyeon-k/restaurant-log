@@ -29,6 +29,8 @@ export type Restaurant = {
   verified: boolean;
   /** 인증 촬영 시 위치 정확도(m). 좌표 자체는 남기지 않습니다. */
   acc: number | null;
+  /** 위치 인증이 실제로 통과한 순간(UTC) — DB 트리거가 서버 시각으로 찍습니다. */
+  verified_at: string | null;
   /** 사진만 찍고 본문을 아직 쓰지 않은 기록 — 보관함에만 보입니다 */
   pending: boolean;
 };
@@ -72,6 +74,32 @@ export const shortDate = (d: string | null) =>
 
 /** "2026-07-12" → "2026.07.12" */
 export const dottedDate = (d: string | null) => (d ?? "").replaceAll("-", ".");
+
+/** UTC ISO 타임스탬프 → "2026. 9. 7. (월) 오후 7:32" (한국 시간 기준) */
+export const verifiedTimestamp = (iso: string) =>
+  new Intl.DateTimeFormat("ko-KR", {
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+    weekday: "short",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+    timeZone: "Asia/Seoul",
+  }).format(new Date(iso));
+
+/**
+ * UTC ISO 타임스탬프 → "19" (한국 시간, 0~23시, 두 자리) — 달력 칸은 좁아서
+ * 분까지는 못 넣습니다. "en-US" 로케일로 포맷해 "시" 단위가 안 붙게 합니다.
+ */
+export const verifiedHour = (iso: string) => {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    hour: "2-digit",
+    hour12: false,
+    timeZone: "Asia/Seoul",
+  }).formatToParts(new Date(iso));
+  return parts.find((p) => p.type === "hour")?.value ?? "";
+};
 
 /** 카테고리별 핀 색. 종이 팔레트 안에서 서로 구분되는 톤으로 골랐습니다. */
 export const CATEGORY_COLORS: Record<string, string> = {

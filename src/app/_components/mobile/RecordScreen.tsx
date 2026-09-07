@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { dottedDate, type Restaurant } from "@/lib/types";
+import { dottedDate, verifiedTimestamp, type Restaurant } from "@/lib/types";
 import { photosOf } from "./record";
 import { Eyebrow, MobileStars, Pigs, VerifiedMark, photoFill } from "./ui";
 import { SAFE_TOP } from "./MobileShell";
@@ -148,9 +148,16 @@ export default function RecordScreen({
 
         <div className="mt-[22px] flex flex-col gap-[18px] border-t border-[#ded8cb] pt-[18px]">
           <Row label="방문">
-            <span className="text-[13.5px]">
-              {dottedDate(record.visited_at) || "날짜를 쓰지 않았습니다"}
-            </span>
+            {record.verified && record.verified_at ? (
+              <span className="flex items-center gap-1.5 text-[13.5px]">
+                {verifiedTimestamp(record.verified_at)}
+                <VerifiedMark size={14} />
+              </span>
+            ) : (
+              <span className="text-[13.5px]">
+                {dottedDate(record.visited_at) || "날짜를 쓰지 않았습니다"}
+              </span>
+            )}
           </Row>
 
           <Row label="메뉴">

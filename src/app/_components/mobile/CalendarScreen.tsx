@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { Restaurant } from "@/lib/types";
+import { useMediaQuery } from "@/lib/useMediaQuery";
+import { verifiedHour, type Restaurant } from "@/lib/types";
 import { Eyebrow } from "./ui";
 
 const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
@@ -9,6 +10,13 @@ const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
 const pad = (n: number) => String(n).padStart(2, "0");
 /** "YYYY-MM-DD" — restaurants.visited_at 도 이 형식(날짜 입력 그대로)이라 문자열로 바로 비교합니다. */
 const keyOf = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+
+/**
+ * 칸 안에서 이름이 잘리는 글자 수를 CSS 말줄임이 아니라 여기서 직접 정합니다 —
+ * 칸 너비마다 "최소 3글자 + …"가 확실히 들어가도록 미리 재서 고른 값입니다.
+ */
+const clipName = (name: string, max: number) =>
+  name.length > max ? `${name.slice(0, max)}…` : name;
 
 /** 그 달을 앞뒤로 채워 온전한 주 단위 격자를 만듭니다(일요일 시작). */
 function monthCells(year: number, month: number) {
@@ -72,6 +80,12 @@ export default function CalendarScreen({
 
   const cells = useMemo(() => monthCells(cursor.year, cursor.month), [cursor]);
   const weeks = useMemo(() => toWeeks(cells), [cells]);
+
+  /** 칸이 넓어지는 화면(sm/md)에서만 이름을 더 보여주고, 인증 시각도 그때만 얹습니다. */
+  const isSm = useMediaQuery("(min-width: 640px)") ?? false;
+  const isMd = useMediaQuery("(min-width: 768px)") ?? false;
+  const maxNameChars = isMd ? 4 : 3;
+  const showHour = isSm;
 
   const monthPrefix = `${cursor.year}-${pad(cursor.month + 1)}`;
   const countThisMonth = rows.filter((r) => r.visited_at?.startsWith(monthPrefix)).length;
@@ -138,7 +152,7 @@ export default function CalendarScreen({
               return (
                 <div
                   key={key}
-                  className={`flex min-w-0 flex-1 flex-col overflow-hidden rounded-[12px] border p-1.5 sm:p-2 md:p-2.5 ${
+                  className={`flex min-w-0 flex-1 flex-col overflow-hidden rounded-[12px] border p-[1px] sm:p-1.5 ${
                     inMonth ? "border-line-soft bg-card" : "border-transparent"
                   } ${isToday ? "border-brick" : ""}`}
                 >
@@ -152,16 +166,25 @@ export default function CalendarScreen({
 
                   {inMonth && visits.length > 0 && (
                     <div className="mt-1 flex min-h-0 flex-1 flex-col gap-[3px] overflow-hidden">
-                      {shown.map((v) => (
-                        <button
-                          key={v.id}
-                          type="button"
-                          onClick={() => onOpenVisit(v)}
-                          className="block w-full shrink-0 cursor-pointer truncate rounded-[5px] border-none bg-brick-soft px-1.5 py-[2px] text-left text-[9px] leading-[1.4] text-brick sm:px-2 sm:py-[3px] sm:text-[11px] md:text-[12px]"
-                        >
-                          {v.name}
-                        </button>
-                      ))}
+                      {shown.map((v) => {
+                        const clipped = clipName(v.name, maxNameChars);
+                        const label =
+                          v.verified && v.verified_at && showHour
+                            ? `${verifiedHour(v.verified_at)} ${clipped}`
+                            : clipped;
+
+                        return (
+                          <button
+                            key={v.id}
+                            type="button"
+                            onClick={() => onOpenVisit(v)}
+                            title={v.name}
+                            className="block w-full shrink-0 cursor-pointer overflow-hidden rounded-[5px] border-none bg-brick-soft px-[1px] py-[2px] text-left text-[9px] leading-[1.4] whitespace-nowrap text-brick sm:px-0.5 sm:py-[3px] sm:text-[11px] md:text-[12px]"
+                          >
+                            {label}
+                          </button>
+                        );
+                      })}
                       {extra > 0 && (
                         <div className="shrink-0 px-1 text-[8.5px] text-faint sm:text-[10px]">
                           +{extra}개 더
