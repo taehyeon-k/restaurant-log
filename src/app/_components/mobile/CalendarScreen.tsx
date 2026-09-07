@@ -24,6 +24,13 @@ function monthCells(year: number, month: number) {
   return cells;
 }
 
+/** 셀 배열을 7개씩 묶어 주 단위 행으로 나눕니다. */
+function toWeeks(cells: Date[]) {
+  const weeks: Date[][] = [];
+  for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
+  return weeks;
+}
+
 /**
  * 월력 — 기록의 visited_at 을 날짜별로 모아 달력 칸 안에 가게 이름으로 보여줍니다.
  * 이름을 누르면 그 기록 상세(RecordScreen)를 엽니다.
@@ -64,6 +71,7 @@ export default function CalendarScreen({
   }, [rows]);
 
   const cells = useMemo(() => monthCells(cursor.year, cursor.month), [cursor]);
+  const weeks = useMemo(() => toWeeks(cells), [cells]);
 
   const monthPrefix = `${cursor.year}-${pad(cursor.month + 1)}`;
   const countThisMonth = rows.filter((r) => r.visited_at?.startsWith(monthPrefix)).length;
@@ -110,58 +118,62 @@ export default function CalendarScreen({
         <div className="mt-1.5 text-[12px] text-faint">이 달 기록 {countThisMonth}건</div>
       </div>
 
-      <div className="mt-3.5 grid shrink-0 grid-cols-7 px-3 text-center font-mono text-[10px] text-faint">
+      <div className="mt-3.5 grid shrink-0 grid-cols-7 px-3 text-center font-mono text-[10px] text-faint sm:text-[11px] md:text-[12px]">
         {WEEKDAYS.map((w) => (
           <div key={w}>{w}</div>
         ))}
       </div>
 
-      <div className="no-bar min-h-0 flex-1 overflow-y-auto px-3 pt-1.5 pb-6">
-        <div className="grid grid-cols-7 gap-1">
-          {cells.map((date) => {
-            const key = keyOf(date);
-            const inMonth = date.getMonth() === cursor.month;
-            const visits = byDate.get(key) ?? [];
-            const shown = visits.slice(0, 2);
-            const extra = visits.length - shown.length;
-            const isToday = key === todayKey;
+      <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-hidden px-3 pt-1.5 pb-3">
+        {weeks.map((week, i) => (
+          <div key={i} className="flex min-h-0 flex-1 gap-1">
+            {week.map((date) => {
+              const key = keyOf(date);
+              const inMonth = date.getMonth() === cursor.month;
+              const visits = byDate.get(key) ?? [];
+              const shown = visits.slice(0, 2);
+              const extra = visits.length - shown.length;
+              const isToday = key === todayKey;
 
-            return (
-              <div
-                key={key}
-                className={`min-h-[72px] rounded-[12px] border p-1 ${
-                  inMonth ? "border-line-soft bg-card" : "border-transparent"
-                } ${isToday ? "border-brick" : ""}`}
-              >
+              return (
                 <div
-                  className={`font-mono text-[10.5px] ${
-                    !inMonth ? "text-[#d3cdc0]" : isToday ? "font-bold text-brick" : "text-ink"
-                  }`}
+                  key={key}
+                  className={`flex min-w-0 flex-1 flex-col overflow-hidden rounded-[12px] border p-1.5 sm:p-2 md:p-2.5 ${
+                    inMonth ? "border-line-soft bg-card" : "border-transparent"
+                  } ${isToday ? "border-brick" : ""}`}
                 >
-                  {date.getDate()}
-                </div>
-
-                {inMonth && visits.length > 0 && (
-                  <div className="mt-1 flex flex-col gap-[3px]">
-                    {shown.map((v) => (
-                      <button
-                        key={v.id}
-                        type="button"
-                        onClick={() => onOpenVisit(v)}
-                        className="block w-full cursor-pointer truncate rounded-[5px] border-none bg-brick-soft px-1 py-[1px] text-left text-[9px] leading-[1.4] text-brick"
-                      >
-                        {v.name}
-                      </button>
-                    ))}
-                    {extra > 0 && (
-                      <div className="px-1 text-[8.5px] text-faint">+{extra}개 더</div>
-                    )}
+                  <div
+                    className={`shrink-0 font-mono text-[10.5px] sm:text-[12px] md:text-[13px] ${
+                      !inMonth ? "text-[#d3cdc0]" : isToday ? "font-bold text-brick" : "text-ink"
+                    }`}
+                  >
+                    {date.getDate()}
                   </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
+
+                  {inMonth && visits.length > 0 && (
+                    <div className="mt-1 flex min-h-0 flex-1 flex-col gap-[3px] overflow-hidden">
+                      {shown.map((v) => (
+                        <button
+                          key={v.id}
+                          type="button"
+                          onClick={() => onOpenVisit(v)}
+                          className="block w-full shrink-0 cursor-pointer truncate rounded-[5px] border-none bg-brick-soft px-1.5 py-[2px] text-left text-[9px] leading-[1.4] text-brick sm:px-2 sm:py-[3px] sm:text-[11px] md:text-[12px]"
+                        >
+                          {v.name}
+                        </button>
+                      ))}
+                      {extra > 0 && (
+                        <div className="shrink-0 px-1 text-[8.5px] text-faint sm:text-[10px]">
+                          +{extra}개 더
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ))}
       </div>
     </div>
   );
