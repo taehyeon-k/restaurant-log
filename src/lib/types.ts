@@ -75,18 +75,38 @@ export const shortDate = (d: string | null) =>
 /** "2026-07-12" → "2026.07.12" */
 export const dottedDate = (d: string | null) => (d ?? "").replaceAll("-", ".");
 
-/** UTC ISO 타임스탬프 → "2026. 9. 7. (월) 오후 7:32" (한국 시간 기준) */
-export const verifiedTimestamp = (iso: string) =>
-  new Intl.DateTimeFormat("ko-KR", {
-    year: "numeric",
-    month: "numeric",
-    day: "numeric",
-    weekday: "short",
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
+/** verified_at(UTC ISO)을 한국 시간 연·월·일·시·분으로 쪼갭니다. */
+function seoulParts(iso: string) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Seoul",
-  }).format(new Date(iso));
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(new Date(iso));
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
+  return {
+    year: get("year"),
+    month: get("month"),
+    day: get("day"),
+    hour: get("hour"),
+    minute: get("minute"),
+  };
+}
+
+/** UTC ISO 타임스탬프 → "13:24" (한국 시간, 24시간 HH:MM) */
+export const verifiedTime = (iso: string) => {
+  const p = seoulParts(iso);
+  return `${p.hour}:${p.minute}`;
+};
+
+/** UTC ISO 타임스탬프 → "2026.06.28 13:24" (한국 시간, 날짜는 점 구분·시각은 24시간 HH:MM) */
+export const verifiedDateTime = (iso: string) => {
+  const p = seoulParts(iso);
+  return `${p.year}.${p.month}.${p.day} ${p.hour}:${p.minute}`;
+};
 
 /** 카테고리별 핀 색. 종이 팔레트 안에서 서로 구분되는 톤으로 골랐습니다. */
 export const CATEGORY_COLORS: Record<string, string> = {

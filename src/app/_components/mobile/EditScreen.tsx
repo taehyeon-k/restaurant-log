@@ -2,11 +2,11 @@
 
 import { useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { CATEGORIES, KEYWORDS, type Kind, type MenuItem, type Restaurant } from "@/lib/types";
+import { CATEGORIES, KEYWORDS, verifiedDateTime, type Kind, type MenuItem, type Restaurant } from "@/lib/types";
 import { FELT_PRICE } from "@/lib/price";
 import { forwardGeocode } from "@/lib/geocode";
 import { regionFromAddress } from "@/lib/regions";
-import { chipClass, Eyebrow } from "./ui";
+import { chipClass, Eyebrow, VerifiedMark } from "./ui";
 
 export type EditTarget =
   | {
@@ -45,6 +45,11 @@ export default function EditScreen({
 }) {
   const record = target.mode === "edit" ? target.record : null;
   const isNew = record === null;
+  /**
+   * 인증된 기록은 촬영 시각이 방문일이라 고칠 수 없습니다 — 단, verified_at
+   * 마이그레이션 이전에 인증된 옛 기록처럼 시각이 없으면 그냥 날짜칸을 씁니다.
+   */
+  const isVerified = !isNew && record.verified && !!record.verified_at;
   const kind: Kind = record?.kind ?? (target.mode === "new" ? target.kind : "restaurant");
   const categories = CATEGORIES[kind];
   const preset = target.mode === "new" ? target.preset : undefined;
@@ -120,7 +125,8 @@ export default function EditScreen({
         price_range: menuTotal || null,
         review: review.trim() || null,
         revisit,
-        visited_at: visitedAt || null,
+        // 인증된 기록은 방문일이 촬영 시각 그대로라 고칠 수 없어 아예 보내지 않습니다.
+        ...(isVerified ? {} : { visited_at: visitedAt || null }),
         keywords,
         updated_at: new Date().toISOString(),
       };
@@ -241,15 +247,30 @@ export default function EditScreen({
           />
         </label>
 
-        <label className="mt-3.5 block">
-          <Eyebrow>방문</Eyebrow>
-          <input
-            type="date"
-            value={visitedAt}
-            onChange={(e) => setVisitedAt(e.target.value)}
-            className={`${fieldClass} font-mono text-[13px]`}
-          />
-        </label>
+        {isVerified ? (
+          <div className="mt-3.5">
+            <Eyebrow>방문</Eyebrow>
+            <div className="mt-[7px] flex min-h-12 items-center gap-2.5 rounded-2xl border border-[#e0c3b1] bg-[#f9efe8] px-[15px]">
+              <VerifiedMark size={20} />
+              <span className="font-mono text-[13.5px] text-ink">
+                {verifiedDateTime(record!.verified_at!)}
+              </span>
+            </div>
+            <div className="mt-1.5 text-[11.5px] text-faint">
+              사진을 찍은 시각이 그대로 찍혀 고칠 수 없습니다.
+            </div>
+          </div>
+        ) : (
+          <label className="mt-3.5 block">
+            <Eyebrow>방문</Eyebrow>
+            <input
+              type="date"
+              value={visitedAt}
+              onChange={(e) => setVisitedAt(e.target.value)}
+              className={`${fieldClass} font-mono text-[13px]`}
+            />
+          </label>
+        )}
 
         <div className="mt-[18px] flex flex-col gap-[9px]">
           <Eyebrow>종류</Eyebrow>

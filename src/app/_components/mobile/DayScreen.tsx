@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { coverPhoto, dottedDate, type Restaurant } from "@/lib/types";
+import { coverPhoto, dottedDate, verifiedTime, type Restaurant } from "@/lib/types";
 import { MobileStars, VerifiedMark, photoFill } from "./ui";
 
 /** "2026-08-09" → { month: 8, day: 9 } (앞자리 0 없이) */
@@ -122,6 +122,14 @@ function VisitCard({ record, onOpen }: { record: Restaurant; onOpen: () => void 
           <span className="font-mono text-[10.5px] text-muted">
             {record.rating?.toFixed(1) ?? "—"}
           </span>
+          {record.verified && record.verified_at && (
+            <>
+              <span className="h-[11px] w-px bg-[#ded8cb]" />
+              <span className="font-mono text-[10.5px] text-brick">
+                {verifiedTime(record.verified_at)}
+              </span>
+            </>
+          )}
         </div>
 
         <div className="mt-1.5 line-clamp-2 text-[11.5px] leading-[1.5] text-[#4d4842]">

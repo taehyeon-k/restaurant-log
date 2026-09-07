@@ -1,7 +1,7 @@
 "use client";
 
 import type { Place } from "@/lib/places";
-import { dottedDate } from "@/lib/types";
+import { dottedDate, verifiedDateTime } from "@/lib/types";
 import { feltLabel, feltLevel } from "@/lib/price";
 import { photoCount } from "./record";
 import { Eyebrow, MobileStars, Pigs, photoFill } from "./ui";
@@ -108,7 +108,9 @@ export default function PlaceScreen({
               >
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-mono text-[12px] text-ink">
-                    {dottedDate(v.visited_at)}
+                    {v.verified && v.verified_at
+                      ? verifiedDateTime(v.verified_at)
+                      : dottedDate(v.visited_at)}
                   </span>
                   <span className="flex items-center gap-[7px]">
                     <MobileStars rating={v.rating} size={11.5} />
