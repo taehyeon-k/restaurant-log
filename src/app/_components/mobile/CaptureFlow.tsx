@@ -32,6 +32,20 @@ const FRAME: React.CSSProperties = {
   height: "min(352px, calc(100dvh - 352px))",
 };
 
+/**
+ * 줌 — 기기가 `MediaStreamTrack` 의 zoom capability 를 지원하면 그 범위를,
+ * 아니면 CSS scale 로 흉내 낼 이 기본 범위를 씁니다.
+ */
+const CSS_ZOOM_RANGE = { min: 1, max: 3, step: 0.1 };
+
+type ZoomRange = { min: number; max: number; step: number };
+/** 표준 타입에 없는 실험적 zoom capability — 지원 브라우저(주로 Chrome)에만 있습니다. */
+type ZoomCapabilities = MediaTrackCapabilities & { zoom?: ZoomRange };
+type ZoomSettings = MediaTrackSettings & { zoom?: number };
+type ZoomConstraints = MediaTrackConstraints & {
+  advanced?: (MediaTrackConstraintSet & { zoom?: number })[];
+};
+
 const pad = (n: number) => String(n).padStart(2, "0");
 const hhmm = (d: Date) => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 const isoDate = (d: Date) =>
@@ -88,6 +102,13 @@ export default function CaptureFlow({
   }>({ session: 0, live: false, err: null });
   const [facing, setFacing] = useState<"environment" | "user">("environment");
 
+  // 지금 켠 트랙이 네이티브 줌을 지원하면 그 범위, 아니면 null(= CSS 흉내).
+  const [zoomCaps, setZoomCaps] = useState<ZoomRange | null>(null);
+  const [zoom, setZoom] = useState(1);
+  const zoomRange = zoomCaps ?? CSS_ZOOM_RANGE;
+  const trackRef = useRef<MediaStreamTrack | null>(null);
+  const pinchRef = useRef<{ dist: number; zoom: number } | null>(null);
+
   const [extra, setExtra] = useState<Candidate[]>([]);
   const [picked, setPicked] = useState<Candidate | null>(null);
   const [saving, setSaving] = useState(false);
@@ -115,6 +136,7 @@ export default function CaptureFlow({
     if (timerRef.current) clearTimeout(timerRef.current);
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
+    trackRef.current = null;
     if (videoRef.current) videoRef.current.srcObject = null;
     liveRef.current = false;
   }, []);
@@ -148,6 +170,23 @@ export default function CaptureFlow({
         }
         liveRef.current = true;
         setCam({ session, live: true, err: null });
+
+        const track = stream.getVideoTracks()[0];
+        trackRef.current = track;
+        let caps: ZoomCapabilities | undefined;
+        try {
+          caps = track.getCapabilities?.() as ZoomCapabilities | undefined;
+        } catch {
+          caps = undefined;
+        }
+        if (caps?.zoom) {
+          setZoomCaps(caps.zoom);
+          const settings = track.getSettings() as ZoomSettings;
+          setZoom(settings.zoom ?? caps.zoom.min);
+        } else {
+          setZoomCaps(null);
+          setZoom(1);
+        }
       })
       .catch((err: DOMException) => {
         if (done) return;
@@ -161,14 +200,24 @@ export default function CaptureFlow({
     };
   }, [step, facing, session, supported, stopCam]);
 
-  /** 화면 한 장을 최대 900px 로 줄여 JPEG 으로 굽습니다. */
+  /**
+   * 화면 한 장을 최대 900px 로 줄여 JPEG 으로 굽습니다.
+   * 네이티브 줌이면 트랙 자체가 이미 확대된 프레임을 주므로 그대로 굽고,
+   * CSS 로 흉내 낸 줌이면(트랙은 원본 그대로) 화면에 보이는 만큼만 가운데를 잘라 굽습니다.
+   */
   function grabFrame() {
     const v = videoRef.current;
     if (!v || !v.videoWidth) return null;
 
-    const scale = Math.min(1, 900 / Math.max(v.videoWidth, v.videoHeight));
-    const w = Math.round(v.videoWidth * scale);
-    const h = Math.round(v.videoHeight * scale);
+    const cssZoom = !zoomCaps && zoom > 1;
+    const cropW = cssZoom ? v.videoWidth / zoom : v.videoWidth;
+    const cropH = cssZoom ? v.videoHeight / zoom : v.videoHeight;
+    const sx = (v.videoWidth - cropW) / 2;
+    const sy = (v.videoHeight - cropH) / 2;
+
+    const scale = Math.min(1, 900 / Math.max(cropW, cropH));
+    const w = Math.round(cropW * scale);
+    const h = Math.round(cropH * scale);
 
     const canvas = document.createElement("canvas");
     canvas.width = w;
@@ -180,9 +229,46 @@ export default function CaptureFlow({
       ctx.translate(w, 0);
       ctx.scale(-1, 1);
     }
-    ctx.drawImage(v, 0, 0, w, h);
+    ctx.drawImage(v, sx, sy, cropW, cropH, 0, 0, w, h);
 
     return canvas.toDataURL("image/jpeg", 0.72);
+  }
+
+  /* ── 줌 ────────────────────────────────────────── */
+
+  /** 슬라이더·+/-·핀치가 모두 이 함수로 모입니다. */
+  function setZoomClamped(next: number) {
+    const clamped = Math.min(zoomRange.max, Math.max(zoomRange.min, next));
+    setZoom(clamped);
+
+    if (zoomCaps) {
+      trackRef.current
+        ?.applyConstraints({ advanced: [{ zoom: clamped }] } as ZoomConstraints)
+        .catch(() => {});
+    }
+  }
+
+  function touchDist(touches: React.TouchList) {
+    const a = touches[0];
+    const b = touches[1];
+    return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+  }
+
+  function onPinchStart(e: React.TouchEvent) {
+    if (e.touches.length === 2) {
+      pinchRef.current = { dist: touchDist(e.touches), zoom };
+    }
+  }
+
+  function onPinchMove(e: React.TouchEvent) {
+    if (e.touches.length === 2 && pinchRef.current) {
+      const ratio = touchDist(e.touches) / pinchRef.current.dist;
+      setZoomClamped(pinchRef.current.zoom * ratio);
+    }
+  }
+
+  function onPinchEnd(e: React.TouchEvent) {
+    if (e.touches.length < 2) pinchRef.current = null;
   }
 
   /* ── 위치 · 후보 ────────────────────────────────── */
@@ -369,14 +455,22 @@ export default function CaptureFlow({
 
     return (
       <div className="absolute inset-0 z-[1400] bg-[#171614]">
-        <video
-          ref={videoRef}
-          autoPlay
-          playsInline
-          muted
+        <div
           style={FRAME}
-          className="absolute inset-x-4 rounded-[28px] bg-[#232120] object-cover"
-        />
+          className="absolute inset-x-4 touch-none overflow-hidden rounded-[28px] bg-[#232120]"
+          onTouchStart={onPinchStart}
+          onTouchMove={onPinchMove}
+          onTouchEnd={onPinchEnd}
+        >
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted
+            className="absolute inset-0 h-full w-full object-cover"
+            style={zoomCaps ? undefined : { transform: `scale(${zoom})`, transformOrigin: "center" }}
+          />
+        </div>
 
         <button
           type="button"
@@ -438,6 +532,43 @@ export default function CaptureFlow({
                 다시 시도
               </button>
             </div>
+          </div>
+        )}
+
+        {!camErr && (
+          <div className="absolute inset-x-8 bottom-[212px] flex items-center gap-2.5">
+            <button
+              type="button"
+              onClick={() => setZoomClamped(zoom - zoomRange.step)}
+              aria-label="줌 축소"
+              className="grid size-8 shrink-0 cursor-pointer place-items-center rounded-full border-none bg-[rgba(251,250,246,.16)] text-[16px] text-card"
+            >
+              −
+            </button>
+
+            <input
+              type="range"
+              min={zoomRange.min}
+              max={zoomRange.max}
+              step={zoomRange.step}
+              value={zoom}
+              onChange={(e) => setZoomClamped(Number(e.target.value))}
+              aria-label="줌"
+              className="h-1 flex-1 accent-[#fbfaf6]"
+            />
+
+            <button
+              type="button"
+              onClick={() => setZoomClamped(zoom + zoomRange.step)}
+              aria-label="줌 확대"
+              className="grid size-8 shrink-0 cursor-pointer place-items-center rounded-full border-none bg-[rgba(251,250,246,.16)] text-[16px] text-card"
+            >
+              +
+            </button>
+
+            <span className="shrink-0 rounded-[10px] bg-[rgba(251,250,246,.16)] px-2 py-1 font-mono text-[11px] text-card">
+              {zoom.toFixed(1)}x
+            </span>
           </div>
         )}
 

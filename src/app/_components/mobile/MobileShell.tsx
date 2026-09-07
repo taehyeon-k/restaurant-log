@@ -14,6 +14,7 @@ import EditScreen, { type EditTarget } from "./EditScreen";
 import CaptureFlow, { type Verified } from "./CaptureFlow";
 import LabelBook from "./LabelBook";
 import DraftsScreen from "./DraftsScreen";
+import CalendarScreen from "./CalendarScreen";
 import TabBar, { type Tab } from "./TabBar";
 import MobilePlaceSearch, { type PickedPlace } from "./PlaceSearch";
 import { BURST, DraftsBoxIcon, PlusIcon, SearchIcon } from "./ui";
@@ -283,8 +284,7 @@ export default function MobileShell({ rows }: { rows: Restaurant[] }) {
 
   const overlayOpen = editing !== null || flow || labelsOpen || draftsOpen || tab !== "map";
 
-  const TAB_TITLE: Record<Exclude<Tab, "map">, string> = {
-    calendar: "월력",
+  const TAB_TITLE: Record<Exclude<Tab, "map" | "calendar">, string> = {
     community: "커뮤니티",
     account: "내계정",
   };
@@ -431,8 +431,19 @@ export default function MobileShell({ rows }: { rows: Restaurant[] }) {
         </div>
       </div>
 
+      {tab === "calendar" && (
+        <CalendarScreen
+          rows={visibleRows}
+          onOpenVisit={(record) => {
+            setKind(record.kind);
+            setPlaceKey(null);
+            setVisitId(record.id);
+          }}
+        />
+      )}
+
       {/* 아직 만들지 않은 탭 — 지도 탭에서만 지도·시트가 보입니다 */}
-      {tab !== "map" && (
+      {tab !== "map" && tab !== "calendar" && (
         <div className="absolute inset-x-0 top-0 bottom-[74px] z-[1160] flex flex-col items-center justify-center gap-2.5 bg-paper">
           <div className="font-serif text-[19px] font-bold">{TAB_TITLE[tab]}</div>
           <div className="text-[12.5px] text-faint">이 화면은 아직 만들지 않았습니다</div>
