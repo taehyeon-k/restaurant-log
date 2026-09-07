@@ -88,19 +88,6 @@ export const verifiedTimestamp = (iso: string) =>
     timeZone: "Asia/Seoul",
   }).format(new Date(iso));
 
-/**
- * UTC ISO 타임스탬프 → "19" (한국 시간, 0~23시, 두 자리) — 달력 칸은 좁아서
- * 분까지는 못 넣습니다. "en-US" 로케일로 포맷해 "시" 단위가 안 붙게 합니다.
- */
-export const verifiedHour = (iso: string) => {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    hour: "2-digit",
-    hour12: false,
-    timeZone: "Asia/Seoul",
-  }).formatToParts(new Date(iso));
-  return parts.find((p) => p.type === "hour")?.value ?? "";
-};
-
 /** 카테고리별 핀 색. 종이 팔레트 안에서 서로 구분되는 톤으로 골랐습니다. */
 export const CATEGORY_COLORS: Record<string, string> = {
   한식: "#b4552d",

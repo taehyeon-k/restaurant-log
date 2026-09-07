@@ -1,8 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useMediaQuery } from "@/lib/useMediaQuery";
-import { verifiedHour, type Restaurant } from "@/lib/types";
+import type { Restaurant } from "@/lib/types";
 import { Eyebrow } from "./ui";
 
 const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
@@ -12,11 +11,22 @@ const pad = (n: number) => String(n).padStart(2, "0");
 const keyOf = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 
 /**
- * 칸 안에서 이름이 잘리는 글자 수를 CSS 말줄임이 아니라 여기서 직접 정합니다 —
- * 칸 너비마다 "최소 3글자 + …"가 확실히 들어가도록 미리 재서 고른 값입니다.
+ * 칸 안 이름 칩 최대 글자 수. HANDOFF-calendar.md 는 4자를 최종값으로 적었지만,
+ * 실제 한글 폰트(Noto Sans KR)로 재보면 390px 폭 · 7열 격자에서 4자+말줄임은
+ * 어떤 여백으로도 들어가지 않습니다(칸 자체가 폭 49px 안팎). 3자는 여유 있게
+ * 들어가 그대로 씁니다 — 이름이 잘려도 최소 3자는 보이게 하려던 요구를 지킵니다.
  */
+const MAX_CHIP_CHARS = 3;
+
+/** 칸 안 이름은 CSS 말줄임이 아니라 여기서 직접 자릅니다(예측 가능한 절단). */
 const clipName = (name: string, max: number) =>
   name.length > max ? `${name.slice(0, max)}…` : name;
+
+/** "YYYY-MM-DD" → { year, month(0-based) } */
+function monthOfKey(dateKey: string) {
+  const [y, m] = dateKey.split("-").map(Number);
+  return { year: y, month: m - 1 };
+}
 
 /** 그 달을 앞뒤로 채워 온전한 주 단위 격자를 만듭니다(일요일 시작). */
 function monthCells(year: number, month: number) {
@@ -40,30 +50,45 @@ function toWeeks(cells: Date[]) {
 }
 
 /**
- * 월력 — 기록의 visited_at 을 날짜별로 모아 달력 칸 안에 가게 이름으로 보여줍니다.
- * 이름을 누르면 그 기록 상세(RecordScreen)를 엽니다.
+ * 월력 — 기록의 visited_at 을 날짜별로 모아 달력 칸 안에 가게 이름 미리보기로 보여줍니다.
+ * 칸 전체가 버튼입니다 — 누르면 그 날짜의 DayScreen 이 열립니다(칸 안 이름은 비활성 텍스트).
+ * HANDOFF-calendar.md 1절.
  */
 export default function CalendarScreen({
   rows,
-  onOpenVisit,
+  onOpenDay,
 }: {
   rows: Restaurant[];
-  onOpenVisit: (record: Restaurant) => void;
+  onOpenDay: (dateKey: string) => void;
 }) {
-  const [cursor, setCursor] = useState(() => {
-    const d = new Date();
-    return { year: d.getFullYear(), month: d.getMonth() };
-  });
+  const maxVisitedAt = useMemo(() => {
+    let max: string | null = null;
+    for (const r of rows) {
+      if (r.visited_at && (!max || r.visited_at > max)) max = r.visited_at;
+    }
+    return max;
+  }, [rows]);
+
+  /** 이번 달이 비어 있을 수 있으니, 처음에는 가장 최근 기록이 있는 달을 엽니다. */
+  const defaultCursor = useMemo(
+    () => monthOfKey(maxVisitedAt ?? keyOf(new Date())),
+    [maxVisitedAt]
+  );
+
+  const [cursorState, setCursorState] = useState<{ year: number; month: number } | null>(
+    null
+  );
+  const cursor = cursorState ?? defaultCursor;
 
   const shiftMonth = (delta: number) =>
-    setCursor(({ year, month }) => {
-      const d = new Date(year, month + delta, 1);
+    setCursorState(() => {
+      const d = new Date(cursor.year, cursor.month + delta, 1);
       return { year: d.getFullYear(), month: d.getMonth() };
     });
 
   const goToday = () => {
     const d = new Date();
-    setCursor({ year: d.getFullYear(), month: d.getMonth() });
+    setCursorState({ year: d.getFullYear(), month: d.getMonth() });
   };
 
   const byDate = useMemo(() => {
@@ -80,12 +105,6 @@ export default function CalendarScreen({
 
   const cells = useMemo(() => monthCells(cursor.year, cursor.month), [cursor]);
   const weeks = useMemo(() => toWeeks(cells), [cells]);
-
-  /** 칸이 넓어지는 화면(sm/md)에서만 이름을 더 보여주고, 인증 시각도 그때만 얹습니다. */
-  const isSm = useMediaQuery("(min-width: 640px)") ?? false;
-  const isMd = useMediaQuery("(min-width: 768px)") ?? false;
-  const maxNameChars = isMd ? 4 : 3;
-  const showHour = isSm;
 
   const monthPrefix = `${cursor.year}-${pad(cursor.month + 1)}`;
   const countThisMonth = rows.filter((r) => r.visited_at?.startsWith(monthPrefix)).length;
@@ -132,7 +151,7 @@ export default function CalendarScreen({
         <div className="mt-1.5 text-[12px] text-faint">이 달 기록 {countThisMonth}건</div>
       </div>
 
-      <div className="mt-3.5 grid shrink-0 grid-cols-7 px-3 text-center font-mono text-[10px] text-faint sm:text-[11px] md:text-[12px]">
+      <div className="mt-3.5 grid shrink-0 grid-cols-7 px-3 text-center font-mono text-[10px] text-faint">
         {WEEKDAYS.map((w) => (
           <div key={w}>{w}</div>
         ))}
@@ -148,16 +167,22 @@ export default function CalendarScreen({
               const shown = visits.slice(0, 2);
               const extra = visits.length - shown.length;
               const isToday = key === todayKey;
+              const clickable = inMonth && visits.length > 0;
 
-              return (
-                <div
-                  key={key}
-                  className={`flex min-w-0 flex-1 flex-col overflow-hidden rounded-[12px] border p-[1px] sm:p-1.5 ${
-                    inMonth ? "border-line-soft bg-card" : "border-transparent"
-                  } ${isToday ? "border-brick" : ""}`}
-                >
+              const borderClass = isToday
+                ? "border-[1.5px] border-brick"
+                : inMonth
+                  ? "border border-line-soft"
+                  : "border border-transparent";
+
+              const cellClass = `flex min-w-0 flex-1 flex-col overflow-hidden rounded-[12px] py-[5px] px-[1px] text-left ${borderClass} ${
+                inMonth ? "bg-card" : ""
+              }`;
+
+              const content = (
+                <>
                   <div
-                    className={`shrink-0 font-mono text-[10.5px] sm:text-[12px] md:text-[13px] ${
+                    className={`shrink-0 px-1 font-mono text-[10.5px] ${
                       !inMonth ? "text-[#d3cdc0]" : isToday ? "font-bold text-brick" : "text-ink"
                     }`}
                   >
@@ -165,33 +190,42 @@ export default function CalendarScreen({
                   </div>
 
                   {inMonth && visits.length > 0 && (
-                    <div className="mt-1 flex min-h-0 flex-1 flex-col gap-[3px] overflow-hidden">
-                      {shown.map((v) => {
-                        const clipped = clipName(v.name, maxNameChars);
-                        const label =
-                          v.verified && v.verified_at && showHour
-                            ? `${verifiedHour(v.verified_at)} ${clipped}`
-                            : clipped;
-
-                        return (
-                          <button
-                            key={v.id}
-                            type="button"
-                            onClick={() => onOpenVisit(v)}
-                            title={v.name}
-                            className="block w-full shrink-0 cursor-pointer overflow-hidden rounded-[5px] border-none bg-brick-soft px-[1px] py-[2px] text-left text-[9px] leading-[1.4] whitespace-nowrap text-brick sm:px-0.5 sm:py-[3px] sm:text-[11px] md:text-[12px]"
-                          >
-                            {label}
-                          </button>
-                        );
-                      })}
+                    <div className="mt-1 flex min-h-0 flex-1 flex-col gap-[2px] overflow-hidden">
+                      {shown.map((v) => (
+                        <span
+                          key={v.id}
+                          className={`block w-full shrink-0 overflow-hidden rounded-[5px] px-[1px] py-[2px] text-[9px] leading-[1.35] whitespace-nowrap ${
+                            v.verified
+                              ? "bg-[#f2e0d5] text-[#a34d27]"
+                              : "bg-[#eae5da] text-muted"
+                          }`}
+                        >
+                          {clipName(v.name, MAX_CHIP_CHARS)}
+                        </span>
+                      ))}
                       {extra > 0 && (
-                        <div className="shrink-0 px-1 text-[8.5px] text-faint sm:text-[10px]">
-                          +{extra}개 더
+                        <div className="shrink-0 px-1 font-mono text-[8.5px] text-[#a29a8c]">
+                          +{extra}
                         </div>
                       )}
                     </div>
                   )}
+                </>
+              );
+
+              return clickable ? (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => onOpenDay(key)}
+                  aria-label={`${cursor.year}년 ${cursor.month + 1}월 ${date.getDate()}일, 기록 ${visits.length}건`}
+                  className={`${cellClass} cursor-pointer`}
+                >
+                  {content}
+                </button>
+              ) : (
+                <div key={key} className={`${cellClass} cursor-default`}>
+                  {content}
                 </div>
               );
             })}

@@ -15,6 +15,7 @@ import CaptureFlow, { type Verified } from "./CaptureFlow";
 import LabelBook from "./LabelBook";
 import DraftsScreen from "./DraftsScreen";
 import CalendarScreen from "./CalendarScreen";
+import DayScreen from "./DayScreen";
 import TabBar, { type Tab } from "./TabBar";
 import MobilePlaceSearch, { type PickedPlace } from "./PlaceSearch";
 import { BURST, DraftsBoxIcon, PlusIcon, SearchIcon } from "./ui";
@@ -74,6 +75,8 @@ export default function MobileShell({ rows }: { rows: Restaurant[] }) {
   const [labelsOpen, setLabelsOpen] = useState(false);
   const [tab, setTab] = useState<Tab>("map");
   const [draftsOpen, setDraftsOpen] = useState(false);
+  /** 월력에서 연 날짜 — 있는 동안은 그날 화면(DayScreen)이 떠 있습니다. */
+  const [day, setDay] = useState<string | null>(null);
 
   const mapRef = useRef<MapHandle>(null);
 
@@ -432,9 +435,15 @@ export default function MobileShell({ rows }: { rows: Restaurant[] }) {
       </div>
 
       {tab === "calendar" && (
-        <CalendarScreen
+        <CalendarScreen rows={visibleRows} onOpenDay={(dateKey) => setDay(dateKey)} />
+      )}
+
+      {day && (
+        <DayScreen
+          dateKey={day}
           rows={visibleRows}
-          onOpenVisit={(record) => {
+          onBack={() => setDay(null)}
+          onOpenRecord={(record) => {
             setKind(record.kind);
             setPlaceKey(null);
             setVisitId(record.id);
@@ -450,7 +459,14 @@ export default function MobileShell({ rows }: { rows: Restaurant[] }) {
         </div>
       )}
 
-      <TabBar tab={tab} onChange={setTab} onShoot={() => setFlow(true)} />
+      <TabBar
+        tab={tab}
+        onChange={(t) => {
+          setDay(null);
+          setTab(t);
+        }}
+        onShoot={() => setFlow(true)}
+      />
 
       {filtersOpen && (
         <FilterSheet
@@ -494,6 +510,11 @@ export default function MobileShell({ rows }: { rows: Restaurant[] }) {
           key={visit.id}
           record={visit}
           onBack={() => {
+            // 그날 화면(day)에서 들어왔으면 월력까지 가지 않고 그날 화면으로 돌아갑니다.
+            if (day) {
+              setVisitId(null);
+              return;
+            }
             if (visitPlace && visitPlace.visits.length > 1) {
               setPlaceKey(visitPlace.key);
               setVisitId(null);
@@ -504,6 +525,11 @@ export default function MobileShell({ rows }: { rows: Restaurant[] }) {
           onEdit={() => setEditing({ mode: "edit", record: visit })}
           onChanged={refresh}
           onDeleted={() => {
+            if (day) {
+              setVisitId(null);
+              refresh();
+              return;
+            }
             const many = (visitPlace?.visits.length ?? 1) > 1;
             setVisitId(null);
             setPlaceKey(many ? visitPlace!.key : null);
