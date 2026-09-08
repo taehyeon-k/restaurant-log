@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { Restaurant } from "@/lib/types";
+import type { Restaurant, Wish } from "@/lib/types";
 import { Eyebrow } from "./ui";
 
 const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
@@ -56,11 +56,17 @@ function toWeeks(cells: Date[]) {
  */
 export default function CalendarScreen({
   rows,
+  wishes,
   onOpenDay,
+  onOpenWishDay,
 }: {
   rows: Restaurant[];
+  wishes: Wish[];
   onOpenDay: (dateKey: string) => void;
+  /** 예정만 있는 날을 눌렀을 때 — 가고싶다 화면으로 갑니다(§6). */
+  onOpenWishDay: () => void;
 }) {
+  const [showWishes, setShowWishes] = useState(true);
   const maxVisitedAt = useMemo(() => {
     let max: string | null = null;
     for (const r of rows) {
@@ -102,6 +108,19 @@ export default function CalendarScreen({
     for (const list of map.values()) list.sort((a, b) => (a.name < b.name ? -1 : 1));
     return map;
   }, [rows]);
+
+  /** 날짜를 정한 위시만 — 날짜 없는 위시는 월력에 뜨지 않습니다(§6). */
+  const byDateWish = useMemo(() => {
+    const map = new Map<string, Wish[]>();
+    for (const w of wishes) {
+      if (!w.plan_date) continue;
+      const list = map.get(w.plan_date) ?? [];
+      list.push(w);
+      map.set(w.plan_date, list);
+    }
+    for (const list of map.values()) list.sort((a, b) => (a.name < b.name ? -1 : 1));
+    return map;
+  }, [wishes]);
 
   const cells = useMemo(() => monthCells(cursor.year, cursor.month), [cursor]);
   const weeks = useMemo(() => toWeeks(cells), [cells]);
@@ -148,7 +167,19 @@ export default function CalendarScreen({
           </div>
         </div>
 
-        <div className="mt-1.5 text-[12px] text-faint">이 달 기록 {countThisMonth}건</div>
+        <div className="mt-1.5 flex items-center justify-between gap-2">
+          <span className="text-[12px] text-faint">이 달 기록 {countThisMonth}건</span>
+          <button
+            type="button"
+            onClick={() => setShowWishes((v) => !v)}
+            className={`flex min-h-[30px] cursor-pointer items-center gap-1.5 rounded-[15px] px-[11px] text-[11px] ${
+              showWishes ? "border border-[#e0c3b1] bg-[#f7ece5] text-brick" : "border-none bg-transparent text-faint"
+            }`}
+          >
+            {showWishes && <span className="block size-[6px] rounded-full border border-brick" />}
+            {showWishes ? "예정 보임" : "예정 숨김"}
+          </button>
+        </div>
       </div>
 
       <div className="mt-3.5 grid shrink-0 grid-cols-7 px-3 text-center font-mono text-[10px] text-faint">
@@ -164,10 +195,13 @@ export default function CalendarScreen({
               const key = keyOf(date);
               const inMonth = date.getMonth() === cursor.month;
               const visits = byDate.get(key) ?? [];
-              const shown = visits.slice(0, 2);
-              const extra = visits.length - shown.length;
+              const wishChips = showWishes ? (byDateWish.get(key) ?? []) : [];
+              const shownVisits = visits.slice(0, 2);
+              const shownWishes = wishChips.slice(0, Math.max(0, 2 - shownVisits.length));
+              const extra = visits.length + wishChips.length - shownVisits.length - shownWishes.length;
               const isToday = key === todayKey;
-              const clickable = inMonth && visits.length > 0;
+              const hasWishOnly = visits.length === 0 && wishChips.length > 0;
+              const clickable = inMonth && (visits.length > 0 || hasWishOnly);
 
               const borderClass = isToday
                 ? "border-[1.5px] border-brick"
@@ -189,9 +223,9 @@ export default function CalendarScreen({
                     {date.getDate()}
                   </div>
 
-                  {inMonth && visits.length > 0 && (
+                  {inMonth && (shownVisits.length > 0 || shownWishes.length > 0) && (
                     <div className="mt-1 flex min-h-0 flex-1 flex-col gap-[2px] overflow-hidden">
-                      {shown.map((v) => (
+                      {shownVisits.map((v) => (
                         <span
                           key={v.id}
                           className={`block w-full shrink-0 overflow-hidden rounded-[5px] px-[1px] py-[2px] text-[9px] leading-[1.35] whitespace-nowrap ${
@@ -201,6 +235,15 @@ export default function CalendarScreen({
                           }`}
                         >
                           {clipName(v.name, MAX_CHIP_CHARS)}
+                        </span>
+                      ))}
+                      {shownWishes.map((w) => (
+                        <span
+                          key={w.id}
+                          className="flex w-full shrink-0 items-center gap-[3px] overflow-hidden rounded-[5px] bg-[#eee9de] px-[1px] py-[2px] text-[9px] leading-[1.35] whitespace-nowrap text-[#8a8377]"
+                        >
+                          <span className="block size-[5px] shrink-0 rounded-full border border-brick" />
+                          {clipName(w.name, MAX_CHIP_CHARS)}
                         </span>
                       ))}
                       {extra > 0 && (
@@ -217,8 +260,8 @@ export default function CalendarScreen({
                 <button
                   key={key}
                   type="button"
-                  onClick={() => onOpenDay(key)}
-                  aria-label={`${cursor.year}년 ${cursor.month + 1}월 ${date.getDate()}일, 기록 ${visits.length}건`}
+                  onClick={() => (hasWishOnly ? onOpenWishDay() : onOpenDay(key))}
+                  aria-label={`${cursor.year}년 ${cursor.month + 1}월 ${date.getDate()}일, 기록 ${visits.length}건${wishChips.length ? ` · 예정 ${wishChips.length}건` : ""}`}
                   className={`${cellClass} cursor-pointer`}
                 >
                   {content}

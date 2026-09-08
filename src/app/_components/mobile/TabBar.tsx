@@ -1,13 +1,13 @@
 "use client";
 
-import { CameraIcon } from "./ui";
+import { BookmarkIcon, CameraIcon } from "./ui";
 
-export type Tab = "calendar" | "map" | "community" | "account";
+export type Tab = "calendar" | "map" | "wish" | "account";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "calendar", label: "월력" },
   { id: "map", label: "지도" },
-  { id: "community", label: "커뮤니티" },
+  { id: "wish", label: "가고싶다" },
   { id: "account", label: "내계정" },
 ];
 
@@ -28,13 +28,8 @@ function icon(id: Tab) {
           <circle cx="12" cy="9.7" r="2.4" />
         </svg>
       );
-    case "community":
-      return (
-        <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M20.5 12.4c0 3.5-3.6 6.3-8 6.3-.9 0-1.8-.1-2.6-.3l-4.4 2 1.3-3.4c-1.4-1.2-2.3-2.8-2.3-4.6 0-3.5 3.6-6.3 8-6.3s8 2.8 8 6.3z" />
-          <path d="M9 12.3h6" />
-        </svg>
-      );
+    case "wish":
+      return <BookmarkIcon size={19} stroke="currentColor" strokeWidth={1.6} />;
     case "account":
       return (
         <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">

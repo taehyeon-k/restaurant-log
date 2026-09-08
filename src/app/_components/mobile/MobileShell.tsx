@@ -3,9 +3,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { groupPlaces, type Place } from "@/lib/places";
-import type { Kind, Restaurant, Sort } from "@/lib/types";
+import { dottedDate, type Kind, type Restaurant, type Sort, type Wish } from "@/lib/types";
 import type { Place as GeocodePlace } from "@/lib/geocode";
-import MobileMap, { type MapHandle } from "./MobileMap";
+import MobileMap, { type MapHandle, type MarkerFilter } from "./MobileMap";
 import PlaceCard from "./PlaceCard";
 import FilterSheet from "./FilterSheet";
 import PlaceScreen from "./PlaceScreen";
@@ -18,7 +18,13 @@ import CalendarScreen from "./CalendarScreen";
 import DayScreen from "./DayScreen";
 import TabBar, { type Tab } from "./TabBar";
 import MobilePlaceSearch, { type PickedPlace } from "./PlaceSearch";
-import { BURST, DraftsBoxIcon, PlusIcon, SearchIcon } from "./ui";
+import WishScreen from "./WishScreen";
+import WishForm, { type WishFormTarget } from "./WishForm";
+import WishSheet from "./WishSheet";
+import { BookmarkIcon, BURST, DraftsBoxIcon, Eyebrow, PlusIcon, SearchIcon } from "./ui";
+
+/** 위시의 종류 어휘는 기록보다 넓어서(고기·술집 등) 카페 계열만 카페로 봅니다. */
+const wishKind = (w: Wish): Kind => (w.category === "카페" || w.category === "빵집" ? "cafe" : "restaurant");
 
 /** 이미 기록한 가게인지 — 이름이 같거나, 150m 안에 있으면 같은 곳으로 봅니다. */
 const norm = (s: string) => s.replace(/\s+/g, "").toLowerCase();
@@ -51,7 +57,7 @@ const uniq = (list: (string | null | undefined)[]) => [
 
 const EASE = "cubic-bezier(.32,.72,0,1)";
 
-export default function MobileShell({ rows }: { rows: Restaurant[] }) {
+export default function MobileShell({ rows, wishes }: { rows: Restaurant[]; wishes: Wish[] }) {
   const router = useRouter();
 
   const [kind, setKind] = useState<Kind>("restaurant");
@@ -77,6 +83,15 @@ export default function MobileShell({ rows }: { rows: Restaurant[] }) {
   const [draftsOpen, setDraftsOpen] = useState(false);
   /** 월력에서 연 날짜 — 있는 동안은 그날 화면(DayScreen)이 떠 있습니다. */
   const [day, setDay] = useState<string | null>(null);
+
+  /** 가고싶다 — 담기/고치기 시트, 지도에서 책갈피를 눌러 연 시트, 마커 필터. */
+  const [wishFormTarget, setWishFormTarget] = useState<WishFormTarget | null>(null);
+  const [openWishId, setOpenWishId] = useState<string | null>(null);
+  const [markerFilter, setMarkerFilter] = useState<MarkerFilter>("all");
+  /** + 단추가 두 갈래(기록 추가 / 계획 추가)로 펼쳐져 있는지. */
+  const [plusOpen, setPlusOpen] = useState(false);
+  /** 지도 검색에서 이미 있는 가게를 찾았을 때의 작은 시트(§9). */
+  const [foundHit, setFoundHit] = useState<{ restaurant: Restaurant; place: Place } | null>(null);
 
   const mapRef = useRef<MapHandle>(null);
 
@@ -208,6 +223,22 @@ export default function MobileShell({ rows }: { rows: Restaurant[] }) {
     );
   }
 
+  /** 이 가게로 새 방문을 이어받아 엽니다(§8, §9) — 취소하면 그냥 아무 일도 없던 게 됩니다. */
+  const openRevisit = useCallback((source: Restaurant) => {
+    setEditing({
+      mode: "new",
+      kind: source.kind,
+      preset: {
+        name: source.name,
+        address: source.address ?? undefined,
+        lat: source.lat ?? undefined,
+        lng: source.lng ?? undefined,
+        category: source.category ?? undefined,
+        revisit: true,
+      },
+    });
+  }, []);
+
   function handleChoosePlace(p: GeocodePlace) {
     const hit = findRecord(p);
 
@@ -217,11 +248,11 @@ export default function MobileShell({ rows }: { rows: Restaurant[] }) {
         pl.visits.some((v) => v.id === hit.id)
       );
       if (target) {
-        setKind(hit.kind);
-        openPlace(target.key, hit.kind);
         if (target.lat != null && target.lng != null) {
-          mapRef.current?.flyTo(target.lat, target.lng, 15);
+          mapRef.current?.flyTo(target.lat, target.lng, 16);
         }
+        // 곧바로 들어가지 않고 작은 시트로 먼저 보여줍니다 — 지도를 누르면 그 자리에 그대로 머무릅니다.
+        setFoundHit({ restaurant: hit, place: target });
       }
       return;
     }
@@ -285,12 +316,21 @@ export default function MobileShell({ rows }: { rows: Restaurant[] }) {
     }
   }
 
-  const overlayOpen = editing !== null || flow || labelsOpen || draftsOpen || tab !== "map";
+  const overlayOpen =
+    editing !== null ||
+    flow ||
+    labelsOpen ||
+    draftsOpen ||
+    tab !== "map" ||
+    wishFormTarget !== null ||
+    openWishId !== null ||
+    foundHit !== null;
 
-  const TAB_TITLE: Record<Exclude<Tab, "map" | "calendar">, string> = {
-    community: "커뮤니티",
+  const TAB_TITLE: Record<Exclude<Tab, "map" | "calendar" | "wish">, string> = {
     account: "내계정",
   };
+
+  const openWish = openWishId ? wishes.find((w) => w.id === openWishId) ?? null : null;
 
   return (
     <div className="relative h-dvh overflow-hidden bg-map">
@@ -309,7 +349,39 @@ export default function MobileShell({ rows }: { rows: Restaurant[] }) {
             preset: { name: pickedPlace.name, address: pickedPlace.address, lat: pickedPlace.lat, lng: pickedPlace.lng },
           })
         }
+        wishes={wishes}
+        markerFilter={markerFilter}
+        onSelectWish={(id) => setOpenWishId(id)}
       />
+
+      {/* 마커 필터 — 지도 왼쪽 아래, 시트를 따라 함께 올라갑니다(§5). */}
+      <div
+        className="absolute left-4 z-[1000] flex items-center gap-[3px] rounded-[18px] border border-[#d8d3c8] p-[3px]"
+        style={{
+          background: "rgba(251,250,246,.95)",
+          bottom: Math.min(sheetH + 74 + 14, 700),
+          transition: `bottom .26s ${EASE}`,
+        }}
+      >
+        {(
+          [
+            { id: "all", label: "둘 다" },
+            { id: "visited", label: "기록만" },
+            { id: "wish", label: "가고싶다만" },
+          ] as const
+        ).map((f) => (
+          <button
+            key={f.id}
+            type="button"
+            onClick={() => setMarkerFilter(f.id)}
+            className={`min-h-[30px] cursor-pointer rounded-[15px] px-[11px] text-[11.5px] ${
+              markerFilter === f.id ? "border-none bg-brick text-card" : "border-none bg-transparent text-muted"
+            }`}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
 
       {/* 위쪽을 눕히는 종이색 그라데이션 */}
       <div
@@ -376,18 +448,69 @@ export default function MobileShell({ rows }: { rows: Restaurant[] }) {
         )}
       </button>
 
-      {/* 인증 없이 직접 쓰기 */}
+      {/* + 단추 — 두 갈래: 기록 추가(인증 없이 직접 쓰기) / 계획 추가(위시, §5) */}
+      {plusOpen && (
+        <button
+          type="button"
+          aria-label="메뉴 닫기"
+          onClick={() => setPlusOpen(false)}
+          className="absolute inset-0 z-[999] cursor-default border-none bg-transparent"
+        />
+      )}
+
+      {plusOpen && (
+        <div
+          className="absolute right-4 z-[1000] flex flex-col items-end gap-2"
+          style={{
+            bottom: Math.min(sheetH + 74 + 16, 702) + 60,
+            transition: `bottom .26s ${EASE}`,
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => {
+              setPlusOpen(false);
+              setEditing({ mode: "new", kind });
+            }}
+            className="flex min-h-[46px] cursor-pointer items-center gap-2 rounded-[16px] border-none bg-card px-4 shadow-[0_6px_16px_rgba(28,26,23,.14)]"
+          >
+            <span className="block size-[22px] shrink-0 rounded-full border-[1.5px] border-[#8a8377]" />
+            <span className="text-[13px] whitespace-nowrap text-ink">기록 추가</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setPlusOpen(false);
+              setWishFormTarget({ mode: "new" });
+            }}
+            className="flex min-h-[46px] cursor-pointer items-center gap-2 rounded-[16px] border-none bg-card px-4 shadow-[0_6px_16px_rgba(28,26,23,.14)]"
+          >
+            <BookmarkIcon size={20} stroke="#1c1a17" />
+            <span className="text-[13px] whitespace-nowrap text-ink">계획 추가</span>
+          </button>
+        </div>
+      )}
+
       <button
         type="button"
-        onClick={() => setEditing({ mode: "new", kind })}
-        aria-label="기록 직접 쓰기"
-        className="absolute right-[84px] z-[1000] grid size-13 cursor-pointer place-items-center rounded-full border border-line bg-card shadow-[0_6px_16px_rgba(28,26,23,.14)]"
+        onClick={() => setPlusOpen((v) => !v)}
+        aria-label="기록·계획 추가"
+        className={`absolute right-[84px] z-[1000] grid size-13 cursor-pointer place-items-center rounded-full ${
+          plusOpen
+            ? "border-none bg-brick shadow-[0_8px_20px_rgba(180,85,45,.34)]"
+            : "border border-line bg-card shadow-[0_6px_16px_rgba(28,26,23,.14)]"
+        }`}
         style={{
           bottom: Math.min(sheetH + 74 + 16, 702),
           transition: `bottom .26s ${EASE}`,
         }}
       >
-        <PlusIcon />
+        <span
+          className="grid place-items-center transition-transform duration-200"
+          style={{ transform: plusOpen ? "rotate(45deg)" : "none" }}
+        >
+          <PlusIcon stroke={plusOpen ? "#fbfaf6" : "#1c1a17"} />
+        </span>
       </button>
 
       {/* 바텀시트 — 하단 바(74px) 위에 얹힙니다 */}
@@ -435,7 +558,16 @@ export default function MobileShell({ rows }: { rows: Restaurant[] }) {
       </div>
 
       {tab === "calendar" && (
-        <CalendarScreen rows={visibleRows} onOpenDay={(dateKey) => setDay(dateKey)} />
+        <CalendarScreen
+          rows={visibleRows}
+          wishes={wishes}
+          onOpenDay={(dateKey) => setDay(dateKey)}
+          onOpenWishDay={() => setTab("wish")}
+        />
+      )}
+
+      {tab === "wish" && (
+        <WishScreen wishes={wishes} onOpenForm={setWishFormTarget} onChanged={refresh} />
       )}
 
       {day && (
@@ -451,18 +583,90 @@ export default function MobileShell({ rows }: { rows: Restaurant[] }) {
         />
       )}
 
-      {/* 아직 만들지 않은 탭 — 지도 탭에서만 지도·시트가 보입니다 */}
-      {tab !== "map" && tab !== "calendar" && (
+      {/* 아직 만들지 않은 탭 — 지도·월력·가고싶다 탭은 각자 화면이 있습니다 */}
+      {tab !== "map" && tab !== "calendar" && tab !== "wish" && (
         <div className="absolute inset-x-0 top-0 bottom-[74px] z-[1160] flex flex-col items-center justify-center gap-2.5 bg-paper">
           <div className="font-serif text-[19px] font-bold">{TAB_TITLE[tab]}</div>
           <div className="text-[12.5px] text-faint">이 화면은 아직 만들지 않았습니다</div>
         </div>
       )}
 
+      {foundHit && (
+        <div className="absolute inset-x-0 top-0 bottom-[74px] z-[1150] flex flex-col justify-end">
+          <button
+            type="button"
+            aria-label="닫기"
+            onClick={() => setFoundHit(null)}
+            className="flex-1 cursor-pointer border-none bg-transparent"
+          />
+          <div className="rounded-t-[24px] bg-paper px-5 pt-4 pb-6 shadow-[0_-8px_30px_rgba(28,26,23,.18)]">
+            <Eyebrow wide>찾았습니다</Eyebrow>
+            <div className="mt-1.5 font-serif text-[22px] font-bold">{foundHit.restaurant.name}</div>
+            <div className="mt-1 text-[11.5px] text-faint">
+              {[foundHit.restaurant.category, foundHit.restaurant.region].filter(Boolean).join(" · ")}
+            </div>
+            <div className="mt-1.5 font-mono text-[10.5px] text-[#a29a8c]">
+              기록 {foundHit.place.visits.length}건 · 마지막 {dottedDate(foundHit.place.latest.visited_at)}
+            </div>
+            <div className="mt-3.5 flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  openRevisit(foundHit.restaurant);
+                  setFoundHit(null);
+                }}
+                className="min-h-[48px] flex-1 cursor-pointer rounded-[16px] border-none bg-ink text-[13px] font-medium text-card"
+              >
+                여기 또 왔어요 · 기록 추가
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  openPlace(foundHit.place.key, foundHit.restaurant.kind);
+                  setFoundHit(null);
+                }}
+                className="min-h-[48px] cursor-pointer rounded-[16px] border border-[#e4dfd3] bg-transparent px-4 text-[12.5px] whitespace-nowrap text-muted"
+              >
+                지난 기록 보기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {openWish && (
+        <WishSheet
+          wish={openWish}
+          onClose={() => setOpenWishId(null)}
+          onCaptureHere={() => {
+            setOpenWishId(null);
+            setKind(wishKind(openWish));
+            setFlow(true);
+          }}
+          onViewList={() => {
+            setOpenWishId(null);
+            setTab("wish");
+          }}
+          onChanged={refresh}
+        />
+      )}
+
+      {wishFormTarget && (
+        <WishForm
+          target={wishFormTarget}
+          onCancel={() => setWishFormTarget(null)}
+          onSaved={() => {
+            setWishFormTarget(null);
+            refresh();
+          }}
+        />
+      )}
+
       <TabBar
         tab={tab}
         onChange={(t) => {
           setDay(null);
+          setPlusOpen(false);
           setTab(t);
         }}
         onShoot={() => setFlow(true)}
@@ -502,6 +706,7 @@ export default function MobileShell({ rows }: { rows: Restaurant[] }) {
           place={place}
           onBack={closeAll}
           onOpenVisit={(id) => setVisitId(id)}
+          onRevisit={() => openRevisit(place.latest)}
         />
       )}
 
@@ -509,6 +714,7 @@ export default function MobileShell({ rows }: { rows: Restaurant[] }) {
         <RecordScreen
           key={visit.id}
           record={visit}
+          onRevisit={() => openRevisit(visit)}
           onBack={() => {
             // 그날 화면(day)에서 들어왔으면 월력까지 가지 않고 그날 화면으로 돌아갑니다.
             if (day) {
@@ -542,6 +748,7 @@ export default function MobileShell({ rows }: { rows: Restaurant[] }) {
         <EditScreen
           target={editing}
           rows={rows}
+          wishes={wishes}
           onCancel={() => setEditing(null)}
           onSaved={(saved) => {
             setEditing(null);
@@ -556,6 +763,7 @@ export default function MobileShell({ rows }: { rows: Restaurant[] }) {
       {flow && (
         <CaptureFlow
           rows={rows}
+          wishes={wishes}
           kind={kind}
           onCancel={() => setFlow(false)}
           onDone={afterVerified}

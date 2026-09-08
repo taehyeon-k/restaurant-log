@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import {
   getAllRestaurants,
+  getAllWishes,
   getFacets,
   getRestaurant,
   searchRestaurants,
@@ -37,11 +38,13 @@ export default async function Home({
   const revisitOnly = sp.revisit === "1";
   const bbox = parseBbox(typeof sp.bbox === "string" ? sp.bbox : undefined);
 
-  const [rows, facets, allRows] = await Promise.all([
+  const [rows, facets, allRows, wishes] = await Promise.all([
     searchRestaurants({ kind, q, categories, regions, keywords, revisitOnly, sort, bbox }),
     getFacets(kind, bbox),
     // 모바일 화면은 거르기·정렬을 브라우저에서 하므로 전체 목록을 함께 넘깁니다.
     getAllRestaurants(),
+    // 위시도 모바일 전용 화면(가고싶다 탭·지도·월력)이 씁니다.
+    getAllWishes(),
   ]);
   const places = groupPlaces(rows);
    // ?rid=기록번호 → 기록 하나 / ?place=키 → 가게 화면. 옛 ?id= 도 그대로 받습니다.
@@ -159,5 +162,5 @@ export default async function Home({
     </main>
   );
 
-  return <Shell rows={allRows} desktop={desktop} />;
+  return <Shell rows={allRows} wishes={wishes} desktop={desktop} />;
 }

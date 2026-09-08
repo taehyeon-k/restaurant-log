@@ -33,7 +33,37 @@ export type Restaurant = {
   verified_at: string | null;
   /** 사진만 찍고 본문을 아직 쓰지 않은 기록 — 보관함에만 보입니다 */
   pending: boolean;
+  /** 위시에서 온 기록임을 남기는 자취. 위시가 아니었으면 null. */
+  from_wish: { saved_at: string; days: number; planned: boolean } | null;
 };
+
+/** 가고싶다(위시) — 아직 가지 않은 곳. restaurants 와 달리 인증·별점·사진이 없습니다. */
+export type Wish = {
+  id: string;
+  name: string;
+  where_text: string | null;
+  category: string | null;
+  note: string | null;
+  plan_date: string | null;
+  notify: boolean;
+  lat: number | null;
+  lng: number | null;
+  saved_at: string;
+  created_at: string;
+};
+
+/** WishForm 종류 칩 — CATEGORIES(기록용)와는 다른, 위시 전용 어휘입니다. */
+export const WISH_CATEGORIES = [
+  "한식",
+  "일식",
+  "중식",
+  "양식",
+  "분식",
+  "고기",
+  "술집",
+  "카페",
+  "빵집",
+];
 
 export const CATEGORIES: Record<Kind, string[]> = {
   restaurant: ["양식", "한식", "일식", "중식", "아시안", "분식"],
@@ -124,6 +154,22 @@ export const CATEGORY_COLORS: Record<string, string> = {
 
 export const pinColor = (category: string | null) =>
   (category && CATEGORY_COLORS[category]) || "#8a8377";
+
+const normName = (s: string) => s.replace(/\s+/g, "").toLowerCase();
+
+/** 이름이 같은 위시를 찾습니다 — 기록을 저장하는 순간의 WISH MET 전환(§7)에 씁니다. */
+export const matchWish = (wishes: Wish[], name: string) =>
+  wishes.find((w) => normName(w.name) === normName(name)) ?? null;
+
+/** 그 위시가 기록이 되는 순간 남기는 자취 — restaurants.from_wish 에 그대로 들어갑니다. */
+export const wishMetInfo = (wish: Wish, visitedAt: string) => {
+  const savedDate = wish.saved_at.slice(0, 10);
+  const days = Math.max(
+    0,
+    Math.round((new Date(visitedAt).getTime() - new Date(savedDate).getTime()) / 86400000)
+  );
+  return { saved_at: savedDate, days, planned: !!wish.plan_date };
+};
 
 /** 그 기록의 대표사진 주소. 없으면 null. */
 export const coverPhoto = (r: {

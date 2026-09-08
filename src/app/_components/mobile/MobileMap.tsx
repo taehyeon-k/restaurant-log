@@ -2,9 +2,11 @@
 
 import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
 import type { Place } from "@/lib/places";
-import { pinColor } from "@/lib/types";
+import { pinColor, type Wish } from "@/lib/types";
 import { loadNaverMaps } from "@/lib/loadNaverMaps";
-import { ghostIcon, LABEL_ZOOM, labelHtml, setLabelVisible } from "../mapPin";
+import { ghostIcon, LABEL_ZOOM, labelHtml, setLabelVisible, wishPinIcon } from "../mapPin";
+
+export type MarkerFilter = "all" | "visited" | "wish";
 
 export type Placed = Place & { lat: number; lng: number };
 export const placed = (places: Place[]) => places.filter((p): p is Placed => p.lat !== null && p.lng !== null);
@@ -35,18 +37,29 @@ const MobileMap = forwardRef<MapHandle, {
   /** 검색으로 고른, 아직 기록에는 없는 자리 — 지도에 흐린 핀으로만 보여줍니다. */
   ghost?: Ghost;
   onGhostClick?: () => void;
-}>(function MobileMap({ places, selectedKey, onSelect, frozen, ghost = null, onGhostClick }, ref) {
+  /** 가고싶다 — 책갈피 마커로 따로 그립니다(§5). */
+  wishes?: Wish[];
+  markerFilter?: MarkerFilter;
+  onSelectWish?: (id: string) => void;
+}>(function MobileMap(
+  { places, selectedKey, onSelect, frozen, ghost = null, onGhostClick, wishes = [], markerFilter = "all", onSelectWish },
+  ref
+) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<naver.maps.Map | null>(null);
   const markers = useRef(new Map<string, naver.maps.Marker>());
+  const wishMarkers = useRef(new Map<string, naver.maps.Marker>());
   const ghostRef = useRef<naver.maps.Marker | null>(null);
   const readyRef = useRef(false);
   const syncRef = useRef<(() => void) | null>(null);
+  const syncWishRef = useRef<(() => void) | null>(null);
   const lastFit = useRef("");
   const onSelectRef = useRef(onSelect);
   const onGhostClickRef = useRef(onGhostClick);
+  const onSelectWishRef = useRef(onSelectWish);
   useEffect(() => { onSelectRef.current = onSelect; }, [onSelect]);
   useEffect(() => { onGhostClickRef.current = onGhostClick; }, [onGhostClick]);
+  useEffect(() => { onSelectWishRef.current = onSelectWish; }, [onSelectWish]);
 
   useImperativeHandle(ref, () => ({
     flyTo: (lat, lng, zoom = 15) => {
@@ -80,14 +93,25 @@ const MobileMap = forwardRef<MapHandle, {
         if (!map) return;
         const visible = map.getZoom() >= LABEL_ZOOM;
         for (const marker of markers.current.values()) setLabelVisible(marker, visible);
+        for (const marker of wishMarkers.current.values()) setLabelVisible(marker, visible);
       });
       syncRef.current?.();
-      window.setTimeout(() => { if (!cancelled) { mapRef.current?.autoResize(); lastFit.current = ""; syncRef.current?.(); } }, 80);
+      syncWishRef.current?.();
+      window.setTimeout(() => {
+        if (!cancelled) {
+          mapRef.current?.autoResize();
+          lastFit.current = "";
+          syncRef.current?.();
+          syncWishRef.current?.();
+        }
+      }, 80);
     }).catch((error: unknown) => console.error(error));
     return () => {
       cancelled = true;
       for (const marker of markers.current.values()) marker.setMap(null);
       markers.current.clear();
+      for (const marker of wishMarkers.current.values()) marker.setMap(null);
+      wishMarkers.current.clear();
       ghostRef.current?.setMap(null);
       ghostRef.current = null;
       readyRef.current = false;
@@ -119,7 +143,7 @@ const MobileMap = forwardRef<MapHandle, {
     const sync = () => {
       const map = mapRef.current;
       if (!map) return;
-      const visible = placed(places);
+      const visible = markerFilter === "wish" ? [] : placed(places);
       const next = new Set(visible.map((p) => p.key));
       for (const [key, marker] of markers.current) {
         if (!next.has(key)) { marker.setMap(null); markers.current.delete(key); }
@@ -151,7 +175,37 @@ const MobileMap = forwardRef<MapHandle, {
     };
     syncRef.current = sync;
     if (readyRef.current) sync();
-  }, [places, selectedKey, frozen]);
+  }, [places, selectedKey, frozen, markerFilter]);
+
+  /** 위시 책갈피 마커 — 기록 핀과 같은 diff-and-update 방식이지만 별도 레이어입니다. */
+  useEffect(() => {
+    const sync = () => {
+      const map = mapRef.current;
+      if (!map) return;
+      const visible = markerFilter === "visited" ? [] : wishes.filter((w) => w.lat != null && w.lng != null);
+      const next = new Set(visible.map((w) => w.id));
+      for (const [id, marker] of wishMarkers.current) {
+        if (!next.has(id)) { marker.setMap(null); wishMarkers.current.delete(id); }
+      }
+      for (const w of visible) {
+        const lat = w.lat as number;
+        const lng = w.lng as number;
+        let marker = wishMarkers.current.get(w.id);
+        const icon = wishPinIcon(naver.maps, { category: w.category }, { name: w.name });
+        if (!marker) {
+          marker = new naver.maps.Marker({ position: new naver.maps.LatLng(lat, lng), map, icon, clickable: true, zIndex: 500 });
+          naver.maps.Event.addListener(marker, "click", () => onSelectWishRef.current?.(w.id));
+          wishMarkers.current.set(w.id, marker);
+        } else {
+          marker.setPosition(new naver.maps.LatLng(lat, lng));
+          marker.setIcon(icon);
+        }
+        setLabelVisible(marker, map.getZoom() >= LABEL_ZOOM);
+      }
+    };
+    syncWishRef.current = sync;
+    if (readyRef.current) sync();
+  }, [wishes, markerFilter]);
 
   return <div ref={containerRef} className="naver-map-tone absolute inset-x-0 top-0 h-[620px] w-full" />;
 });

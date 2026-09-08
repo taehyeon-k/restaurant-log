@@ -12,10 +12,13 @@ export default function PlaceScreen({
   place,
   onBack,
   onOpenVisit,
+  onRevisit,
 }: {
   place: Place;
   onBack: () => void;
   onOpenVisit: (id: number) => void;
+  /** 「여기 또 왔어요 · 기록 추가」(§8) — 이 가게 정보를 이어받은 새 기록을 엽니다. */
+  onRevisit: () => void;
 }) {
   return (
     <div className="absolute inset-0 z-[1200] flex flex-col bg-paper">
@@ -85,6 +88,14 @@ export default function PlaceScreen({
             ))}
           </div>
         )}
+
+        <button
+          type="button"
+          onClick={onRevisit}
+          className="mt-5 min-h-[50px] w-full cursor-pointer rounded-[18px] border-none bg-ink text-[13.5px] font-medium text-card"
+        >
+          여기 또 왔어요 · 기록 추가
+        </button>
 
         <div className="mt-[26px] flex items-center justify-between border-t border-[#ded8cb] pt-[18px]">
           <Eyebrow>RECORDS</Eyebrow>

@@ -4,19 +4,22 @@ import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { dottedDate, verifiedDateTime, type Restaurant } from "@/lib/types";
 import { photosOf } from "./record";
-import { Eyebrow, MobileStars, Pigs, VerifiedMark, photoFill } from "./ui";
+import { BookmarkIcon, Eyebrow, MobileStars, Pigs, VerifiedMark, photoFill } from "./ui";
 import { SAFE_TOP } from "./MobileShell";
 
 export default function RecordScreen({
   record,
   onBack,
   onEdit,
+  onRevisit,
   onChanged,
   onDeleted,
 }: {
   record: Restaurant;
   onBack: () => void;
   onEdit: () => void;
+  /** 「여기 또 왔어요 · 기록 추가」(§8) — 이 가게 정보를 이어받은 새 기록을 엽니다. */
+  onRevisit: () => void;
   onChanged: () => void;
   onDeleted: () => void;
 }) {
@@ -198,24 +201,48 @@ export default function RecordScreen({
           </div>
         )}
 
+        {record.from_wish && (
+          <div className="mt-5 rounded-[20px] border border-[#e0c3b1] bg-[#f9f0e9] px-4 py-[15px]">
+            <div className="flex items-center gap-1.5">
+              <BookmarkIcon size={17} fill="#b4552d" stroke="#b4552d" />
+              <span className="font-mono text-[9.5px] tracking-[0.18em] text-brick">WISH MET</span>
+            </div>
+            <div className="mt-2 font-serif text-[14px] leading-[1.75] text-[#2e2a25]">
+              {record.from_wish.days === 0
+                ? `${dottedDate(record.from_wish.saved_at)}에 담아두고 바로 다녀오셨네요.`
+                : `${dottedDate(record.from_wish.saved_at)}에 담아둔 곳입니다. ${record.from_wish.days}일 만에 드디어 다녀오셨네요.`}
+            </div>
+          </div>
+        )}
+
         {error && <p className="mt-4 text-[12px] text-[#a8412a]">{error}</p>}
 
-        <div className="mt-5 flex gap-2">
+        <div className="mt-5 flex flex-col gap-2">
           <button
             type="button"
-            onClick={onEdit}
-            className="min-h-[50px] flex-1 cursor-pointer rounded-[18px] border-none bg-ink text-[13.5px] font-medium text-card"
+            onClick={onRevisit}
+            className="min-h-[50px] w-full cursor-pointer rounded-[18px] border-none bg-ink text-[13.5px] font-medium text-card"
           >
-            기록 수정
+            여기 또 왔어요 · 기록 추가
           </button>
-          <button
-            type="button"
-            onClick={remove}
-            disabled={busy}
-            className="min-h-[50px] shrink-0 cursor-pointer rounded-[18px] border border-[#e4dfd3] bg-transparent px-[18px] text-[12.5px] text-faint disabled:opacity-50"
-          >
-            지우기
-          </button>
+
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={onEdit}
+              className="min-h-[50px] flex-1 cursor-pointer rounded-[18px] border border-[#e4dfd3] bg-transparent text-[13.5px] font-medium text-ink"
+            >
+              기록 수정
+            </button>
+            <button
+              type="button"
+              onClick={remove}
+              disabled={busy}
+              className="min-h-[50px] shrink-0 cursor-pointer rounded-[18px] border border-[#e4dfd3] bg-transparent px-[18px] text-[12.5px] text-faint disabled:opacity-50"
+            >
+              지우기
+            </button>
+          </div>
         </div>
       </div>
     </div>

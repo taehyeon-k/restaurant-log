@@ -5,7 +5,7 @@ import { supabase } from "@/lib/supabase";
 import { groupPlaces } from "@/lib/places";
 import { nearbyPlaces } from "@/lib/geocode";
 import { dataUrlToBlob, uploadPhoto } from "@/lib/photos";
-import type { Kind, Restaurant } from "@/lib/types";
+import { matchWish, wishMetInfo, type Kind, type Restaurant, type Wish } from "@/lib/types";
 import { CameraIcon, PinIcon, VerifiedMark, photoFill } from "./ui";
 
 export type Verified = { record: Restaurant; writeNow: boolean };
@@ -76,11 +76,13 @@ function camMessage(name?: string) {
 
 export default function CaptureFlow({
   rows,
+  wishes,
   kind,
   onCancel,
   onDone,
 }: {
   rows: Restaurant[];
+  wishes: Wish[];
   kind: Kind;
   onCancel: () => void;
   onDone: (result: Verified) => void;
@@ -373,6 +375,10 @@ export default function CaptureFlow({
 
       const address = twin?.address ?? picked.address ?? null;
 
+      // 이름이 같은 위시가 있으면 이 인증 기록은 그 위시가 이루어진 것입니다(§7, WISH MET).
+      const matchedWish = matchWish(wishes, picked.name);
+      const fromWish = matchedWish ? wishMetInfo(matchedWish, isoDate(at)) : null;
+
       const { data, error } = await supabase
         .from("restaurants")
         .insert({
@@ -400,11 +406,14 @@ export default function CaptureFlow({
           verified: true,
           acc: geo?.acc ?? null,
           pending: !writeNow,
+          from_wish: fromWish,
         })
         .select("*")
         .single();
 
       if (error) throw new Error(error.message);
+
+      if (matchedWish) await supabase.from("wishes").delete().eq("id", matchedWish.id);
 
       onDone({ record: data as Restaurant, writeNow });
     } catch (err) {

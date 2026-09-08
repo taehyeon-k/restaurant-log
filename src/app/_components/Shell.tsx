@@ -1,7 +1,7 @@
 "use client";
 
 import { useMediaQuery } from "@/lib/useMediaQuery";
-import type { Restaurant } from "@/lib/types";
+import type { Restaurant, Wish } from "@/lib/types";
 import MobileShell from "./mobile/MobileShell";
 
 /**
@@ -11,9 +11,11 @@ import MobileShell from "./mobile/MobileShell";
  */
 export default function Shell({
   rows,
+  wishes,
   desktop,
 }: {
   rows: Restaurant[];
+  wishes: Wish[];
   desktop: React.ReactNode;
 }) {
   const isMobile = useMediaQuery("(max-width: 820px)");
@@ -21,5 +23,5 @@ export default function Shell({
   // 첫 페인트에서는 화면 크기를 모릅니다 — 종이색 바탕만 깔고 기다립니다.
   if (isMobile === null) return <div className="h-dvh bg-paper" />;
 
-  return isMobile ? <MobileShell rows={rows} /> : <>{desktop}</>;
+  return isMobile ? <MobileShell rows={rows} wishes={wishes} /> : <>{desktop}</>;
 }

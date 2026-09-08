@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { CATEGORIES, KEYWORDS, verifiedDateTime, type Kind, type MenuItem, type Restaurant } from "@/lib/types";
+import { CATEGORIES, KEYWORDS, matchWish, verifiedDateTime, wishMetInfo, type Kind, type MenuItem, type Restaurant, type Wish } from "@/lib/types";
 import { FELT_PRICE } from "@/lib/price";
 import { forwardGeocode } from "@/lib/geocode";
 import { regionFromAddress } from "@/lib/regions";
@@ -13,7 +13,15 @@ export type EditTarget =
       mode: "new";
       kind: Kind;
       /** 지도 검색에서 고른 자리 — 이름·주소·좌표를 미리 채웁니다. */
-      preset?: { name?: string; address?: string; lat?: number; lng?: number };
+      preset?: {
+        name?: string;
+        address?: string;
+        lat?: number;
+        lng?: number;
+        category?: string;
+        /** 재방문 단추(§8)로 만든 새 기록이면 true — 처음부터 재방문으로 표시합니다. */
+        revisit?: boolean;
+      };
     }
   | { mode: "edit"; record: Restaurant };
 
@@ -35,11 +43,13 @@ const menuDigits = (v: string) => v.replace(/[^0-9]/g, "").slice(0, 9);
 export default function EditScreen({
   target,
   rows,
+  wishes,
   onCancel,
   onSaved,
 }: {
   target: EditTarget;
   rows: Restaurant[];
+  wishes: Wish[];
   onCancel: () => void;
   onSaved: (saved: { id: number; kind: Kind }) => void;
 }) {
@@ -57,10 +67,10 @@ export default function EditScreen({
   const [name, setName] = useState(record?.name ?? preset?.name ?? "");
   const [address, setAddress] = useState(record?.address ?? preset?.address ?? "");
   const [visitedAt, setVisitedAt] = useState(record?.visited_at ?? today());
-  const [category, setCategory] = useState(record?.category ?? "");
+  const [category, setCategory] = useState(record?.category ?? preset?.category ?? "");
   const [rating, setRating] = useState(record?.rating ?? 0);
   const [priceLevel, setPriceLevel] = useState(record?.price_level ?? 0);
-  const [revisit, setRevisit] = useState(record?.revisit ?? false);
+  const [revisit, setRevisit] = useState(record?.revisit ?? preset?.revisit ?? false);
   const [menus, setMenus] = useState<MenuItem[]>(() => {
     if (record?.menus?.length) return record.menus;
     const names = (record?.menu ?? "").split(",").map((s) => s.trim()).filter(Boolean);
@@ -162,6 +172,10 @@ export default function EditScreen({
       const finalAddress = cleanAddress || twin?.address || null;
       const finalRegion = twin?.region || regionFromAddress(finalAddress ?? "") || null;
 
+      // 이름이 같은 위시가 있으면 이 기록은 그 위시가 이루어진 것입니다(§7, WISH MET).
+      const matchedWish = matchWish(wishes, cleanName);
+      const fromWish = matchedWish ? wishMetInfo(matchedWish, visitedAt || today()) : null;
+
       const { data, error } = await supabase
         .from("restaurants")
         .insert({
@@ -176,11 +190,15 @@ export default function EditScreen({
           address: finalAddress,
           // 같은 이름의 가게가 이미 있으면 그 자체로 재방문입니다.
           revisit: revisit || Boolean(twin),
+          from_wish: fromWish,
         })
         .select("id")
         .single();
 
       if (error) throw new Error(error.message);
+
+      if (matchedWish) await supabase.from("wishes").delete().eq("id", matchedWish.id);
+
       onSaved({ id: data.id as number, kind });
     } catch (err) {
       setError(err instanceof Error ? err.message : "저장에 실패했습니다");

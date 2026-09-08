@@ -1,5 +1,5 @@
 import { supabase } from "@/lib/supabase";
-import type { Bbox, Kind, Restaurant, Sort } from "@/lib/types";
+import type { Bbox, Kind, Restaurant, Sort, Wish } from "@/lib/types";
 
 export type SearchFilters = {
   bbox?: Bbox | null;
@@ -116,4 +116,34 @@ export async function getAllRestaurants() {
 
   if (error) throw new Error(error.message);
   return (data ?? []) as Restaurant[];
+}
+
+/** 가고싶다 전체 목록 — WishScreen·월력·지도가 함께 씁니다. */
+export async function getAllWishes() {
+  const { data, error } = await supabase
+    .from("wishes")
+    .select("*")
+    .order("plan_date", { ascending: true, nullsFirst: false })
+    .order("saved_at", { ascending: false });
+
+  if (error) throw new Error(error.message);
+  return (data ?? []) as Wish[];
+}
+
+/**
+ * 지난 예정 처리(HANDOFF-wish.md §2) — plan_date 가 오늘보다 이르면
+ * 조용히 null 로 되돌립니다("언젠가"로). 바뀐 목록을 그대로 돌려주므로
+ * 호출한 쪽은 다시 불러오지 않아도 됩니다.
+ */
+export async function releasePastWishes(wishes: Wish[]) {
+  const today = new Date().toISOString().slice(0, 10);
+  const stale = wishes.filter((w) => w.plan_date && w.plan_date < today);
+  if (!stale.length) return wishes;
+
+  const ids = stale.map((w) => w.id);
+  const { error } = await supabase.from("wishes").update({ plan_date: null }).in("id", ids);
+  if (error) throw new Error(error.message);
+
+  const staleIds = new Set(ids);
+  return wishes.map((w) => (staleIds.has(w.id) ? { ...w, plan_date: null } : w));
 }

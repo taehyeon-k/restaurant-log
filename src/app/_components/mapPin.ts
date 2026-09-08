@@ -37,6 +37,26 @@ export function pinIcon(_maps: typeof naver.maps, row: PinRow, details?: { name:
   return icon(content);
 }
 
+/** 책갈피 — 위시(가고싶다) 지도 마커. HANDOFF-wish.md §5, 기록 핀과 모양으로 갈립니다. */
+const BOOKMARK_PATH =
+  "M6.5 2.6h11a1.4 1.4 0 0 1 1.4 1.4v17a.6.6 0 0 1-.95.49L12 16.7l-5.95 4.79a.6.6 0 0 1-.95-.49V4a1.4 1.4 0 0 1 1.4-1.4Z";
+
+const wishPinHtml = (row: PinRow) => {
+  const fill = pinColor(row.category);
+  return (
+    '<div data-pin style="position:absolute;left:50%;bottom:8px;width:26px;height:26px;transform:translateX(-50%);filter:drop-shadow(0 2px 4px rgba(28,26,23,.28))">' +
+    '<svg width="26" height="26" viewBox="0 0 24 24" fill="' + fill + '" stroke="#fbfaf6" stroke-width="1.6" stroke-linejoin="round"><path d="' + BOOKMARK_PATH + '"/></svg>' +
+    "</div>" +
+    '<div style="position:absolute;left:50%;bottom:4px;width:8px;height:2.5px;transform:translateX(-50%);border-radius:50%;background:rgba(28,26,23,.16)"></div>'
+  );
+};
+
+export function wishPinIcon(_maps: typeof naver.maps, row: PinRow, details?: { name: string }): naver.maps.HtmlIcon {
+  const content = '<div class="restaurant-map-pin" style="position:relative;width:48px;height:48px">' +
+    (details ? labelHtml(details.name) : "") + wishPinHtml(row) + "</div>";
+  return { content, size: new naver.maps.Size(48, 48), anchor: new naver.maps.Point(22, 38) };
+}
+
 export function ghostIcon(_maps: typeof naver.maps, details?: { name: string; cta: string }): naver.maps.HtmlIcon {
   const content = '<div class="restaurant-map-pin" style="position:relative;width:48px;height:48px">' +
     (details ? labelHtml(details.name, undefined, details.cta) : "") +
