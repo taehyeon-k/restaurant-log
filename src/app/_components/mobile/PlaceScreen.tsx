@@ -92,21 +92,22 @@ export default function PlaceScreen({
           </div>
         )}
 
-        <div className="mt-5 flex gap-2">
+        <div className="mt-5 flex flex-col gap-2">
           <button
             type="button"
             onClick={onRevisit}
-            className="min-h-[50px] flex-1 cursor-pointer rounded-[18px] border-none bg-ink text-[13.5px] font-medium text-card"
+            className="min-h-[50px] w-full cursor-pointer rounded-[18px] border-none bg-ink text-[13.5px] font-medium text-card"
           >
             여기 또 왔어요 · 기록 추가
           </button>
+
           <button
             type="button"
             onClick={onAddWish}
-            aria-label="가고싶다에 담기"
-            className="grid size-[50px] shrink-0 cursor-pointer place-items-center rounded-[18px] border border-[#ded8cb] bg-transparent"
+            className="flex min-h-[50px] w-full cursor-pointer items-center justify-center gap-2 rounded-[18px] border border-[#ded8cb] bg-transparent text-[13.5px] text-ink hover:border-brick hover:text-brick"
           >
-            <BookmarkIcon size={16} stroke="#1c1a17" />
+            <BookmarkIcon size={14} fill="#b4552d" stroke="#b4552d" />
+            또 갈 예정으로 담기
           </button>
         </div>
 

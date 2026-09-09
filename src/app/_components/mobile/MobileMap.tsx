@@ -2,9 +2,9 @@
 
 import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
 import type { Place } from "@/lib/places";
-import { pinColor, type Wish } from "@/lib/types";
+import { matchWish, pinColor, type Wish } from "@/lib/types";
 import { loadNaverMaps } from "@/lib/loadNaverMaps";
-import { ghostIcon, LABEL_ZOOM, labelHtml, setLabelVisible, wishPinIcon } from "../mapPin";
+import { BOOKMARK_PATH, ghostIcon, LABEL_ZOOM, labelHtml, setLabelVisible, wishPinIcon } from "../mapPin";
 
 export type MarkerFilter = "all" | "visited" | "wish";
 
@@ -17,14 +17,31 @@ export type MapHandle = {
   invalidate: () => void;
 };
 
-function pinHtml(row: Place, active: boolean) {
+const norm = (s: string) => s.replace(/\s+/g, "").toLowerCase();
+
+/**
+ * 기록이 있는 곳을 또 갈 예정으로 담았을 때 붙는 책갈피 배지(HANDOFF-map-badge.md §1).
+ * 한 자리에 핀 하나 — 물방울 오른쪽 위 모서리에 얹습니다. 자리는 물방울 크기(size)에 따라 달라집니다.
+ */
+function badgeHtml(size: number) {
+  return (
+    '<div style="position:absolute;left:50%;bottom:' + (8 + size - 8) + 'px;margin-left:' + (size / 2 - 5) + 'px;width:15px;height:15px;border-radius:50%;background:#fbfaf6;box-shadow:0 1px 3px rgba(28,26,23,.28);display:flex;align-items:center;justify-content:center">' +
+    '<svg width="9" height="9" viewBox="0 0 24 24" fill="#b4552d"><path d="' + BOOKMARK_PATH + '"/></svg>' +
+    "</div>"
+  );
+}
+
+function pinHtml(row: Place, active: boolean, planned: boolean) {
   const base = pinColor(row.category);
   const fill = row.revisit ? base : "#fbfaf6";
   const stroke = row.revisit ? "#fbfaf6" : base;
   const core = row.revisit ? "#fbfaf6" : base;
   const size = active ? 30 : 23;
   const dot = active ? 10 : 8;
-  return '<div data-pin style="position:absolute;left:50%;bottom:8px;width:' + size + 'px;height:' + size + 'px;box-sizing:border-box;transform:translateX(-50%) rotate(-45deg);border-radius:50% 50% 50% 0;background:' + fill + ';border:' + (active ? 2 : 1.5) + 'px solid ' + stroke + ';box-shadow:1px -1px 5px rgba(28,26,23,.18);display:flex;align-items:center;justify-content:center"><div style="width:' + dot + 'px;height:' + dot + 'px;border-radius:50%;background:' + core + ';transform:rotate(45deg)"></div></div><div style="position:absolute;left:50%;bottom:4px;width:9px;height:3px;transform:translateX(-50%);border-radius:50%;background:rgba(28,26,23,.16)"></div>';
+  return (
+    '<div data-pin style="position:absolute;left:50%;bottom:8px;width:' + size + 'px;height:' + size + 'px;box-sizing:border-box;transform:translateX(-50%) rotate(-45deg);border-radius:50% 50% 50% 0;background:' + fill + ';border:' + (active ? 2 : 1.5) + 'px solid ' + stroke + ';box-shadow:1px -1px 5px rgba(28,26,23,.18);display:flex;align-items:center;justify-content:center"><div style="width:' + dot + 'px;height:' + dot + 'px;border-radius:50%;background:' + core + ';transform:rotate(45deg)"></div></div><div style="position:absolute;left:50%;bottom:4px;width:9px;height:3px;transform:translateX(-50%);border-radius:50%;background:rgba(28,26,23,.16)"></div>' +
+    (planned ? badgeHtml(size) : "")
+  );
 }
 
 export type Ghost = { name: string; lat: number; lng: number } | null;
@@ -143,15 +160,19 @@ const MobileMap = forwardRef<MapHandle, {
     const sync = () => {
       const map = mapRef.current;
       if (!map) return;
-      const visible = markerFilter === "wish" ? [] : placed(places);
+      // 「가고싶다만」에서도 기록+위시가 겹치는 곳은 배지 붙은 물방울로 남깁니다 — 그렇지 않으면
+      // 위시 마커가 걸러지고(§1) 기록 핀도 숨어 그 자리가 통째로 사라집니다.
+      const visible =
+        markerFilter === "wish" ? placed(places).filter((p) => matchWish(wishes, p.name) != null) : placed(places);
       const next = new Set(visible.map((p) => p.key));
       for (const [key, marker] of markers.current) {
         if (!next.has(key)) { marker.setMap(null); markers.current.delete(key); }
       }
       for (const p of visible) {
         const active = selectedKey === p.key;
+        const planned = matchWish(wishes, p.name) != null;
         let marker = markers.current.get(p.key);
-        const content = '<div class="restaurant-map-pin" style="position:relative;width:44px;height:44px">' + labelHtml(p.name, p.rating) + pinHtml(p, active) + "</div>";
+        const content = '<div class="restaurant-map-pin" style="position:relative;width:44px;height:44px">' + labelHtml(p.name, p.rating) + pinHtml(p, active, planned) + "</div>";
         const icon: naver.maps.HtmlIcon = { content, size: new naver.maps.Size(44, 44), anchor: new naver.maps.Point(22, 38) };
         if (!marker) {
           marker = new naver.maps.Marker({ position: new naver.maps.LatLng(p.lat, p.lng), map, icon, clickable: true });
@@ -175,14 +196,21 @@ const MobileMap = forwardRef<MapHandle, {
     };
     syncRef.current = sync;
     if (readyRef.current) sync();
-  }, [places, selectedKey, frozen, markerFilter]);
+  }, [places, selectedKey, frozen, markerFilter, wishes]);
 
-  /** 위시 책갈피 마커 — 기록 핀과 같은 diff-and-update 방식이지만 별도 레이어입니다. */
+  /**
+   * 위시 책갈피 마커 — 기록 핀과 같은 diff-and-update 방식이지만 별도 레이어입니다.
+   * 기록이 있는 곳은 배지로 이미 표시되므로, 이름이 같은 기록이 있는 위시는 겹치지 않게 걸러냅니다(§1).
+   */
   useEffect(() => {
     const sync = () => {
       const map = mapRef.current;
       if (!map) return;
-      const visible = markerFilter === "visited" ? [] : wishes.filter((w) => w.lat != null && w.lng != null);
+      const recordNames = new Set(places.map((p) => norm(p.name)));
+      const visible =
+        markerFilter === "visited"
+          ? []
+          : wishes.filter((w) => w.lat != null && w.lng != null && !recordNames.has(norm(w.name)));
       const next = new Set(visible.map((w) => w.id));
       for (const [id, marker] of wishMarkers.current) {
         if (!next.has(id)) { marker.setMap(null); wishMarkers.current.delete(id); }
@@ -205,7 +233,7 @@ const MobileMap = forwardRef<MapHandle, {
     };
     syncWishRef.current = sync;
     if (readyRef.current) sync();
-  }, [wishes, markerFilter]);
+  }, [wishes, markerFilter, places]);
 
   return <div ref={containerRef} className="naver-map-tone absolute inset-x-0 top-0 h-[620px] w-full" />;
 });

@@ -38,7 +38,7 @@ export function pinIcon(_maps: typeof naver.maps, row: PinRow, details?: { name:
 }
 
 /** 책갈피 — 위시(가고싶다) 지도 마커. HANDOFF-wish.md §5, 기록 핀과 모양으로 갈립니다. */
-const BOOKMARK_PATH =
+export const BOOKMARK_PATH =
   "M6.5 2.6h11a1.4 1.4 0 0 1 1.4 1.4v17a.6.6 0 0 1-.95.49L12 16.7l-5.95 4.79a.6.6 0 0 1-.95-.49V4a1.4 1.4 0 0 1 1.4-1.4Z";
 
 const wishPinHtml = (row: PinRow) => {
