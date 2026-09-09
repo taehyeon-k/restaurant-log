@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { CATEGORIES, KEYWORDS, matchWish, verifiedDateTime, wishMetInfo, type Kind, type MenuItem, type Restaurant, type Wish } from "@/lib/types";
+import { CATEGORIES, findMatchingWish, KEYWORDS, verifiedDateTime, wishMetInfo, WISH_AUTO_M, type Kind, type MenuItem, type Restaurant, type Wish } from "@/lib/types";
 import { FELT_PRICE } from "@/lib/price";
 import { forwardGeocode } from "@/lib/geocode";
 import { regionFromAddress } from "@/lib/regions";
@@ -172,8 +172,9 @@ export default function EditScreen({
       const finalAddress = cleanAddress || twin?.address || null;
       const finalRegion = twin?.region || regionFromAddress(finalAddress ?? "") || null;
 
-      // 이름이 같은 위시가 있으면 이 기록은 그 위시가 이루어진 것입니다(§7, WISH MET).
-      const matchedWish = matchWish(wishes, cleanName);
+      // 짝지어진 위시가 있으면 이 기록은 그 위시가 이루어진 것입니다(§7, WISH MET).
+      // 좌표가 있으면 거리로, 없으면 이름으로 판정합니다 — 촬영 인증 흐름과 같은 함수입니다(§4).
+      const matchedWish = findMatchingWish(wishes, { name: cleanName, lat, lng }, WISH_AUTO_M);
       const fromWish = matchedWish ? wishMetInfo(matchedWish, visitedAt || today()) : null;
 
       const { data, error } = await supabase

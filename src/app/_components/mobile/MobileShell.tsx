@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { groupPlaces, type Place } from "@/lib/places";
-import { CATEGORIES, dottedDate, matchWish, type Kind, type Restaurant, type Sort, type Wish } from "@/lib/types";
+import { dottedDate, matchWish, wishKind, type Kind, type Restaurant, type Sort, type Wish } from "@/lib/types";
 import type { Place as GeocodePlace } from "@/lib/geocode";
 import MobileMap, { type MapHandle, type MarkerFilter } from "./MobileMap";
 import PlaceCard from "./PlaceCard";
@@ -23,9 +23,6 @@ import WishForm, { type WishFormTarget } from "./WishForm";
 import WishSheet from "./WishSheet";
 import SearchMissSheet from "./SearchMissSheet";
 import { BookmarkIcon, BURST, DraftsBoxIcon, Eyebrow, PlusIcon, SearchIcon } from "./ui";
-
-/** 기록과 같은 분류 어휘를 씁니다(§4.3) — 카페 계열이면 카페 종류로 봅니다. */
-const wishKind = (w: Wish): Kind => (CATEGORIES.cafe.includes(w.category ?? "") ? "cafe" : "restaurant");
 
 /** 이미 기록한 가게인지 — 이름이 같거나, 150m 안에 있으면 같은 곳으로 봅니다. */
 const norm = (s: string) => s.replace(/\s+/g, "").toLowerCase();
@@ -79,6 +76,8 @@ export default function MobileShell({ rows, wishes }: { rows: Restaurant[]; wish
   const [visitId, setVisitId] = useState<number | null>(null);
   const [editing, setEditing] = useState<EditTarget | null>(null);
   const [flow, setFlow] = useState(false);
+  /** 「방문 인증」으로 촬영을 시작했을 때 인증 대상 위시 id(HANDOFF-verify.md §3). */
+  const [verifyWishId, setVerifyWishId] = useState<string | null>(null);
   const [labelsOpen, setLabelsOpen] = useState(false);
   const [tab, setTab] = useState<Tab>("map");
   const [draftsOpen, setDraftsOpen] = useState(false);
@@ -275,6 +274,14 @@ export default function MobileShell({ rows, wishes }: { rows: Restaurant[]; wish
     [wishes]
   );
 
+  /** 「방문 인증」/「여기 왔어요 · 사진 찍기」 — 이 위시를 인증 대상으로 들고 카메라를 켭니다(§2, §3). */
+  const startVerify = useCallback((wish: Wish) => {
+    setOpenWishId(null);
+    setKind(wishKind(wish));
+    setVerifyWishId(wish.id);
+    setFlow(true);
+  }, []);
+
   function handleChoosePlace(p: GeocodePlace) {
     const hit = findRecord(p);
 
@@ -354,6 +361,7 @@ export default function MobileShell({ rows, wishes }: { rows: Restaurant[]; wish
 
   function afterVerified({ record, writeNow }: Verified) {
     setFlow(false);
+    setVerifyWishId(null);
     refresh();
     setKind(record.kind);
     setSnap("half");
@@ -611,7 +619,12 @@ export default function MobileShell({ rows, wishes }: { rows: Restaurant[]; wish
       )}
 
       {tab === "wish" && (
-        <WishScreen wishes={wishes} onOpenForm={setWishFormTarget} onChanged={refresh} />
+        <WishScreen
+          wishes={wishes}
+          onOpenForm={setWishFormTarget}
+          onVerify={startVerify}
+          onChanged={refresh}
+        />
       )}
 
       {day && (
@@ -728,11 +741,7 @@ export default function MobileShell({ rows, wishes }: { rows: Restaurant[]; wish
         <WishSheet
           wish={openWish}
           onClose={() => setOpenWishId(null)}
-          onCaptureHere={() => {
-            setOpenWishId(null);
-            setKind(wishKind(openWish));
-            setFlow(true);
-          }}
+          onCaptureHere={() => startVerify(openWish)}
           onViewList={() => {
             setOpenWishId(null);
             setTab("wish");
@@ -878,7 +887,11 @@ export default function MobileShell({ rows, wishes }: { rows: Restaurant[]; wish
           rows={rows}
           wishes={wishes}
           kind={kind}
-          onCancel={() => setFlow(false)}
+          verifyWishId={verifyWishId}
+          onCancel={() => {
+            setFlow(false);
+            setVerifyWishId(null);
+          }}
           onDone={afterVerified}
         />
       )}

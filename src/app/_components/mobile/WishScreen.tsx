@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { releasePastWishes } from "@/lib/queries";
 import { dottedDate, type Wish } from "@/lib/types";
-import { BellIcon, BookmarkIcon, Eyebrow, ExternalLinkIcon } from "./ui";
+import { BellIcon, BookmarkIcon, CameraIcon, Eyebrow, ExternalLinkIcon } from "./ui";
 import { firstUrl, noteWithoutUrl, type WishFormTarget } from "./WishForm";
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -24,10 +24,13 @@ function meta(w: Wish) {
 export default function WishScreen({
   wishes,
   onOpenForm,
+  onVerify,
   onChanged,
 }: {
   wishes: Wish[];
   onOpenForm: (target: WishFormTarget) => void;
+  /** 「방문 인증」 — 이 위시를 인증 대상으로 들고 카메라를 켭니다(HANDOFF-verify.md §2). */
+  onVerify: (wish: Wish) => void;
   onChanged: () => void;
 }) {
   const [datingId, setDatingId] = useState<string | null>(null);
@@ -115,6 +118,7 @@ export default function WishScreen({
                     onCancelDating={() => setDatingId(null)}
                     onSetDate={(d) => setDate(w.id, d)}
                     onToggleNotify={() => toggleNotify(w)}
+                    onVerify={() => onVerify(w)}
                   />
                 ))}
               </Section>
@@ -135,6 +139,7 @@ export default function WishScreen({
                     onCancelDating={() => setDatingId(null)}
                     onSetDate={(d) => setDate(w.id, d)}
                     onToggleNotify={() => toggleNotify(w)}
+                    onVerify={() => onVerify(w)}
                   />
                 ))}
               </Section>
@@ -166,6 +171,7 @@ function WishCard({
   onCancelDating,
   onSetDate,
   onToggleNotify,
+  onVerify,
 }: {
   wish: Wish;
   dated: boolean;
@@ -177,6 +183,7 @@ function WishCard({
   onCancelDating: () => void;
   onSetDate: (date: string) => void;
   onToggleNotify: () => void;
+  onVerify: () => void;
 }) {
   const url = firstUrl(wish.note);
   const noteBody = noteWithoutUrl(wish.note, url);
@@ -262,6 +269,24 @@ function WishCard({
               날짜 정하기
             </button>
           ))}
+
+        <div className="ml-auto flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={onOpen}
+            className="min-h-[30px] cursor-pointer rounded-[15px] border border-[#e4dfd3] bg-transparent px-[11px] text-[11px] text-muted hover:border-brick hover:text-brick"
+          >
+            수정
+          </button>
+          <button
+            type="button"
+            onClick={onVerify}
+            className="flex min-h-[30px] cursor-pointer items-center gap-1 rounded-[15px] border-none bg-ink px-[11px] text-[11px] font-medium text-card"
+          >
+            <CameraIcon size={12} stroke="#fbfaf6" width={1.8} />
+            방문 인증
+          </button>
+        </div>
       </div>
 
       {wish.lat != null && (

@@ -155,6 +155,48 @@ const normName = (s: string) => s.replace(/\s+/g, "").toLowerCase();
 export const matchWish = (wishes: Wish[], name: string) =>
   wishes.find((w) => normName(w.name) === normName(name)) ?? null;
 
+/** 위시의 종류 어휘는 기록과 같은 CATEGORIES 를 씁니다(HANDOFF-wish.md §4.3). 카페 계열이면 카페 종류로 봅니다. */
+export const wishKind = (w: Wish): Kind =>
+  CATEGORIES.cafe.includes(w.category ?? "") ? "cafe" : "restaurant";
+
+const metersBetween = (aLat: number, aLng: number, bLat: number, bLng: number) => {
+  const R = 6371000;
+  const rad = (n: number) => (n * Math.PI) / 180;
+  const dLat = rad(bLat - aLat);
+  const dLng = rad(bLng - aLng);
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(rad(aLat)) * Math.cos(rad(bLat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+};
+
+/** §1 — 촬영 후보 목록에서 위로 올릴 거리 기준(m). */
+export const WISH_NEAR_M = 50;
+/** §3 — 후보를 묻지 않고 바로 그 가게로 정할 거리 기준(m). */
+export const WISH_AUTO_M = 100;
+
+/**
+ * 위시-가게 짝 찾기(HANDOFF-verify.md §4) — 위시에 좌표가 있으면 후보 좌표와의
+ * 거리로, 없으면 이름으로 판정합니다. 후보 올리기(§1)·자동 선택(§3)·WISH MET
+ * (기록 저장 시 거두기)이 이 함수를 함께 써야 합니다 — 판정이 갈리면 후보에서는
+ * "담아둔 식당"이라 해놓고 저장 뒤 위시가 목록에 유령으로 남는 상태가 됩니다.
+ */
+export function findMatchingWish(
+  wishes: Wish[],
+  place: { name: string; lat?: number | null; lng?: number | null },
+  maxMeters: number
+): Wish | null {
+  const target = normName(place.name);
+  for (const w of wishes) {
+    if (w.lat != null && w.lng != null && place.lat != null && place.lng != null) {
+      if (metersBetween(w.lat, w.lng, place.lat, place.lng) <= maxMeters) return w;
+      continue;
+    }
+    if (target && normName(w.name) === target) return w;
+  }
+  return null;
+}
+
 /** 그 위시가 기록이 되는 순간 남기는 자취 — restaurants.from_wish 에 그대로 들어갑니다. */
 export const wishMetInfo = (wish: Wish, visitedAt: string) => {
   const savedDate = wish.saved_at.slice(0, 10);

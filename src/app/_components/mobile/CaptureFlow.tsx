@@ -5,8 +5,16 @@ import { supabase } from "@/lib/supabase";
 import { groupPlaces } from "@/lib/places";
 import { nearbyPlaces } from "@/lib/geocode";
 import { dataUrlToBlob, uploadPhoto } from "@/lib/photos";
-import { matchWish, wishMetInfo, type Kind, type Restaurant, type Wish } from "@/lib/types";
-import { CameraIcon, PinIcon, VerifiedMark, photoFill } from "./ui";
+import {
+  findMatchingWish,
+  wishMetInfo,
+  WISH_AUTO_M,
+  WISH_NEAR_M,
+  type Kind,
+  type Restaurant,
+  type Wish,
+} from "@/lib/types";
+import { BookmarkIcon, CameraIcon, PinIcon, VerifiedMark, photoFill } from "./ui";
 
 export type Verified = { record: Restaurant; writeNow: boolean };
 
@@ -22,6 +30,8 @@ type Candidate = {
   distance: number | null;
   /** 이미 내 기록에 있는 가게 */
   mine: boolean;
+  /** 이 후보와 짝지어진 위시 — 담아둔 곳이면 후보 목록 맨 위로 올립니다(§1). */
+  wish?: Wish | null;
 };
 
 type Geo = { lat: number; lng: number; acc: number };
@@ -78,15 +88,23 @@ export default function CaptureFlow({
   rows,
   wishes,
   kind,
+  verifyWishId,
   onCancel,
   onDone,
 }: {
   rows: Restaurant[];
   wishes: Wish[];
   kind: Kind;
+  /** 「방문 인증」으로 들어왔으면 인증 대상 위시 id(HANDOFF-verify.md §3). */
+  verifyWishId?: string | null;
   onCancel: () => void;
   onDone: (result: Verified) => void;
 }) {
+  const verifyWish = useMemo(
+    () => (verifyWishId ? (wishes.find((w) => w.id === verifyWishId) ?? null) : null),
+    [wishes, verifyWishId]
+  );
+  const [autoMatched, setAutoMatched] = useState(false);
   const [step, setStep] = useState<"shoot" | "pick" | "done">("shoot");
   const [shot, setShot] = useState<string | null>(null);
   const [shotAt, setShotAt] = useState<Date | null>(null);
@@ -327,6 +345,50 @@ export default function CaptureFlow({
       .slice(0, 8);
   }, [mine, extra]);
 
+  /**
+   * 담아둔 곳을 맨 위로(§1) — 위치를 읽었고, 후보 중 가고싶다에 담긴 가게이며
+   * 거리가 WISH_NEAR_M 이내인 것만 올립니다. 나머지는 기존 거리 오름차순 그대로.
+   */
+  const pickCandidates = useMemo(() => {
+    if (!geo) return candidates as (Candidate & { wish: Wish | null })[];
+
+    const tagged = candidates.map((c) => ({
+      ...c,
+      wish: findMatchingWish(wishes, c, WISH_NEAR_M),
+    }));
+    const boosted = tagged.filter((c) => c.wish);
+    const rest = tagged.filter((c) => !c.wish);
+    return [...boosted, ...rest];
+  }, [candidates, wishes, geo]);
+
+  /**
+   * 인증 대상 위시가 있고 100m 이내면 후보 목록을 건너뛰고 곧바로 그 가게로
+   * 정합니다(§3) — 사용자가 이미 「방문 인증」으로 그 가게라고 말한 상태입니다.
+   */
+  useEffect(() => {
+    if (step !== "pick" || !geo || !verifyWish || picked) return;
+    if (verifyWish.lat == null || verifyWish.lng == null) return;
+
+    const d = metersBetween(geo, verifyWish.lat, verifyWish.lng);
+    if (d > WISH_AUTO_M) return;
+
+    setAutoMatched(true);
+    setPicked({
+      id: `wish:${verifyWish.id}`,
+      name: verifyWish.name,
+      kind,
+      category: verifyWish.category,
+      region: null,
+      address: verifyWish.where_text,
+      lat: verifyWish.lat,
+      lng: verifyWish.lng,
+      distance: Math.round(d),
+      mine: false,
+      wish: verifyWish,
+    });
+    setStep("done");
+  }, [step, geo, verifyWish, picked, kind]);
+
   // 그다음 둘레 장소 검색 — 좌표는 이 요청에만 쓰고 저장하지 않습니다.
   useEffect(() => {
     if (step !== "pick" || !geo) return;
@@ -375,8 +437,9 @@ export default function CaptureFlow({
 
       const address = twin?.address ?? picked.address ?? null;
 
-      // 이름이 같은 위시가 있으면 이 인증 기록은 그 위시가 이루어진 것입니다(§7, WISH MET).
-      const matchedWish = matchWish(wishes, picked.name);
+      // 짝지어진 위시가 있으면 이 인증 기록은 그 위시가 이루어진 것입니다(§7, WISH MET).
+      // §1·§3 에서 이미 찾았으면 그 값을 쓰고, 아니면 같은 함수로 다시 한 번 확인합니다(§4).
+      const matchedWish = picked.wish ?? findMatchingWish(wishes, picked, WISH_AUTO_M);
       const fromWish = matchedWish ? wishMetInfo(matchedWish, isoDate(at)) : null;
 
       const { data, error } = await supabase
@@ -496,6 +559,12 @@ export default function CaptureFlow({
           <div className="rounded-[14px] bg-[rgba(251,250,246,.12)] px-3 py-1 text-[11px] text-[rgba(251,250,246,.8)]">
             {status}
           </div>
+          {verifyWish && (
+            <div className="flex items-center gap-1.5 rounded-[14px] bg-[rgba(180,85,45,.32)] px-3 py-1">
+              <BookmarkIcon size={11} fill="#fbfaf6" stroke="#fbfaf6" />
+              <span className="text-[11px] text-card">{verifyWish.name} · 담아둔 곳</span>
+            </div>
+          )}
         </div>
 
         {camErr && (
@@ -646,7 +715,7 @@ export default function CaptureFlow({
 
         <div className="no-bar absolute inset-x-0 top-[158px] bottom-[104px] overflow-y-auto px-5">
           <div className="flex flex-col gap-[9px]">
-            {candidates.map((c, i) => (
+            {pickCandidates.map((c) => (
               <button
                 key={c.id}
                 type="button"
@@ -654,20 +723,26 @@ export default function CaptureFlow({
                   setPicked(c);
                   setStep("done");
                 }}
-                className={`flex min-h-[62px] w-full cursor-pointer items-center gap-3 rounded-[20px] bg-card px-[15px] py-[13px] ${
-                  i === 0
-                    ? "border-[1.5px] border-brick shadow-[0_4px_14px_rgba(180,85,45,.1)]"
-                    : "border border-[#ded8cb]"
+                className={`flex min-h-[62px] w-full cursor-pointer items-center gap-3 rounded-[20px] px-[15px] py-[13px] ${
+                  c.wish
+                    ? "border-[1.5px] border-brick bg-[#f9f0e9]"
+                    : "border border-[#ded8cb] bg-card"
                 }`}
               >
                 <span
                   className={`grid size-[34px] shrink-0 place-items-center rounded-full font-mono text-[9.5px] ${
-                    i === 0 ? "bg-brick-soft text-brick" : "bg-[#f1ede4] text-muted"
+                    c.wish ? "bg-brick-soft text-brick" : "bg-[#f1ede4] text-muted"
                   }`}
                 >
                   {c.distance == null ? "—" : `${c.distance}m`}
                 </span>
                 <span className="min-w-0 flex-1 text-left">
+                  {c.wish && (
+                    <span className="mb-[5px] flex items-center gap-[5px]">
+                      <BookmarkIcon size={12} fill="#b4552d" stroke="#b4552d" />
+                      <span className="font-mono text-[10.5px] text-brick">가고싶다에 담아둔 식당</span>
+                    </span>
+                  )}
                   <span className="block truncate font-serif text-[16px] font-bold text-ink">
                     {c.name}
                   </span>
@@ -739,6 +814,12 @@ export default function CaptureFlow({
           <div className="mt-[7px] text-[12px] leading-[1.6] text-muted">
             {picked?.name} · {isoDate(at).replaceAll("-", ".")} {hhmm(at)}
           </div>
+          {autoMatched && (
+            <div className="mt-3 flex items-center justify-center gap-1.5 rounded-[14px] border border-[#e0c3b1] bg-[#f9f0e9] px-3 py-[7px]">
+              <BookmarkIcon size={12} fill="#b4552d" stroke="#b4552d" />
+              <span className="text-[11px] text-brick">담아둔 곳이라 바로 이 가게로 정했습니다</span>
+            </div>
+          )}
           {error && <div className="mt-2 text-[12px] text-[#a8412a]">{error}</div>}
         </div>
       </div>
