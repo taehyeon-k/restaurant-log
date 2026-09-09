@@ -2,11 +2,23 @@
 
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { WISH_CATEGORIES, type Wish } from "@/lib/types";
+import { ALL_CATEGORIES, matchWish, type Wish } from "@/lib/types";
 import { chipClass, Eyebrow, ToggleSwitch } from "./ui";
 import SpotPicker from "./SpotPicker";
 
-export type WishFormTarget = { mode: "new" } | { mode: "edit"; wish: Wish };
+export type WishFormTarget =
+  | {
+      mode: "new";
+      /** 검색·기록에서 예정으로 담을 때 미리 채우는 값(§9). */
+      preset?: {
+        name?: string;
+        where_text?: string;
+        category?: string;
+        lat?: number;
+        lng?: number;
+      };
+    }
+  | { mode: "edit"; wish: Wish };
 
 /** 자유 글에서 첫 URL만 뽑아냅니다 — 「출처 보기」 단추가 이걸 씁니다. */
 export const firstUrl = (text: string | null) => text?.match(/https?:\/\/[^\s]+/)?.[0] ?? null;
@@ -22,24 +34,35 @@ const fieldClass =
 
 export default function WishForm({
   target,
+  wishes,
   onCancel,
   onSaved,
+  onDuplicate,
 }: {
   target: WishFormTarget;
+  /** 새로 담을 때 같은 이름 방어에 씁니다(§9) — saveWish 쪽 안전망. */
+  wishes: Wish[];
   onCancel: () => void;
   onSaved: () => void;
+  /** 이미 같은 이름의 위시가 있으면 새로 만들지 않고 그 위시를 돌려줍니다. */
+  onDuplicate: (wish: Wish) => void;
 }) {
   const wish = target.mode === "edit" ? target.wish : null;
   const isNew = wish === null;
+  const preset = target.mode === "new" ? target.preset : undefined;
 
-  const [name, setName] = useState(wish?.name ?? "");
-  const [whereText, setWhereText] = useState(wish?.where_text ?? "");
-  const [category, setCategory] = useState(wish?.category ?? "");
+  const [name, setName] = useState(wish?.name ?? preset?.name ?? "");
+  const [whereText, setWhereText] = useState(wish?.where_text ?? preset?.where_text ?? "");
+  const [category, setCategory] = useState(wish?.category ?? preset?.category ?? "");
   const [note, setNote] = useState(wish?.note ?? "");
   const [planDate, setPlanDate] = useState(wish?.plan_date ?? "");
   const [notify, setNotify] = useState(wish?.notify ?? false);
   const [spot, setSpot] = useState<{ lat: number; lng: number } | null>(
-    wish?.lat != null && wish?.lng != null ? { lat: wish.lat, lng: wish.lng } : null
+    wish?.lat != null && wish?.lng != null
+      ? { lat: wish.lat, lng: wish.lng }
+      : preset?.lat != null && preset?.lng != null
+        ? { lat: preset.lat, lng: preset.lng }
+        : null
   );
   const [picking, setPicking] = useState(false);
 
@@ -54,8 +77,20 @@ export default function WishForm({
     setSaving(true);
     setError("");
 
+    const cleanName = name.trim();
+
+    // 같은 이름의 위시가 이미 있으면 중복으로 만들지 않고 그 위시로 돌려보냅니다.
+    if (isNew) {
+      const dup = matchWish(wishes, cleanName);
+      if (dup) {
+        setSaving(false);
+        onDuplicate(dup);
+        return;
+      }
+    }
+
     const payload = {
-      name: name.trim(),
+      name: cleanName,
       where_text: whereText.trim() || null,
       category: category || null,
       note: note.trim() || null,
@@ -137,7 +172,7 @@ export default function WishForm({
           <div>
             <Eyebrow>종류</Eyebrow>
             <div className="mt-[9px] flex flex-wrap gap-1.5">
-              {WISH_CATEGORIES.map((c) => (
+              {ALL_CATEGORIES.map((c) => (
                 <button
                   key={c}
                   type="button"

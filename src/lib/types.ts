@@ -52,19 +52,6 @@ export type Wish = {
   created_at: string;
 };
 
-/** WishForm 종류 칩 — CATEGORIES(기록용)와는 다른, 위시 전용 어휘입니다. */
-export const WISH_CATEGORIES = [
-  "한식",
-  "일식",
-  "중식",
-  "양식",
-  "분식",
-  "고기",
-  "술집",
-  "카페",
-  "빵집",
-];
-
 export const CATEGORIES: Record<Kind, string[]> = {
   restaurant: ["양식", "한식", "일식", "중식", "아시안", "분식"],
   cafe: ["커피", "디저트", "베이커리", "차"],
@@ -154,6 +141,13 @@ export const CATEGORY_COLORS: Record<string, string> = {
 
 export const pinColor = (category: string | null) =>
   (category && CATEGORY_COLORS[category]) || "#8a8377";
+
+/**
+ * WishForm 종류 칩 — 기록(CATEGORIES)과 같은 어휘를 그대로 씁니다.
+ * 갈리면 (a) 검색·기록에서 넘어온 분류가 어느 칩에도 안 맞고, (b) 지도
+ * 책갈피가 pinColor 를 못 찾아 회색으로 떨어집니다(HANDOFF-wish.md §4.3).
+ */
+export const ALL_CATEGORIES = Object.keys(CATEGORY_COLORS);
 
 const normName = (s: string) => s.replace(/\s+/g, "").toLowerCase();
 

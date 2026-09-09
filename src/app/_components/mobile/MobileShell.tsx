@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { groupPlaces, type Place } from "@/lib/places";
-import { dottedDate, type Kind, type Restaurant, type Sort, type Wish } from "@/lib/types";
+import { CATEGORIES, dottedDate, matchWish, type Kind, type Restaurant, type Sort, type Wish } from "@/lib/types";
 import type { Place as GeocodePlace } from "@/lib/geocode";
 import MobileMap, { type MapHandle, type MarkerFilter } from "./MobileMap";
 import PlaceCard from "./PlaceCard";
@@ -21,10 +21,11 @@ import MobilePlaceSearch, { type PickedPlace } from "./PlaceSearch";
 import WishScreen from "./WishScreen";
 import WishForm, { type WishFormTarget } from "./WishForm";
 import WishSheet from "./WishSheet";
+import SearchMissSheet from "./SearchMissSheet";
 import { BookmarkIcon, BURST, DraftsBoxIcon, Eyebrow, PlusIcon, SearchIcon } from "./ui";
 
-/** 위시의 종류 어휘는 기록보다 넓어서(고기·술집 등) 카페 계열만 카페로 봅니다. */
-const wishKind = (w: Wish): Kind => (w.category === "카페" || w.category === "빵집" ? "cafe" : "restaurant");
+/** 기록과 같은 분류 어휘를 씁니다(§4.3) — 카페 계열이면 카페 종류로 봅니다. */
+const wishKind = (w: Wish): Kind => (CATEGORIES.cafe.includes(w.category ?? "") ? "cafe" : "restaurant");
 
 /** 이미 기록한 가게인지 — 이름이 같거나, 150m 안에 있으면 같은 곳으로 봅니다. */
 const norm = (s: string) => s.replace(/\s+/g, "").toLowerCase();
@@ -223,6 +224,25 @@ export default function MobileShell({ rows, wishes }: { rows: Restaurant[]; wish
     );
   }
 
+  /** 이미 담아둔 위시인지 — 이름이 같거나, 150m 안에 있으면 같은 곳으로 봅니다(§10). */
+  function findWish(p: GeocodePlace): Wish | null {
+    const needle = norm(p.name || "");
+
+    if (needle) {
+      const byName = wishes.find((w) => {
+        const n = norm(w.name);
+        return n === needle || n.includes(needle) || needle.includes(n);
+      });
+      if (byName) return byName;
+    }
+
+    return (
+      wishes.find(
+        (w) => w.lat !== null && w.lng !== null && metersBetween(w.lat, w.lng, p.lat, p.lng) < 150
+      ) ?? null
+    );
+  }
+
   /** 이 가게로 새 방문을 이어받아 엽니다(§8, §9) — 취소하면 그냥 아무 일도 없던 게 됩니다. */
   const openRevisit = useCallback((source: Restaurant) => {
     setEditing({
@@ -239,6 +259,22 @@ export default function MobileShell({ rows, wishes }: { rows: Restaurant[]; wish
     });
   }, []);
 
+  /**
+   * 예정으로 담습니다(§9) — 이미 같은 이름의 위시가 있으면 새로 만들지 않고
+   * 그 위시 시트를 곧바로 엽니다(중복 방지, WISH MET 유령 위시를 막습니다).
+   */
+  const openWishPlan = useCallback(
+    (preset: { name: string; where_text?: string; category?: string; lat?: number; lng?: number }) => {
+      const dup = matchWish(wishes, preset.name);
+      if (dup) {
+        setOpenWishId(dup.id);
+        return;
+      }
+      setWishFormTarget({ mode: "new", preset });
+    },
+    [wishes]
+  );
+
   function handleChoosePlace(p: GeocodePlace) {
     const hit = findRecord(p);
 
@@ -254,6 +290,21 @@ export default function MobileShell({ rows, wishes }: { rows: Restaurant[]; wish
         // 곧바로 들어가지 않고 작은 시트로 먼저 보여줍니다 — 지도를 누르면 그 자리에 그대로 머무릅니다.
         setFoundHit({ restaurant: hit, place: target });
       }
+      return;
+    }
+
+    // 기록에 없으면 위시에서 찾습니다 — 담아둔 곳을 검색했는데 "어느 쪽에도 없다"고
+    // 말하며 중복 담기를 권하면 안 됩니다(§10).
+    const wishHit = findWish(p);
+    if (wishHit) {
+      closeAll();
+      setPickedPlace(null);
+      if (wishHit.lat != null && wishHit.lng != null) {
+        mapRef.current?.flyTo(wishHit.lat, wishHit.lng, 16);
+      } else {
+        mapRef.current?.flyTo(p.lat, p.lng, 16);
+      }
+      setOpenWishId(wishHit.id);
       return;
     }
 
@@ -324,7 +375,8 @@ export default function MobileShell({ rows, wishes }: { rows: Restaurant[]; wish
     tab !== "map" ||
     wishFormTarget !== null ||
     openWishId !== null ||
-    foundHit !== null;
+    foundHit !== null ||
+    pickedPlace !== null;
 
   const TAB_TITLE: Record<Exclude<Tab, "map" | "calendar" | "wish">, string> = {
     account: "내계정",
@@ -402,14 +454,6 @@ export default function MobileShell({ rows, wishes }: { rows: Restaurant[]; wish
           onChange={setMapQuery}
           onChoose={handleChoosePlace}
           picked={pickedPlace}
-          onAddHere={() =>
-            pickedPlace &&
-            setEditing({
-              mode: "new",
-              kind,
-              preset: { name: pickedPlace.name, address: pickedPlace.address, lat: pickedPlace.lat, lng: pickedPlace.lng },
-            })
-          }
           onClearPicked={() => setPickedPlace(null)}
         />
 
@@ -622,6 +666,23 @@ export default function MobileShell({ rows, wishes }: { rows: Restaurant[]; wish
               <button
                 type="button"
                 onClick={() => {
+                  openWishPlan({
+                    name: foundHit.restaurant.name,
+                    where_text: foundHit.restaurant.address ?? foundHit.restaurant.region ?? undefined,
+                    category: foundHit.restaurant.category ?? undefined,
+                    lat: foundHit.restaurant.lat ?? undefined,
+                    lng: foundHit.restaurant.lng ?? undefined,
+                  });
+                  setFoundHit(null);
+                }}
+                aria-label="가고싶다에 담기"
+                className="grid size-12 shrink-0 cursor-pointer place-items-center rounded-[16px] border border-[#e4dfd3] bg-transparent text-muted"
+              >
+                <BookmarkIcon size={16} stroke="#6b665e" />
+              </button>
+              <button
+                type="button"
+                onClick={() => {
                   openPlace(foundHit.place.key, foundHit.restaurant.kind);
                   setFoundHit(null);
                 }}
@@ -632,6 +693,35 @@ export default function MobileShell({ rows, wishes }: { rows: Restaurant[]; wish
             </div>
           </div>
         </div>
+      )}
+
+      {pickedPlace && (
+        <SearchMissSheet
+          name={pickedPlace.name}
+          onAddRecord={() => {
+            setEditing({
+              mode: "new",
+              kind,
+              preset: {
+                name: pickedPlace.name,
+                address: pickedPlace.address,
+                lat: pickedPlace.lat,
+                lng: pickedPlace.lng,
+              },
+            });
+            setPickedPlace(null);
+          }}
+          onAddWish={() => {
+            openWishPlan({
+              name: pickedPlace.name,
+              where_text: pickedPlace.address ?? undefined,
+              lat: pickedPlace.lat,
+              lng: pickedPlace.lng,
+            });
+            setPickedPlace(null);
+          }}
+          onClose={() => setPickedPlace(null)}
+        />
       )}
 
       {openWish && (
@@ -654,10 +744,15 @@ export default function MobileShell({ rows, wishes }: { rows: Restaurant[]; wish
       {wishFormTarget && (
         <WishForm
           target={wishFormTarget}
+          wishes={wishes}
           onCancel={() => setWishFormTarget(null)}
           onSaved={() => {
             setWishFormTarget(null);
             refresh();
+          }}
+          onDuplicate={(dup) => {
+            setWishFormTarget(null);
+            setOpenWishId(dup.id);
           }}
         />
       )}
@@ -707,6 +802,15 @@ export default function MobileShell({ rows, wishes }: { rows: Restaurant[]; wish
           onBack={closeAll}
           onOpenVisit={(id) => setVisitId(id)}
           onRevisit={() => openRevisit(place.latest)}
+          onAddWish={() =>
+            openWishPlan({
+              name: place.name,
+              where_text: place.address ?? place.region ?? undefined,
+              category: place.category ?? undefined,
+              lat: place.lat ?? undefined,
+              lng: place.lng ?? undefined,
+            })
+          }
         />
       )}
 
@@ -715,6 +819,15 @@ export default function MobileShell({ rows, wishes }: { rows: Restaurant[]; wish
           key={visit.id}
           record={visit}
           onRevisit={() => openRevisit(visit)}
+          onAddWish={() =>
+            openWishPlan({
+              name: visit.name,
+              where_text: visit.address ?? visit.region ?? undefined,
+              category: visit.category ?? undefined,
+              lat: visit.lat ?? undefined,
+              lng: visit.lng ?? undefined,
+            })
+          }
           onBack={() => {
             // 그날 화면(day)에서 들어왔으면 월력까지 가지 않고 그날 화면으로 돌아갑니다.
             if (day) {

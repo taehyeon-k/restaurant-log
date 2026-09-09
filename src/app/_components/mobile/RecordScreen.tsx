@@ -12,6 +12,7 @@ export default function RecordScreen({
   onBack,
   onEdit,
   onRevisit,
+  onAddWish,
   onChanged,
   onDeleted,
 }: {
@@ -20,6 +21,8 @@ export default function RecordScreen({
   onEdit: () => void;
   /** 「여기 또 왔어요 · 기록 추가」(§8) — 이 가게 정보를 이어받은 새 기록을 엽니다. */
   onRevisit: () => void;
+  /** 이 가게를 가고싶다에 예정으로 담습니다(§9). */
+  onAddWish: () => void;
   onChanged: () => void;
   onDeleted: () => void;
 }) {
@@ -218,13 +221,23 @@ export default function RecordScreen({
         {error && <p className="mt-4 text-[12px] text-[#a8412a]">{error}</p>}
 
         <div className="mt-5 flex flex-col gap-2">
-          <button
-            type="button"
-            onClick={onRevisit}
-            className="min-h-[50px] w-full cursor-pointer rounded-[18px] border-none bg-ink text-[13.5px] font-medium text-card"
-          >
-            여기 또 왔어요 · 기록 추가
-          </button>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={onRevisit}
+              className="min-h-[50px] flex-1 cursor-pointer rounded-[18px] border-none bg-ink text-[13.5px] font-medium text-card"
+            >
+              여기 또 왔어요 · 기록 추가
+            </button>
+            <button
+              type="button"
+              onClick={onAddWish}
+              aria-label="가고싶다에 담기"
+              className="grid size-[50px] shrink-0 cursor-pointer place-items-center rounded-[18px] border border-[#ded8cb] bg-transparent"
+            >
+              <BookmarkIcon size={16} stroke="#1c1a17" />
+            </button>
+          </div>
 
           <div className="flex gap-2">
             <button

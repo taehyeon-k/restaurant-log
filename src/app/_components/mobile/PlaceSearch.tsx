@@ -16,14 +16,12 @@ export default function MobilePlaceSearch({
   onChange,
   onChoose,
   picked,
-  onAddHere,
   onClearPicked,
 }: {
   value: string;
   onChange: (v: string) => void;
   onChoose: (p: Place) => void;
   picked: PickedPlace;
-  onAddHere: () => void;
   onClearPicked: () => void;
 }) {
   const [results, setResults] = useState<Place[]>([]);
@@ -119,22 +117,6 @@ export default function MobilePlaceSearch({
             </li>
           ))}
         </ul>
-      )}
-
-      {picked && !open && (
-        <div className="absolute inset-x-0 top-[52px] z-10 flex items-center justify-between gap-3 rounded-[16px] border border-line bg-card px-4 py-3 shadow-[0_12px_28px_rgba(28,26,23,.12)]">
-          <div className="flex min-w-0 flex-col gap-0.5">
-            <span className="truncate text-[13.5px] font-medium text-ink">{picked.name}</span>
-            <span className="truncate text-[11.5px] text-muted">{picked.address}</span>
-          </div>
-          <button
-            type="button"
-            onClick={onAddHere}
-            className="shrink-0 cursor-pointer rounded-[16px] border-none bg-ink px-3.5 py-2 text-[12px] font-medium whitespace-nowrap text-paper"
-          >
-            + 여기에 기록 추가
-          </button>
-        </div>
       )}
     </div>
   );

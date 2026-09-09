@@ -4,7 +4,7 @@ import type { Place } from "@/lib/places";
 import { dottedDate, verifiedDateTime } from "@/lib/types";
 import { feltLabel, feltLevel } from "@/lib/price";
 import { photoCount } from "./record";
-import { Eyebrow, MobileStars, Pigs, photoFill } from "./ui";
+import { BookmarkIcon, Eyebrow, MobileStars, Pigs, photoFill } from "./ui";
 import { SAFE_TOP } from "./MobileShell";
 
 /** 기록이 두 개 이상인 가게 화면. */
@@ -13,12 +13,15 @@ export default function PlaceScreen({
   onBack,
   onOpenVisit,
   onRevisit,
+  onAddWish,
 }: {
   place: Place;
   onBack: () => void;
   onOpenVisit: (id: number) => void;
   /** 「여기 또 왔어요 · 기록 추가」(§8) — 이 가게 정보를 이어받은 새 기록을 엽니다. */
   onRevisit: () => void;
+  /** 이 가게를 가고싶다에 예정으로 담습니다(§9). */
+  onAddWish: () => void;
 }) {
   return (
     <div className="absolute inset-0 z-[1200] flex flex-col bg-paper">
@@ -89,13 +92,23 @@ export default function PlaceScreen({
           </div>
         )}
 
-        <button
-          type="button"
-          onClick={onRevisit}
-          className="mt-5 min-h-[50px] w-full cursor-pointer rounded-[18px] border-none bg-ink text-[13.5px] font-medium text-card"
-        >
-          여기 또 왔어요 · 기록 추가
-        </button>
+        <div className="mt-5 flex gap-2">
+          <button
+            type="button"
+            onClick={onRevisit}
+            className="min-h-[50px] flex-1 cursor-pointer rounded-[18px] border-none bg-ink text-[13.5px] font-medium text-card"
+          >
+            여기 또 왔어요 · 기록 추가
+          </button>
+          <button
+            type="button"
+            onClick={onAddWish}
+            aria-label="가고싶다에 담기"
+            className="grid size-[50px] shrink-0 cursor-pointer place-items-center rounded-[18px] border border-[#ded8cb] bg-transparent"
+          >
+            <BookmarkIcon size={16} stroke="#1c1a17" />
+          </button>
+        </div>
 
         <div className="mt-[26px] flex items-center justify-between border-t border-[#ded8cb] pt-[18px]">
           <Eyebrow>RECORDS</Eyebrow>
