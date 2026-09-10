@@ -140,7 +140,89 @@ export const LABELS: LabelDef[] = [
     count: streak,
   },
   { id: "revisit", shape: "seal", color: "#b4552d", name: "다시 그 집", desc: "재방문 20곳", need: 20, count: (rows) => distinct(rows.filter((r) => r.revisit).map((r) => r.place_key ?? r.name)).size },
+  { id: "palate", shape: "hex", color: "#6f8455", name: "고루 먹는 입", desc: "분류 8가지", need: 8, count: (rows) => distinct(rows.map((r) => r.category)).size },
+  {
+    id: "weekend", shape: "diamond", color: "#7a6a9a", name: "주말의 식탁", desc: "토·일 기록 20개", need: 20,
+    count: (rows) =>
+      rows.filter((r) => r.visited_at && [0, 6].includes(new Date(`${r.visited_at}T00:00:00`).getDay())).length,
+  },
+  {
+    id: "album", shape: "scallop", color: "#5f7a8a", name: "사진첩", desc: "사진 세 장 이상 10개", need: 10,
+    count: (rows) =>
+      rows.filter((r) => (r.photo_urls?.length ?? (r.photo_url ? 1 : 0)) >= 3).length,
+  },
+  {
+    id: "longform", shape: "shield", color: "#7a5c42", name: "긴 이야기", desc: "100자 넘는 메모 5개", need: 5,
+    count: (rows) => rows.filter((r) => (r.review ?? "").length > 100).length,
+  },
+  {
+    id: "morning", shape: "oct", color: "#c07a2e", name: "아침의 사람", desc: "오전 기록 10개", need: 10,
+    count: (rows) =>
+      rows.filter((r) => r.verified && r.verified_at && new Date(r.verified_at).getHours() < 11).length,
+  },
+  {
+    id: "thrift", shape: "seal", color: "#6f7350", name: "만원의 행복", desc: "만원 아래 20그릇", need: 20,
+    count: (rows) => rows.filter((r) => r.price_range != null && r.price_range < 10000).length,
+  },
+  {
+    id: "december", shape: "check", color: "#a8412a", name: "연말의 식탁", desc: "12월 기록 10개", need: 10,
+    count: (rows) => rows.filter((r) => (r.visited_at ?? "").slice(5, 7) === "12").length,
+  },
 ];
+
+/** 동네 칭호 — 한 구에서 인증 기록을 쌓으면 등급이 오릅니다(등급이 오르면 아래 등급을 대체). */
+export const REGION_TIERS = [
+  { need: 10, tier: "동", suffix: "러버", stars: 1, color: "#8c6239", ink: "#f6ece2" },
+  { need: 30, tier: "은", suffix: "보안관", stars: 2, color: "#8e949b", ink: "#f7f8f9" },
+  { need: 50, tier: "금", suffix: "맛잘알", stars: 3, color: "#b58a2b", ink: "#fbf4e2" },
+] as const;
+
+export type RegionTier = (typeof REGION_TIERS)[number];
+
+/** 서울 25개 구 로마자 표기 — 동네 칭호 배지 원반에 씁니다. */
+export const REGION_EN: Record<string, string> = {
+  종로구: "JONGNO", 중구: "JUNG", 용산구: "YONGSAN", 성동구: "SEONGDONG", 광진구: "GWANGJIN",
+  동대문구: "DONGDAEMUN", 중랑구: "JUNGNANG", 성북구: "SEONGBUK", 강북구: "GANGBUK", 도봉구: "DOBONG",
+  노원구: "NOWON", 은평구: "EUNPYEONG", 서대문구: "SEODAEMUN", 마포구: "MAPO", 양천구: "YANGCHEON",
+  강서구: "GANGSEO", 구로구: "GURO", 금천구: "GEUMCHEON", 영등포구: "YEONGDEUNGPO", 동작구: "DONGJAK",
+  관악구: "GWANAK", 서초구: "SEOCHO", 강남구: "GANGNAM", 송파구: "SONGPA", 강동구: "GANGDONG",
+};
+
+export type RegionTitle = {
+  /** 구 이름만("중구") — 표시용. */
+  region: string;
+  /** 그 구에서 인증된 기록 수 */
+  have: number;
+  tier: RegionTier | null;
+  next: RegionTier | null;
+};
+
+/**
+ * 구별 동네 칭호. 인증되고 대기(pending)가 아닌 기록만 셉니다.
+ * "서울 {구}" 형태만 보고 구 이름만 뽑습니다 — 그냥 구 이름만 보면 부산 중구처럼
+ * 다른 시·도의 같은 이름 구와 섞입니다.
+ */
+export function regionTitles(rows: Restaurant[]): RegionTitle[] {
+  const counts = new Map<string, number>();
+
+  for (const r of rows) {
+    if (!r.verified || r.pending) continue;
+    const parts = (r.region ?? "").trim().split(/\s+/);
+    if (parts.length !== 2 || parts[0] !== "서울") continue;
+    const gu = parts[1];
+    if (!REGION_EN[gu]) continue;
+    counts.set(gu, (counts.get(gu) ?? 0) + 1);
+  }
+
+  return [...counts.entries()]
+    .map(([region, have]) => {
+      let tier: RegionTier | null = null;
+      for (const t of REGION_TIERS) if (have >= t.need) tier = t;
+      const next = REGION_TIERS.find((t) => have < t.need) ?? null;
+      return { region, have, tier, next };
+    })
+    .sort((a, b) => b.have - a.have);
+}
 
 export type EarnedLabel = LabelDef & { have: number; earned: boolean };
 
