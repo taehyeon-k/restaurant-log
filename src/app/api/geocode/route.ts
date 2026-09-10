@@ -12,7 +12,7 @@ type Place = {
   lng: number;
 };
 
-type NearbyPlace = Place & { distance: number; category: string | null };
+type NearbyPlace = Place & { distance: number; category: string | null; kind: "restaurant" | "cafe" };
 
 /** 카카오 카테고리 코드 — 음식점 / 카페 */
 const GROUP = { restaurant: "FD6", cafe: "CE7" } as const;
@@ -73,19 +73,11 @@ export async function GET(req: Request) {
 
   try {
     // 좌표 둘레의 음식점·카페 — 방문인증 후보 (좌표는 여기서만 쓰고 남기지 않습니다)
+    // 음식점/카페 중 하나만 찾으면 예를 들어 베이커리·카페가 후보에서 통째로 빠지므로,
+    // 항상 둘 다 찾아 하나의 후보 목록으로 합칩니다.
     if (lat && lng && sp.get("near")) {
-      const kind = sp.get("kind") === "cafe" ? "cafe" : "restaurant";
-      const json = await kakao("search/category.json", {
-        category_group_code: GROUP[kind],
-        x: lng,
-        y: lat,
-        radius: "500",
-        sort: "distance",
-        size: "10",
-      });
-
-      const places: NearbyPlace[] = (json?.documents ?? []).map(
-        (d: Record<string, string>) => {
+      const toPlaces = (kind: "restaurant" | "cafe") => (json: { documents?: Record<string, string>[] }): NearbyPlace[] =>
+        (json?.documents ?? []).map((d) => {
           const address = d.road_address_name || d.address_name;
           return {
             name: d.place_name,
@@ -95,8 +87,23 @@ export async function GET(req: Request) {
             lat: Number(d.y),
             lng: Number(d.x),
             distance: Number(d.distance) || 0,
+            kind,
           };
-        }
+        });
+
+      const [restJson, cafeJson] = await Promise.all([
+        kakao("search/category.json", {
+          category_group_code: GROUP.restaurant,
+          x: lng, y: lat, radius: "500", sort: "distance", size: "10",
+        }),
+        kakao("search/category.json", {
+          category_group_code: GROUP.cafe,
+          x: lng, y: lat, radius: "500", sort: "distance", size: "10",
+        }),
+      ]);
+
+      const places = [...toPlaces("restaurant")(restJson), ...toPlaces("cafe")(cafeJson)].sort(
+        (a, b) => a.distance - b.distance
       );
 
       return NextResponse.json({ places });

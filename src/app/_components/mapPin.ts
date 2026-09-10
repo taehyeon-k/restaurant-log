@@ -24,7 +24,7 @@ const pinHtml = (row: PinRow) => {
   const fill = row.revisit ? base : "#fbfaf6";
   const stroke = row.revisit ? "#fbfaf6" : base;
   const core = row.revisit ? "#fbfaf6" : base;
-  return '<div data-pin style="position:absolute;left:50%;bottom:8px;width:24px;height:24px;box-sizing:border-box;transform:translateX(-50%) rotate(-45deg);border-radius:50% 50% 50% 0;background:' + fill + ';border:1.5px solid ' + stroke + ';box-shadow:1px -1px 5px rgba(28,26,23,.16);display:flex;align-items:center;justify-content:center;transition:width .16s ease,height .16s ease,border-width .16s ease"><div data-core style="width:8px;height:8px;border-radius:50%;background:' + core + ';transform:rotate(45deg);transition:width .16s ease,height .16s ease"></div></div><div data-shadow style="position:absolute;left:50%;bottom:4px;width:9px;height:3px;transform:translateX(-50%);border-radius:50%;background:rgba(28,26,23,.16);transition:width .16s ease,height .16s ease"></div>';
+  return '<div data-pin style="position:absolute;left:50%;bottom:8px;width:24px;height:24px;box-sizing:border-box;transform:translateX(-50%) rotate(-45deg);border-radius:50% 50% 50% 0;background:' + fill + ';border:1.5px solid ' + stroke + ';box-shadow:1px -1px 5px rgba(28,26,23,.16);display:flex;align-items:center;justify-content:center;transition:width .16s ease,height .16s ease,border-width .16s ease"><div data-core style="width:7px;height:7px;border-radius:50%;background:' + core + ';transform:rotate(45deg);transition:width .16s ease,height .16s ease"></div></div><div data-shadow style="position:absolute;left:50%;bottom:4px;width:9px;height:3px;transform:translateX(-50%);border-radius:50%;background:rgba(28,26,23,.16);transition:width .16s ease,height .16s ease"></div>';
 };
 
 const icon = (content: string): naver.maps.HtmlIcon => ({
@@ -73,7 +73,7 @@ export function applyActive(marker: naver.maps.Marker, active: boolean) {
   pin.style.width = pin.style.height = active ? "32px" : "24px";
   pin.style.borderWidth = active ? "2px" : "1.5px";
   pin.style.boxShadow = active ? "2px -2px 9px rgba(28,26,23,.22)" : "1px -1px 5px rgba(28,26,23,.16)";
-  if (core) core.style.width = core.style.height = active ? "10px" : "8px";
+  if (core) core.style.width = core.style.height = active ? "10px" : "7px";
   if (shadow) { shadow.style.width = active ? "12px" : "9px"; shadow.style.height = active ? "4px" : "3px"; }
   marker.setZIndex(active ? 1000 : 0);
 }

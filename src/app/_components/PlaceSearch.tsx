@@ -8,6 +8,8 @@ import type { Restaurant } from "@/lib/types";
 import { usePlace } from "./Workspace";
 
 const norm = (s: string) => s.replace(/\s+/g, "").toLowerCase();
+/** 부분일치나 넓은 반경을 쓰면 "자마버거 이대점"과 "자마버거 망원점"처럼 지점이 다른 곳을 섞어버립니다. */
+const SAME_SPOT_M = 30;
 
 /** 두 좌표 사이 거리(m). 같은 가게인지 판단하는 데만 씁니다. */
 function metersBetween(aLat: number, aLng: number, bLat: number, bLng: number) {
@@ -57,15 +59,12 @@ export default function PlaceSearch({ rows }: { rows: Restaurant[] }) {
     };
   }, [value, open]);
 
-  /** 이미 기록한 가게인지 — 이름이 같거나, 150m 안에 있으면 같은 곳으로 봅니다. */
+  /** 이미 기록한 가게인지 — 이름이 정확히 같거나, 아주 가까우면(30m) 같은 곳으로 봅니다. */
   function findRecord(p: Place) {
     const needle = norm(p.name || "");
 
     if (needle) {
-      const byName = rows.find((r) => {
-        const n = norm(r.name);
-        return n === needle || n.includes(needle) || needle.includes(n);
-      });
+      const byName = rows.find((r) => norm(r.name) === needle);
       if (byName) return byName;
     }
 
@@ -73,7 +72,7 @@ export default function PlaceSearch({ rows }: { rows: Restaurant[] }) {
       (r) =>
         r.lat !== null &&
         r.lng !== null &&
-        metersBetween(r.lat, r.lng, p.lat, p.lng) < 150
+        metersBetween(r.lat, r.lng, p.lat, p.lng) < SAME_SPOT_M
     );
   }
 

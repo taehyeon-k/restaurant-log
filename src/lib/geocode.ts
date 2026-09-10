@@ -39,16 +39,17 @@ export type NearbyPlace = Place & {
   /** 읽은 좌표에서의 거리(m) */
   distance: number;
   category: string | null;
+  kind: "restaurant" | "cafe";
 };
 
 /**
- * 좌표 둘레의 음식점·카페. 방문인증 흐름에서 "여기 어디예요?" 후보로 씁니다.
+ * 좌표 둘레의 음식점과 카페를 함께 찾습니다. 방문인증 흐름에서 "여기 어디예요?"
+ * 후보로 씁니다 — 둘 중 하나만 찾으면 카페·베이커리가 후보에서 통째로 빠집니다.
  * 좌표는 후보를 찾는 요청에만 쓰고 저장하지 않습니다.
  */
 export async function nearbyPlaces(
   lat: number,
   lng: number,
-  kind: "restaurant" | "cafe",
   signal?: AbortSignal
 ): Promise<NearbyPlace[]> {
   const res = await fetch(
@@ -56,7 +57,6 @@ export async function nearbyPlaces(
       near: "1",
       lat: String(lat),
       lng: String(lng),
-      kind,
     })}`,
     { signal }
   );

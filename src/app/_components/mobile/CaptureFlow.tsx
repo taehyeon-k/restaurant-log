@@ -389,20 +389,20 @@ export default function CaptureFlow({
     setStep("done");
   }, [step, geo, verifyWish, picked, kind]);
 
-  // 그다음 둘레 장소 검색 — 좌표는 이 요청에만 쓰고 저장하지 않습니다.
+  // 그다음 둘레 장소 검색 — 음식점·카페를 함께 찾습니다. 좌표는 이 요청에만 쓰고 저장하지 않습니다.
   useEffect(() => {
     if (step !== "pick" || !geo) return;
 
     let cancelled = false;
 
-    nearbyPlaces(geo.lat, geo.lng, kind)
+    nearbyPlaces(geo.lat, geo.lng)
       .then((found) => {
         if (cancelled) return;
         setExtra(
           found.map((f) => ({
             id: `near:${f.name}:${f.lat},${f.lng}`,
             name: f.name,
-            kind,
+            kind: f.kind,
             category: f.category,
             region: f.region,
             address: f.address,
@@ -418,7 +418,7 @@ export default function CaptureFlow({
     return () => {
       cancelled = true;
     };
-  }, [step, geo, kind]);
+  }, [step, geo]);
 
   /* ── 저장 ─────────────────────────────────────── */
 

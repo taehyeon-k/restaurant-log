@@ -24,8 +24,13 @@ import WishSheet from "./WishSheet";
 import SearchMissSheet from "./SearchMissSheet";
 import { BookmarkIcon, BURST, DraftsBoxIcon, Eyebrow, PlusIcon, SearchIcon } from "./ui";
 
-/** 이미 기록한 가게인지 — 이름이 같거나, 150m 안에 있으면 같은 곳으로 봅니다. */
+/**
+ * 이미 기록한 가게인지 — 이름이 정확히 같거나, 아주 가까우면(30m) 같은 곳으로 봅니다.
+ * 이름을 부분일치(포함 관계)로 보거나 반경을 넓게 잡으면 "자마버거"가 "자마버거 이대점"과
+ * "자마버거 망원점"을 구분 못 하거나, 옆 건물의 다른 가게와 헷갈립니다.
+ */
 const norm = (s: string) => s.replace(/\s+/g, "").toLowerCase();
+const SAME_SPOT_M = 30;
 function metersBetween(aLat: number, aLng: number, bLat: number, bLng: number) {
   const toRad = (d: number) => (d * Math.PI) / 180;
   const dLat = toRad(bLat - aLat);
@@ -201,15 +206,12 @@ export default function MobileShell({ rows, wishes }: { rows: Restaurant[]; wish
 
   /* ── 지도 검색 (PC 의 PlaceSearch 와 같은 방식) ──────── */
 
-  /** 이미 기록한 가게인지 — 이름이 같거나, 150m 안에 있으면 같은 곳으로 봅니다. */
+  /** 이미 기록한 가게인지 — 이름이 정확히 같거나, 아주 가까우면(30m) 같은 곳으로 봅니다. */
   function findRecord(p: GeocodePlace): Restaurant | null {
     const needle = norm(p.name || "");
 
     if (needle) {
-      const byName = visibleRows.find((r) => {
-        const n = norm(r.name);
-        return n === needle || n.includes(needle) || needle.includes(n);
-      });
+      const byName = visibleRows.find((r) => norm(r.name) === needle);
       if (byName) return byName;
     }
 
@@ -218,26 +220,23 @@ export default function MobileShell({ rows, wishes }: { rows: Restaurant[]; wish
         (r) =>
           r.lat !== null &&
           r.lng !== null &&
-          metersBetween(r.lat, r.lng, p.lat, p.lng) < 150
+          metersBetween(r.lat, r.lng, p.lat, p.lng) < SAME_SPOT_M
       ) ?? null
     );
   }
 
-  /** 이미 담아둔 위시인지 — 이름이 같거나, 150m 안에 있으면 같은 곳으로 봅니다(§10). */
+  /** 이미 담아둔 위시인지 — 이름이 정확히 같거나, 아주 가까우면(30m) 같은 곳으로 봅니다(§10). */
   function findWish(p: GeocodePlace): Wish | null {
     const needle = norm(p.name || "");
 
     if (needle) {
-      const byName = wishes.find((w) => {
-        const n = norm(w.name);
-        return n === needle || n.includes(needle) || needle.includes(n);
-      });
+      const byName = wishes.find((w) => norm(w.name) === needle);
       if (byName) return byName;
     }
 
     return (
       wishes.find(
-        (w) => w.lat !== null && w.lng !== null && metersBetween(w.lat, w.lng, p.lat, p.lng) < 150
+        (w) => w.lat !== null && w.lng !== null && metersBetween(w.lat, w.lng, p.lat, p.lng) < SAME_SPOT_M
       ) ?? null
     );
   }
