@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { ALL_CATEGORIES, matchWish, type Wish } from "@/lib/types";
+import { forwardGeocode, type Place } from "@/lib/geocode";
 import { chipClass, Eyebrow, ToggleSwitch } from "./ui";
 import SpotPicker from "./SpotPicker";
 
@@ -68,6 +69,49 @@ export default function WishForm({
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  // 「자리」 칸에서 바로 가게를 찾아 위치를 잡습니다 — 지도에서 손으로 짚지 않아도 되게.
+  const [spotResults, setSpotResults] = useState<Place[]>([]);
+  const [spotOpen, setSpotOpen] = useState(false);
+  const [spotBusy, setSpotBusy] = useState(false);
+  const skipSpotSearch = useRef(false);
+
+  useEffect(() => {
+    if (skipSpotSearch.current) {
+      skipSpotSearch.current = false;
+      return;
+    }
+    if (!spotOpen || whereText.trim().length < 2) {
+      setSpotResults([]);
+      return;
+    }
+
+    const ctrl = new AbortController();
+    const t = setTimeout(async () => {
+      setSpotBusy(true);
+      try {
+        setSpotResults(await forwardGeocode(whereText, ctrl.signal));
+      } catch {
+        /* aborted or offline */
+      } finally {
+        setSpotBusy(false);
+      }
+    }, 250);
+
+    return () => {
+      clearTimeout(t);
+      ctrl.abort();
+    };
+  }, [whereText, spotOpen]);
+
+  function chooseSpot(p: Place) {
+    skipSpotSearch.current = true;
+    setWhereText(p.name || p.address);
+    setSpot({ lat: p.lat, lng: p.lng });
+    setSpotOpen(false);
+    setSpotResults([]);
+    if (!name.trim()) setName(p.name);
+  }
 
   const missing = !name.trim() ? "가게 이름을 적어주세요" : "";
   const canSave = !missing;
@@ -151,12 +195,45 @@ export default function WishForm({
           <label className="block">
             <Eyebrow>자리</Eyebrow>
             <div className="mt-[7px] flex items-center gap-[7px]">
-              <input
-                value={whereText}
-                onChange={(e) => setWhereText(e.target.value)}
-                placeholder="동네나 주소"
-                className="min-h-[46px] min-w-0 flex-1 rounded-[14px] border border-[#ded8cb] bg-card px-[14px] text-[14px] text-ink outline-none placeholder:text-[#b3ada1] focus:border-brick"
-              />
+              <div className="relative min-w-0 flex-1">
+                <input
+                  value={whereText}
+                  onChange={(e) => {
+                    setWhereText(e.target.value);
+                    setSpotOpen(true);
+                    if (spot) setSpot(null);
+                  }}
+                  onFocus={() => setSpotOpen(true)}
+                  onBlur={() => setTimeout(() => setSpotOpen(false), 150)}
+                  placeholder="가게 이름으로 찾기, 또는 동네나 주소"
+                  className="min-h-[46px] w-full rounded-[14px] border border-[#ded8cb] bg-card px-[14px] text-[14px] text-ink outline-none placeholder:text-[#b3ada1] focus:border-brick"
+                />
+
+                {spotBusy && (
+                  <span className="absolute top-1/2 right-3.5 -translate-y-1/2 font-mono text-[10px] text-faint">
+                    검색 중…
+                  </span>
+                )}
+
+                {spotOpen && spotResults.length > 0 && (
+                  <ul className="absolute inset-x-0 top-[50px] z-10 overflow-hidden rounded-[14px] border border-line bg-card shadow-[0_12px_28px_rgba(28,26,23,.12)]">
+                    {spotResults.map((p, i) => (
+                      <li key={`${p.lat}-${p.lng}-${i}`}>
+                        <button
+                          type="button"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => chooseSpot(p)}
+                          className="flex w-full flex-col gap-0.5 border-b border-line px-3.5 py-2.5 text-left last:border-0 hover:bg-brick-soft"
+                        >
+                          <span className="text-[13px] font-medium text-ink">{p.name || p.address}</span>
+                          <span className="text-[11px] text-muted">{p.address}</span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
               <button
                 type="button"
                 onClick={() => setPicking(true)}
@@ -167,6 +244,9 @@ export default function WishForm({
                 {spot ? "자리 정해짐 · 다시 고르기" : "지도에서 고르기"}
               </button>
             </div>
+            {spot && (
+              <div className="mt-1.5 text-[11px] text-brick">검색으로 찾은 자리가 정확히 잡혔습니다.</div>
+            )}
           </label>
 
           <div>
