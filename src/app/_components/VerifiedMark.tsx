@@ -10,8 +10,8 @@ export default function VerifiedMark({
   shadow?: boolean;
 }) {
   const drop = size / Math.SQRT2;
-  const circle = size * 0.62;
-  const check = size * 0.365;
+  const circle = size * 0.52;
+  const check = size * 0.31;
   const strokeWidth =
     size >= 40 ? 3 : size >= 24 ? 3.6 : size >= 22 ? 3.8 : size >= 20 ? 4 : 4.4;
   const dropShadow = !shadow
