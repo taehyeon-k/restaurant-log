@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { groupPlaces } from "@/lib/places";
-import { nearbyPlaces } from "@/lib/geocode";
+import { forwardGeocode, nearbyPlaces, type Place as GeoPlace } from "@/lib/geocode";
 import { dataUrlToBlob, uploadPhoto } from "@/lib/photos";
 import {
   findMatchingWish,
@@ -58,6 +58,8 @@ type ZoomSettings = MediaTrackSettings & { zoom?: number };
 type ZoomConstraints = MediaTrackConstraints & {
   advanced?: (MediaTrackConstraintSet & { zoom?: number })[];
 };
+
+const norm = (s: string) => s.replace(/\s+/g, "").toLowerCase();
 
 const pad = (n: number) => String(n).padStart(2, "0");
 const hhmm = (d: Date) => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
@@ -143,6 +145,32 @@ export default function CaptureFlow({
   /** 「여기 없어요 · 직접 찾기」로 연 가게 찾기 화면(§2). */
   const [searchOpen, setSearchOpen] = useState(false);
   const [pickQuery, setPickQuery] = useState("");
+  /** 두 글자 이상 입력하면 내 기록·둘레를 넘어 전국을 찾습니다(메인 검색창과 같은 API). */
+  const [apiHits, setApiHits] = useState<GeoPlace[]>([]);
+  const [searching, setSearching] = useState(false);
+
+  useEffect(() => {
+    if (!searchOpen) return;
+    const needle = pickQuery.trim();
+    const ctrl = new AbortController();
+
+    const t = setTimeout(() => {
+      if (needle.length < 2) {
+        setApiHits([]);
+        return;
+      }
+      setSearching(true);
+      forwardGeocode(needle, ctrl.signal)
+        .then((places) => setApiHits(places))
+        .catch(() => {})
+        .finally(() => setSearching(false));
+    }, 250);
+
+    return () => {
+      clearTimeout(t);
+      ctrl.abort();
+    };
+  }, [searchOpen, pickQuery]);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -407,13 +435,46 @@ export default function CaptureFlow({
     );
   }, [rows, extra, geo]);
 
+  /**
+   * 두 글자 미만이면 내 기록·둘레만 거리순으로 보여주고, 그 이상이면 그 이름·주소를
+   * 가진 것들에 더해 전국 검색(메인 검색창과 같은 API) 결과까지 합쳐 보여줍니다.
+   * 이미 내 기록이나 둘레 결과에 있는 가게는 전국 검색 결과에서 걸러 중복을 막습니다.
+   */
   const searchHits = useMemo(() => {
     const needle = pickQuery.trim().toLowerCase();
     if (!needle) return searchPool;
-    return searchPool.filter((c) =>
-      [c.name, c.category, c.address].some((f) => (f ?? "").toLowerCase().includes(needle))
-    );
-  }, [searchPool, pickQuery]);
+
+    const seen = new Set<string>();
+    const hits: Candidate[] = [];
+
+    for (const c of searchPool) {
+      if (![c.name, c.category, c.address].some((f) => (f ?? "").toLowerCase().includes(needle)))
+        continue;
+      seen.add(norm(c.name));
+      hits.push(c);
+    }
+
+    for (const p of apiHits) {
+      const name = p.name || p.address;
+      const key = norm(name);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      hits.push({
+        id: `api:${key}:${p.lat},${p.lng}`,
+        name,
+        kind,
+        category: null,
+        region: p.region,
+        address: p.address,
+        lat: p.lat,
+        lng: p.lng,
+        distance: geo ? metersBetween(geo, p.lat, p.lng) : null,
+        mine: false,
+      });
+    }
+
+    return hits.sort((a, b) => (a.distance ?? 1e9) - (b.distance ?? 1e9));
+  }, [searchPool, apiHits, pickQuery, geo, kind]);
 
   /**
    * 인증 대상 위시가 있고 100m 이내면 후보 목록을 건너뛰고 곧바로 그 가게로
@@ -770,8 +831,9 @@ export default function CaptureFlow({
             placeholder="가게 이름"
             className="mt-3 min-h-12 w-full rounded-[16px] border border-[#ded8cb] bg-[#fbfaf6] px-[15px] text-[14px] text-ink outline-none focus:border-brick"
           />
-          <div className="mt-2.5 text-[11.5px] leading-[1.6] text-[#8a8377]">
-            인증은 50m 안에 있는 가게에만 붙습니다. 그보다 먼 곳은 인증 없이 기록으로 남길 수 있습니다.
+          <div className="mt-2.5 flex items-center gap-2 text-[11.5px] leading-[1.6] text-[#8a8377]">
+            <span>인증은 50m 안에 있는 가게에만 붙습니다. 그보다 먼 곳은 인증 없이 기록으로 남길 수 있습니다.</span>
+            {searching && <span className="shrink-0 font-mono text-[10px] text-faint">검색 중…</span>}
           </div>
         </div>
 
@@ -779,6 +841,12 @@ export default function CaptureFlow({
           <div className="flex flex-col gap-[9px]">
             {searchHits.map((c) => {
               const far = !!geo && (c.distance ?? Infinity) > PICK_MAX_M;
+              const note =
+                c.distance == null
+                  ? "인증할 수 있습니다"
+                  : far
+                    ? `${c.distance}m · 인증 없이 기록됩니다`
+                    : `${c.distance}m · 인증할 수 있습니다`;
               return (
                 <button
                   key={c.id}
@@ -811,12 +879,18 @@ export default function CaptureFlow({
                       {[c.mine ? "내 기록" : c.category, c.address].filter(Boolean).join(" · ")}
                     </span>
                     <span className={`mt-1 block text-[10.5px] ${far ? "text-[#a29a8c]" : "text-brick"}`}>
-                      {far ? "50m 밖 · 인증 없이 기록됩니다" : "인증할 수 있습니다"}
+                      {note}
                     </span>
                   </span>
                 </button>
               );
             })}
+
+            {searchHits.length === 0 && !searching && pickQuery.trim() && (
+              <div className="px-2 py-6 text-center text-[12px] leading-[1.7] text-faint">
+                찾는 이름과 맞는 가게가 없습니다. 그대로 인증 없이 기록할 수 있습니다.
+              </div>
+            )}
 
             {typed && (
               <button
