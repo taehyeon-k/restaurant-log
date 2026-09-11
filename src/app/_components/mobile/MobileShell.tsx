@@ -426,7 +426,7 @@ export default function MobileShell({ rows, wishes }: { rows: Restaurant[]; wish
           [
             { id: "all", label: "둘 다" },
             { id: "visited", label: "기록만" },
-            { id: "wish", label: "가고싶다만" },
+            { id: "wish", label: "위시리스트만" },
           ] as const
         ).map((f) => (
           <button
@@ -687,7 +687,7 @@ export default function MobileShell({ rows, wishes }: { rows: Restaurant[]; wish
                   });
                   setFoundHit(null);
                 }}
-                aria-label="가고싶다에 담기"
+                aria-label="위시리스트에 담기"
                 className="grid size-12 shrink-0 cursor-pointer place-items-center rounded-[16px] border border-[#e4dfd3] bg-transparent text-muted"
               >
                 <BookmarkIcon size={16} stroke="#6b665e" />

@@ -740,7 +740,7 @@ export default function CaptureFlow({
                   {c.wish && (
                     <span className="mb-[5px] flex items-center gap-[5px]">
                       <BookmarkIcon size={12} fill="#b4552d" stroke="#b4552d" />
-                      <span className="font-mono text-[10.5px] text-brick">가고싶다에 담아둔 식당</span>
+                      <span className="font-mono text-[10.5px] text-brick">위시리스트에 담아둔 식당</span>
                     </span>
                   )}
                   <span className="block truncate font-serif text-[16px] font-bold text-ink">

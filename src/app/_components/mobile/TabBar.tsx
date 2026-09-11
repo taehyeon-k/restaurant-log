@@ -5,9 +5,9 @@ import { BookmarkIcon, CameraIcon } from "./ui";
 export type Tab = "calendar" | "map" | "wish" | "account";
 
 const TABS: { id: Tab; label: string }[] = [
-  { id: "calendar", label: "월력" },
+  { id: "calendar", label: "캘린더" },
   { id: "map", label: "지도" },
-  { id: "wish", label: "가고싶다" },
+  { id: "wish", label: "위시리스트" },
   { id: "account", label: "내계정" },
 ];
 

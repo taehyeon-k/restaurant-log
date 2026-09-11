@@ -31,7 +31,7 @@ export default function SearchMissSheet({
         <Eyebrow wide>아직 없는 곳</Eyebrow>
         <div className="mt-1.5 font-serif text-[22px] font-bold">{name}</div>
         <div className="mt-1.5 text-[11.5px] leading-[1.6] text-faint">
-          기록에도 가고싶다에도 없는 이름입니다. 어느 쪽으로 둘까요?
+          기록에도 위시리스트에도 없는 이름입니다. 어느 쪽으로 둘까요?
         </div>
 
         <div className="mt-3.5 flex flex-col gap-2">

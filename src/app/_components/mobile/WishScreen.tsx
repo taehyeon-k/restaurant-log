@@ -81,7 +81,7 @@ export default function WishScreen({
     <div className="absolute inset-x-0 top-0 bottom-[74px] z-[1160] flex flex-col bg-paper">
       <div className="shrink-0 px-5 pt-12 pb-3.5">
         <Eyebrow wide>WISHLIST</Eyebrow>
-        <h1 className="mt-2 font-serif text-[22px] font-bold">가고싶다</h1>
+        <h1 className="mt-2 font-serif text-[22px] font-bold">위시리스트</h1>
         <div className="mt-1.5 text-[12px] text-faint">{countLine}</div>
         <div className="mt-2 text-[11.5px] leading-[1.6] text-faint">
           아직 가지 않은 곳입니다. 인증 도장은 그 자리에서 사진을 찍을 때만 붙습니다.

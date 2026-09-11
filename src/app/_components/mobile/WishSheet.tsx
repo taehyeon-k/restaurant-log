@@ -43,7 +43,7 @@ export default function WishSheet({
       <div className="rounded-t-[28px] bg-paper px-5 pt-[18px] pb-[26px] shadow-[0_-8px_30px_rgba(28,26,23,.2)]">
         <div className="flex items-center gap-1.5">
           <BookmarkIcon size={15} fill="#b4552d" stroke="#b4552d" />
-          <span className="font-mono text-[9.5px] tracking-[0.18em] text-brick">가고싶다</span>
+          <span className="font-mono text-[9.5px] tracking-[0.18em] text-brick">위시리스트</span>
         </div>
 
         <h1 className="mt-1.5 font-serif text-[22px] font-bold">{wish.name}</h1>
@@ -100,7 +100,7 @@ export default function WishSheet({
           onClick={onViewList}
           className="mt-3 w-full cursor-pointer border-none bg-transparent text-center text-[12px] text-faint"
         >
-          가고싶다 목록에서 보기
+          위시리스트에서 보기
         </button>
       </div>
     </div>
