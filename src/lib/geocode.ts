@@ -42,6 +42,27 @@ export type NearbyPlace = Place & {
   kind: "restaurant" | "cafe";
 };
 
+export type FoodPlace = Place & {
+  category: string | null;
+  kind: "restaurant" | "cafe";
+};
+
+/**
+ * 이름으로 찾되 음식점·카페만 — 방문 인증의 가게 찾기 화면(§2)에서 씁니다.
+ * `forwardGeocode` 와 달리 역·학교 같은 일반 장소는 걸러내고, 거리 제한 없이 전국에서 찾습니다.
+ */
+export async function searchFoodPlaces(query: string, signal?: AbortSignal): Promise<FoodPlace[]> {
+  const q = query.trim();
+  if (q.length < 2) return [];
+  const res = await fetch(
+    `/api/geocode?${new URLSearchParams({ q, food: "1" })}`,
+    { signal }
+  );
+  if (!res.ok) throw new Error("가게 검색에 실패했습니다");
+  const json = (await res.json()) as { places?: FoodPlace[] };
+  return json.places ?? [];
+}
+
 /**
  * 좌표 둘레의 음식점과 카페를 함께 찾습니다. 방문인증 흐름에서 "여기 어디예요?"
  * 후보로 씁니다 — 둘 중 하나만 찾으면 카페·베이커리가 후보에서 통째로 빠집니다.

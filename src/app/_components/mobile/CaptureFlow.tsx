@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { groupPlaces } from "@/lib/places";
-import { forwardGeocode, nearbyPlaces, type Place as GeoPlace } from "@/lib/geocode";
+import { nearbyPlaces, searchFoodPlaces, type FoodPlace } from "@/lib/geocode";
 import { dataUrlToBlob, uploadPhoto } from "@/lib/photos";
 import {
   findMatchingWish,
@@ -145,8 +145,8 @@ export default function CaptureFlow({
   /** 「여기 없어요 · 직접 찾기」로 연 가게 찾기 화면(§2). */
   const [searchOpen, setSearchOpen] = useState(false);
   const [pickQuery, setPickQuery] = useState("");
-  /** 두 글자 이상 입력하면 내 기록·둘레를 넘어 전국을 찾습니다(메인 검색창과 같은 API). */
-  const [apiHits, setApiHits] = useState<GeoPlace[]>([]);
+  /** 두 글자 이상 입력하면 내 기록·둘레를 넘어 전국의 음식점·카페를 찾습니다. */
+  const [apiHits, setApiHits] = useState<FoodPlace[]>([]);
   const [searching, setSearching] = useState(false);
 
   useEffect(() => {
@@ -160,7 +160,7 @@ export default function CaptureFlow({
         return;
       }
       setSearching(true);
-      forwardGeocode(needle, ctrl.signal)
+      searchFoodPlaces(needle, ctrl.signal)
         .then((places) => setApiHits(places))
         .catch(() => {})
         .finally(() => setSearching(false));
@@ -462,8 +462,8 @@ export default function CaptureFlow({
       hits.push({
         id: `api:${key}:${p.lat},${p.lng}`,
         name,
-        kind,
-        category: null,
+        kind: p.kind,
+        category: p.category,
         region: p.region,
         address: p.address,
         lat: p.lat,
@@ -474,7 +474,7 @@ export default function CaptureFlow({
     }
 
     return hits.sort((a, b) => (a.distance ?? 1e9) - (b.distance ?? 1e9));
-  }, [searchPool, apiHits, pickQuery, geo, kind]);
+  }, [searchPool, apiHits, pickQuery, geo]);
 
   /**
    * 인증 대상 위시가 있고 100m 이내면 후보 목록을 건너뛰고 곧바로 그 가게로

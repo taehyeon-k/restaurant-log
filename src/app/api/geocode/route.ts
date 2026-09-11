@@ -131,6 +131,42 @@ export async function GET(req: Request) {
       });
     }
 
+    // 이름으로 찾되 음식점·카페만(방문 인증의 가게 찾기 화면 §2) — 거리 제한 없이 전국에서 찾습니다.
+    if (sp.get("food")) {
+      const fq = (sp.get("q") ?? "").trim();
+      if (fq.length < 2) return NextResponse.json({ places: [] });
+
+      const toPlaces = (kind: "restaurant" | "cafe") => (json: { documents?: Record<string, string>[] }): NearbyPlace[] =>
+        (json?.documents ?? []).map((d) => {
+          const address = d.road_address_name || d.address_name;
+          return {
+            name: d.place_name,
+            address,
+            region: gu(address),
+            category: category(d.category_name),
+            lat: Number(d.y),
+            lng: Number(d.x),
+            distance: 0,
+            kind,
+          };
+        });
+
+      const [restJson, cafeJson] = await Promise.all([
+        kakao("search/keyword.json", { query: fq, category_group_code: GROUP.restaurant, size: "15" }),
+        kakao("search/keyword.json", { query: fq, category_group_code: GROUP.cafe, size: "15" }),
+      ]);
+
+      const seen = new Set<string>();
+      const places = [...toPlaces("restaurant")(restJson), ...toPlaces("cafe")(cafeJson)].filter((p) => {
+        const key = `${p.lat.toFixed(5)},${p.lng.toFixed(5)}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+
+      return NextResponse.json({ places });
+    }
+
     // 주소·상호 검색
     const q = (sp.get("q") ?? "").trim();
     if (q.length < 2) return NextResponse.json({ places: [] });
