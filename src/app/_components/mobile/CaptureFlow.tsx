@@ -48,6 +48,9 @@ const FRAME: React.CSSProperties = {
  */
 const CSS_ZOOM_RANGE = { min: 1, max: 3, step: 0.1 };
 
+/* 이보다 먼 가게는 고를 수 없습니다 — 그 자리에 있었다는 증명이 인증의 값입니다 */
+const PICK_MAX_M = 50;
+
 type ZoomRange = { min: number; max: number; step: number };
 /** 표준 타입에 없는 실험적 zoom capability — 지원 브라우저(주로 Chrome)에만 있습니다. */
 type ZoomCapabilities = MediaTrackCapabilities & { zoom?: ZoomRange };
@@ -90,6 +93,7 @@ export default function CaptureFlow({
   kind,
   verifyWishId,
   onCancel,
+  onUnverified,
   onDone,
 }: {
   rows: Restaurant[];
@@ -98,6 +102,8 @@ export default function CaptureFlow({
   /** 「방문 인증」으로 들어왔으면 인증 대상 위시 id(HANDOFF-verify.md §3). */
   verifyWishId?: string | null;
   onCancel: () => void;
+  /** 인증 없이 기록만 남깁니다(§1·§2) — 이름이 있으면 채워서 기록 입력을 엽니다. */
+  onUnverified: (name?: string) => void;
   onDone: (result: Verified) => void;
 }) {
   const verifyWish = useMemo(
@@ -133,6 +139,10 @@ export default function CaptureFlow({
   const [picked, setPicked] = useState<Candidate | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  /** 「여기 없어요 · 직접 찾기」로 연 가게 찾기 화면(§2). */
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [pickQuery, setPickQuery] = useState("");
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -360,6 +370,50 @@ export default function CaptureFlow({
     const rest = tagged.filter((c) => !c.wish);
     return [...boosted, ...rest];
   }, [candidates, wishes, geo]);
+
+  /**
+   * 인증은 50m 안에서만(§1) — 위치를 못 읽었으면 제한하지 않습니다.
+   * 맨 위 강조는 고를 수 있는 첫 후보에게만 줍니다.
+   */
+  const pickList = useMemo(
+    () =>
+      pickCandidates.map((c, i) => {
+        const far = !!geo && (c.distance ?? Infinity) > PICK_MAX_M;
+        return { ...c, far, hot: i === 0 && !far };
+      }),
+    [pickCandidates, geo]
+  );
+  const noneNear = !!geo && candidates.length > 0 && pickList.every((c) => c.far);
+
+  /** 가게 찾기(§2)의 검색 대상 — 800m·8곳 제한 없이 내 기록 전체 + 둘레 검색 결과. */
+  const searchPool = useMemo<Candidate[]>(() => {
+    const mineAll = groupPlaces(rows)
+      .filter((p) => p.lat != null && p.lng != null)
+      .map((p) => ({
+        id: `mine:${p.key}`,
+        name: p.name,
+        kind: p.kind,
+        category: p.category,
+        region: p.region,
+        address: p.address,
+        lat: p.lat,
+        lng: p.lng,
+        distance: geo ? metersBetween(geo, p.lat as number, p.lng as number) : null,
+        mine: true,
+      }));
+    const taken = new Set(mineAll.map((c) => c.name));
+    return [...mineAll, ...extra.filter((c) => !taken.has(c.name))].sort(
+      (a, b) => (a.distance ?? 1e9) - (b.distance ?? 1e9)
+    );
+  }, [rows, extra, geo]);
+
+  const searchHits = useMemo(() => {
+    const needle = pickQuery.trim().toLowerCase();
+    if (!needle) return searchPool;
+    return searchPool.filter((c) =>
+      [c.name, c.category, c.address].some((f) => (f ?? "").toLowerCase().includes(needle))
+    );
+  }, [searchPool, pickQuery]);
 
   /**
    * 인증 대상 위시가 있고 100m 이내면 후보 목록을 건너뛰고 곧바로 그 가게로
@@ -688,6 +742,100 @@ export default function CaptureFlow({
     );
   }
 
+  /* ── 6-2a 가게 찾기(§2) ────────────────────────── */
+
+  if (step === "pick" && searchOpen) {
+    const typed = pickQuery.trim();
+
+    return (
+      <div className="absolute inset-0 z-[1450] flex flex-col bg-paper">
+        <div
+          className="shrink-0 border-b border-[#e6e0d3] px-5 pb-3.5"
+          style={{ paddingTop: "max(46px, calc(env(safe-area-inset-top) + 14px))" }}
+        >
+          <div className="flex items-center gap-2.5">
+            <button
+              type="button"
+              onClick={() => setSearchOpen(false)}
+              aria-label="뒤로"
+              className="-ml-2.5 grid size-11 shrink-0 cursor-pointer place-items-center rounded-full border-none bg-transparent text-[17px] text-ink"
+            >
+              ←
+            </button>
+            <div className="font-serif text-[18px] font-bold">가게 찾기</div>
+          </div>
+          <input
+            value={pickQuery}
+            onChange={(e) => setPickQuery(e.target.value)}
+            placeholder="가게 이름"
+            className="mt-3 min-h-12 w-full rounded-[16px] border border-[#ded8cb] bg-[#fbfaf6] px-[15px] text-[14px] text-ink outline-none focus:border-brick"
+          />
+          <div className="mt-2.5 text-[11.5px] leading-[1.6] text-[#8a8377]">
+            인증은 50m 안에 있는 가게에만 붙습니다. 그보다 먼 곳은 인증 없이 기록으로 남길 수 있습니다.
+          </div>
+        </div>
+
+        <div className="no-bar min-h-0 flex-1 overflow-y-auto px-4 pt-3.5 pb-[30px]">
+          <div className="flex flex-col gap-[9px]">
+            {searchHits.map((c) => {
+              const far = !!geo && (c.distance ?? Infinity) > PICK_MAX_M;
+              return (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => {
+                    if (far) {
+                      setSearchOpen(false);
+                      onUnverified(c.name);
+                      return;
+                    }
+                    setPicked(c);
+                    setStep("done");
+                  }}
+                  className={`flex min-h-[62px] w-full cursor-pointer items-center gap-3 rounded-[20px] border px-[15px] py-[13px] ${
+                    far ? "border-[#e4dfd3] bg-transparent" : "border-[#ded8cb] bg-card"
+                  }`}
+                >
+                  <span
+                    className={`grid size-[34px] shrink-0 place-items-center rounded-full font-mono text-[9.5px] ${
+                      far ? "bg-[#f1ede4] text-[#a29a8c]" : "bg-brick-soft text-brick"
+                    }`}
+                  >
+                    {c.distance == null ? "—" : `${c.distance}m`}
+                  </span>
+                  <span className="min-w-0 flex-1 text-left">
+                    <span className="block truncate font-serif text-[16px] font-bold text-ink">
+                      {c.name}
+                    </span>
+                    <span className="mt-[3px] block truncate text-[11.5px] text-faint">
+                      {[c.mine ? "내 기록" : c.category, c.address].filter(Boolean).join(" · ")}
+                    </span>
+                    <span className={`mt-1 block text-[10.5px] ${far ? "text-[#a29a8c]" : "text-brick"}`}>
+                      {far ? "50m 밖 · 인증 없이 기록됩니다" : "인증할 수 있습니다"}
+                    </span>
+                  </span>
+                </button>
+              );
+            })}
+
+            {typed && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchOpen(false);
+                  onUnverified(typed);
+                }}
+                className="mt-1 flex min-h-[50px] cursor-pointer items-center justify-center rounded-[20px] border border-dashed border-[#cdc6b8] bg-transparent px-3.5 text-center text-[12.5px] text-[#6b665e] hover:border-brick hover:text-brick"
+              >
+                「{typed}」 로 인증 없이 기록하기
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   /* ── 6-2 가게 고르기 ───────────────────────────── */
 
   if (step === "pick") {
@@ -715,23 +863,44 @@ export default function CaptureFlow({
 
         <div className="no-bar absolute inset-x-0 top-[158px] bottom-[104px] overflow-y-auto px-5">
           <div className="flex flex-col gap-[9px]">
-            {pickCandidates.map((c) => (
+            {noneNear && (
+              <div className="mb-1 rounded-[18px] border border-[#e2c9bb] bg-[#f9f0e9] px-4 py-3.5">
+                <div className="text-[12px] leading-[1.65] text-[#6b665e]">
+                  50m 안에 가게가 없습니다. 가게 앞에서 다시 찍으면 인증이 붙습니다.
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onUnverified()}
+                  className="mt-[11px] min-h-11 w-full cursor-pointer rounded-[14px] border border-[#ded8cb] bg-[#fbfaf6] text-[12.5px] text-ink hover:border-brick hover:text-brick"
+                >
+                  인증 없이 기록만 남기기
+                </button>
+              </div>
+            )}
+
+            {pickList.map((c) => (
               <button
                 key={c.id}
                 type="button"
+                disabled={c.far}
                 onClick={() => {
+                  if (c.far) return;
                   setPicked(c);
                   setStep("done");
                 }}
-                className={`flex min-h-[62px] w-full cursor-pointer items-center gap-3 rounded-[20px] px-[15px] py-[13px] ${
-                  c.wish
-                    ? "border-[1.5px] border-brick bg-[#f9f0e9]"
-                    : "border border-[#ded8cb] bg-card"
+                className={`flex min-h-[62px] w-full items-center gap-3 rounded-[20px] px-[15px] py-[13px] ${
+                  c.far ? "cursor-default opacity-50" : "cursor-pointer"
+                } ${
+                  c.far
+                    ? "border border-[#ded8cb] bg-transparent"
+                    : c.hot || c.wish
+                      ? "border-[1.5px] border-brick bg-[#f9f0e9] shadow-[0_4px_14px_rgba(180,85,45,.1)]"
+                      : "border border-[#ded8cb] bg-card"
                 }`}
               >
                 <span
                   className={`grid size-[34px] shrink-0 place-items-center rounded-full font-mono text-[9.5px] ${
-                    c.wish ? "bg-brick-soft text-brick" : "bg-[#f1ede4] text-muted"
+                    !c.far && (c.hot || c.wish) ? "bg-brick-soft text-brick" : "bg-[#f1ede4] text-muted"
                   }`}
                 >
                   {c.distance == null ? "—" : `${c.distance}m`}
@@ -751,6 +920,11 @@ export default function CaptureFlow({
                       .filter(Boolean)
                       .join(" · ")}
                   </span>
+                  {c.far && (
+                    <span className="mt-1 block text-[10.5px] text-[#a29a8c]">
+                      너무 멀어 고를 수 없습니다
+                    </span>
+                  )}
                 </span>
               </button>
             ))}
@@ -765,7 +939,7 @@ export default function CaptureFlow({
 
             <button
               type="button"
-              onClick={onCancel}
+              onClick={() => setSearchOpen(true)}
               className="mt-1 flex min-h-12 cursor-pointer items-center justify-center rounded-[20px] border border-dashed border-line bg-transparent text-[12.5px] text-muted"
             >
               여기 없어요 · 직접 찾기

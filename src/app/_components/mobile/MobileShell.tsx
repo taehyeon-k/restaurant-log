@@ -891,6 +891,11 @@ export default function MobileShell({ rows, wishes }: { rows: Restaurant[]; wish
             setFlow(false);
             setVerifyWishId(null);
           }}
+          onUnverified={(name) => {
+            setFlow(false);
+            setVerifyWishId(null);
+            setEditing({ mode: "new", kind, preset: name ? { name } : undefined });
+          }}
           onDone={afterVerified}
         />
       )}

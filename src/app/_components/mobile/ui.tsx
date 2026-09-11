@@ -160,7 +160,7 @@ export const PlusIcon = ({ stroke = "#1c1a17" }: { stroke?: string }) => (
   </svg>
 );
 
-/** 보관함(사진 상자) — 지도 우하단 단추와 보관함 카드 사진이 함께 씁니다. */
+/** 보관함(서류철) — 기록이 모여 있는 곳이므로 폴더 모양을 씁니다. */
 export const DraftsBoxIcon = ({
   size = 23,
   stroke = "#1c1a17",
@@ -178,10 +178,9 @@ export const DraftsBoxIcon = ({
     strokeLinecap="round"
     strokeLinejoin="round"
   >
-    <rect x="3.2" y="6.6" width="17.6" height="13.4" rx="2.6" />
-    <path d="M3.2 10.6h17.6" />
-    <circle cx="12" cy="15.3" r="2.7" />
-    <path d="M8.8 6.6 9.9 4.2h4.2l1.1 2.4" />
+    <path d="M3 7.4V19a1.4 1.4 0 0 0 1.4 1.4h15.2A1.4 1.4 0 0 0 21 19V9.2a1.4 1.4 0 0 0-1.4-1.4h-7L10.4 5.2a1.4 1.4 0 0 0-1.1-.6H4.4A1.4 1.4 0 0 0 3 6v1.4Z" />
+    <path d="M7.2 13.2h9.6" />
+    <path d="M7.2 16.6h6" />
   </svg>
 );
 
