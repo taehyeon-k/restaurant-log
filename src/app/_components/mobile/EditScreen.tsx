@@ -60,9 +60,12 @@ export default function EditScreen({
    * 마이그레이션 이전에 인증된 옛 기록처럼 시각이 없으면 그냥 날짜칸을 씁니다.
    */
   const isVerified = !isNew && record.verified && !!record.verified_at;
-  const kind: Kind = record?.kind ?? (target.mode === "new" ? target.kind : "restaurant");
-  const categories = CATEGORIES[kind];
   const preset = target.mode === "new" ? target.preset : undefined;
+
+  /** 새 기록일 때만 여기서 고를 수 있습니다 — 이미 있는 기록의 종류는 바꾸지 않습니다. */
+  const [newKind, setNewKind] = useState<Kind>(target.mode === "new" ? target.kind : "restaurant");
+  const kind: Kind = record?.kind ?? newKind;
+  const categories = CATEGORIES[kind];
 
   const [name, setName] = useState(record?.name ?? preset?.name ?? "");
   const [address, setAddress] = useState(record?.address ?? preset?.address ?? "");
@@ -81,6 +84,12 @@ export default function EditScreen({
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  const chooseKind = (k: Kind) => {
+    if (k === kind) return;
+    setNewKind(k);
+    setCategory("");
+  };
 
   const setMenuAt = (i: number, patch: Partial<MenuItem>) =>
     setMenus((p) => p.map((m, n) => (n === i ? { ...m, ...patch } : m)));
@@ -245,6 +254,24 @@ export default function EditScreen({
         <h1 className="font-serif text-[25px] font-bold">
           {isNew ? "오늘 뭐 먹었나요" : "기록 고치기"}
         </h1>
+
+        {isNew && !preset?.revisit && (
+          <div className="mt-[18px] flex flex-col gap-[9px]">
+            <Eyebrow>맛집 · 카페</Eyebrow>
+            <div className="flex gap-[7px]">
+              {(["restaurant", "cafe"] as Kind[]).map((k) => (
+                <button
+                  key={k}
+                  type="button"
+                  onClick={() => chooseKind(k)}
+                  className={chipClass(kind === k)}
+                >
+                  {k === "restaurant" ? "맛집" : "카페"}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         <label className="mt-[18px] block">
           <Eyebrow>가게</Eyebrow>
