@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { groupPlaces, type Place } from "@/lib/places";
 import { dottedDate, matchWish, wishKind, type Kind, type Restaurant, type Sort, type Wish } from "@/lib/types";
 import type { Place as GeocodePlace } from "@/lib/geocode";
+import { inRegion, matchRegionName, regionNamesFrom } from "@/lib/regions";
 import MobileMap, { type MapHandle, type MarkerFilter } from "./MobileMap";
 import PlaceCard from "./PlaceCard";
 import FilterSheet from "./FilterSheet";
@@ -109,6 +110,8 @@ export default function MobileShell({ rows, wishes }: { rows: Restaurant[]; wish
   const [plusOpen, setPlusOpen] = useState(false);
   /** 지도 검색에서 이미 있는 가게를 찾았을 때의 작은 시트(§9). */
   const [foundHit, setFoundHit] = useState<{ restaurant: Restaurant; place: Place } | null>(null);
+  /** 지도 검색이 지역으로 걸렸을 때 — 기록 추가 시트 대신 이 지역 띠를 띄웁니다. */
+  const [regionView, setRegionView] = useState<{ name: string; count: number } | null>(null);
 
   const mapRef = useRef<MapHandle>(null);
 
@@ -146,6 +149,9 @@ export default function MobileShell({ rows, wishes }: { rows: Restaurant[]; wish
   /** 작성 전(pending) 기록 — 보관함에만 보이고, 목록·지도·필터에는 넘기지 않습니다. */
   const pendingRows = useMemo(() => rows.filter((r) => r.pending), [rows]);
   const visibleRows = useMemo(() => rows.filter((r) => !r.pending), [rows]);
+
+  /** 지도 검색에서 지역인지 가려낼 때 쓰는 지역 이름 목록 — 기록에서 모읍니다(§region). */
+  const regionNames = useMemo(() => regionNamesFrom(visibleRows), [visibleRows]);
 
   const placesByKind = useMemo(
     () => ({
@@ -203,6 +209,7 @@ export default function MobileShell({ rows, wishes }: { rows: Restaurant[]; wish
       const target = placesByKind[k].find((p) => p.key === key);
       if (!target) return;
 
+      setRegionView(null);
       setKind(k);
       setPlaceKey(key);
       setVisitId(target.visits.length === 1 ? target.visits[0].id : null);
@@ -294,7 +301,38 @@ export default function MobileShell({ rows, wishes }: { rows: Restaurant[]; wish
     setFlow(true);
   }, []);
 
+  /**
+   * 지역 보기 — 「신촌」처럼 지역을 검색했을 때. 기록 추가 시트 대신 그 지역
+   * 기록 전체가 보이게 범위를 맞추고, 검색어·필터·열린 시트를 모두 비웁니다.
+   */
+  function enterRegionView(name: string, rowsInRegion: Restaurant[]) {
+    closeAll();
+    setEditing(null);
+    setFoundHit(null);
+    setOpenWishId(null);
+    setWishFormTarget(null);
+    setFiltersOpen(false);
+    setLabelsOpen(false);
+    setDraftsOpen(false);
+    setPlusOpen(false);
+    setPickedPlace(null);
+    setMapQuery("");
+    setQ("");
+    setCategories([]);
+    setKeywords([]);
+    setRevisitOnly(false);
+    setVerifiedOnly(false);
+    setSnap("high");
+    setRegionView({ name, count: rowsInRegion.length });
+
+    const points = rowsInRegion
+      .filter((r) => r.lat != null && r.lng != null)
+      .map((r) => [r.lat as number, r.lng as number] as [number, number]);
+    mapRef.current?.fitRegion(points);
+  }
+
   function handleChoosePlace(p: GeocodePlace) {
+    setRegionView(null);
     const hit = findRecord(p);
 
     if (hit) {
@@ -325,6 +363,17 @@ export default function MobileShell({ rows, wishes }: { rows: Restaurant[]; wish
       }
       setOpenWishId(wishHit.id);
       return;
+    }
+
+    // 가게·위시 어디에도 없으면 지역인지 봅니다 — "중구식당" 같은 가게 이름이 지역으로
+    // 빨려 들어가지 않게, 이 확인은 반드시 위 두 검사 다음입니다.
+    const regionName = matchRegionName(p.name || p.address, regionNames);
+    if (regionName) {
+      const rowsInRegion = visibleRows.filter((r) => inRegion(r, regionName));
+      if (rowsInRegion.length) {
+        enterRegionView(regionName, rowsInRegion);
+        return;
+      }
     }
 
     closeAll();
@@ -396,7 +445,8 @@ export default function MobileShell({ rows, wishes }: { rows: Restaurant[]; wish
     wishFormTarget !== null ||
     openWishId !== null ||
     foundHit !== null ||
-    pickedPlace !== null;
+    pickedPlace !== null ||
+    regionView !== null;
 
   const TAB_TITLE: Record<Exclude<Tab, "map" | "calendar" | "wish">, string> = {
     account: "내계정",
@@ -489,6 +539,37 @@ export default function MobileShell({ rows, wishes }: { rows: Restaurant[]; wish
           />
         </button>
       </div>
+
+      {/* 지역 띠 — 지역을 검색했을 때 기록 추가 시트 대신 뜹니다(§region) */}
+      {tab === "map" && regionView && (
+        <div
+          className="absolute z-[1000] flex items-center gap-[11px] rounded-[18px] border border-[#d8d3c8] px-[13px] py-[11px] shadow-[0_4px_14px_rgba(28,26,23,.1)]"
+          style={{ top: 108, left: 16, right: 16, background: "rgba(251,250,246,.96)" }}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#b4552d" strokeWidth="1.7" strokeLinecap="round" className="shrink-0">
+            <path d="M4 8.5h16" />
+            <path d="M4 15.5h16" />
+            <path d="M9.5 4v16" />
+            <path d="M16.5 4v16" />
+          </svg>
+
+          <div className="min-w-0 flex-1">
+            <div className="truncate font-serif text-[14px] font-bold text-ink">{regionView.name}</div>
+            <div className="mt-0.5 truncate text-[11px] text-[#8a8377]">
+              이 지역 기록 {regionView.count}곳 · 근처 식당을 보여줍니다
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setRegionView(null)}
+            aria-label="지역 띠 닫기"
+            className="grid size-[30px] shrink-0 cursor-pointer place-items-center rounded-full border-none bg-transparent text-[15px] text-faint hover:text-brick"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* 보관함 — 예전 카메라 FAB 자리, 이제 카메라는 하단 바 가운데로 옮겼습니다 */}
       <button
@@ -802,6 +883,7 @@ export default function MobileShell({ rows, wishes }: { rows: Restaurant[]; wish
         onChange={(t) => {
           setDay(null);
           setPlusOpen(false);
+          setRegionView(null);
           setTab(t);
         }}
         onShoot={() => setFlow(true)}

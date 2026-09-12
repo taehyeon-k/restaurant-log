@@ -14,6 +14,8 @@ export const placed = (places: Place[]) => places.filter((p): p is Placed => p.l
 export type MapHandle = {
   flyTo: (lat: number, lng: number, zoom?: number) => void;
   fitTo: (points: [number, number][]) => void;
+  /** 지역 보기 — 위 검색줄·지역 띠에 가리지 않게 여유를 더 두고, 한 점으로는 파고들지 않게 maxZoom 을 14 로 묶습니다. */
+  fitRegion: (points: [number, number][]) => void;
   invalidate: () => void;
 };
 
@@ -91,6 +93,18 @@ const MobileMap = forwardRef<MapHandle, {
       const bounds = new naver.maps.LatLngBounds(new naver.maps.LatLng(points[0][0], points[0][1]), new naver.maps.LatLng(points[0][0], points[0][1]));
       for (const point of points.slice(1)) bounds.extend(new naver.maps.LatLng(point[0], point[1]));
       map.fitBounds(bounds, { top: 120, right: 40, bottom: 40, left: 36, maxZoom: 15 });
+    },
+    fitRegion: (points) => {
+      const map = mapRef.current;
+      if (!map || !points.length) return;
+      lastFit.current = "region:" + points.length + ":" + points[0].join(",");
+      if (points.length === 1) {
+        map.morph(new naver.maps.LatLng(points[0][0], points[0][1]), 14, { duration: 700 });
+        return;
+      }
+      const bounds = new naver.maps.LatLngBounds(new naver.maps.LatLng(points[0][0], points[0][1]), new naver.maps.LatLng(points[0][0], points[0][1]));
+      for (const point of points.slice(1)) bounds.extend(new naver.maps.LatLng(point[0], point[1]));
+      map.fitBounds(bounds, { top: 150, right: 40, bottom: 60, left: 40, maxZoom: 14 });
     },
     invalidate: () => mapRef.current?.autoResize(),
   }), []);
@@ -188,10 +202,14 @@ const MobileMap = forwardRef<MapHandle, {
       // 범위 맞추기는 목록(검색·필터) 결과 기준입니다 — 마커 필터(모두/기록만/위시만)를
       // 눌렀다고 그 순간 지도가 다른 곳으로 튀면 안 됩니다.
       const all = placed(places);
-      if (frozen || !all.length) return;
+      if (!all.length) return;
       const key = all.map((p) => p.key).join(",");
       if (key === lastFit.current) return;
+      // frozen 인 동안(다른 시트가 떠 있거나 지역 보기 중) 바뀐 키는 "본 것"으로만 남겨
+      // 두고 카메라는 움직이지 않습니다 — 그래야 그 시트가 닫힐 때 갑자기 전체 범위로
+      // 튀지 않습니다.
       lastFit.current = key;
+      if (frozen) return;
       if (all.length === 1) { map.morph(new naver.maps.LatLng(all[0].lat, all[0].lng), 15, { duration: 500 }); return; }
       const bounds = new naver.maps.LatLngBounds(new naver.maps.LatLng(all[0].lat, all[0].lng), new naver.maps.LatLng(all[0].lat, all[0].lng));
       for (const p of all.slice(1)) bounds.extend(new naver.maps.LatLng(p.lat, p.lng));

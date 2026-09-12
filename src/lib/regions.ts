@@ -1,3 +1,5 @@
+import type { Restaurant } from "./types";
+
 /** 시·도 → 시·군·구 */
 export const REGIONS: Record<string, string[]> = {
   서울: ["종로구","중구","용산구","성동구","광진구","동대문구","중랑구","성북구","강북구","도봉구","노원구","은평구","서대문구","마포구","양천구","강서구","구로구","금천구","영등포구","동작구","관악구","서초구","강남구","송파구","강동구"],
@@ -93,4 +95,54 @@ export function regionFromAddress(address: string | null | undefined): string {
   }
 
   return `${sido} ${si}`;
+}
+
+/**
+ * 기록에서 지역 이름을 모읍니다 — 별도 지역 사전을 두지 않고, 각 기록의
+ * region 값 그대로와, 주소를 공백으로 쪼갠 토큰 중 구·동·가로 끝나는
+ * 두 글자 이상인 것만 더합니다("신촌동", "합정동", "중구" 등).
+ */
+export function regionNamesFrom(rows: Restaurant[]): string[] {
+  const set = new Set<string>();
+  for (const r of rows) {
+    if (r.region) set.add(r.region.trim());
+    if (r.address) {
+      for (const token of r.address.trim().split(/\s+/)) {
+        if (token.length >= 2 && /[구동가]$/.test(token)) set.add(token);
+      }
+    }
+  }
+  return [...set];
+}
+
+/**
+ * 검색어가 지역 이름과 걸리는지 — 양방향 부분일치("중구청"→"중구",
+ * "신촌"→"신촌동"). 여럿 걸리면 길이 차가 가장 적은(가장 가까운) 이름을
+ * 고릅니다. 걸리는 게 없으면 null.
+ */
+export function matchRegionName(query: string, names: string[]): string | null {
+  const needle = query.trim();
+  if (!needle) return null;
+
+  let best: string | null = null;
+  let bestDiff = Infinity;
+
+  for (const name of names) {
+    if (!name) continue;
+    if (needle === name) return name;
+    if (needle.includes(name) || name.includes(needle)) {
+      const diff = Math.abs(name.length - needle.length);
+      if (diff < bestDiff) {
+        best = name;
+        bestDiff = diff;
+      }
+    }
+  }
+  return best;
+}
+
+/** 이 기록이 그 지역에 속하는지 — region 값이 같거나, 주소 토큰 중 하나가 정확히 같으면. */
+export function inRegion(row: Restaurant, regionName: string): boolean {
+  if (row.region === regionName) return true;
+  return (row.address ?? "").trim().split(/\s+/).includes(regionName);
 }
