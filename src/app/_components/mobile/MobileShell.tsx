@@ -40,9 +40,16 @@ function metersBetween(aLat: number, aLng: number, bLat: number, bLng: number) {
   return Math.sqrt(dLat * dLat + x * x) * 6371000;
 }
 
-/** 시트가 멈추는 높이. 화면이 낮으면 그만큼 줄여 잡습니다. */
-const SNAP_MAX = { peek: 96, half: 462, full: 668 };
-const ORDER = ["peek", "half", "full"] as const;
+/**
+ * 시트가 멈추는 네 단계 — peek(스크롤바만) · low(화면 35%) · high(화면 75%) ·
+ * full(다 올려서 기록창만). low·high 는 화면 높이의 비율 그대로라 기기 크기와
+ * 무관하게 "화면의 몇 %"라는 감각이 그대로 맞습니다. full 은 위 검색줄이
+ * 가리지 않을 만큼만 남기고 채우므로(84px), 큰 화면에서도 항상 high 보다
+ * 높습니다 — 상한을 따로 두면 큰 화면에서 그 순서가 뒤집힙니다.
+ */
+const SNAP_MAX = { peek: 96 };
+const SNAP_RATIO = { low: 0.35, high: 0.75 };
+const ORDER = ["peek", "low", "high", "full"] as const;
 export type Snap = (typeof ORDER)[number];
 
 /** 손가락으로 끌 수 있는 가장 낮은 높이 — 손잡이만 남기고 지도를 최대한 보여줍니다. */
@@ -79,7 +86,7 @@ export default function MobileShell({ rows, wishes }: { rows: Restaurant[]; wish
   const [verifiedOnly, setVerifiedOnly] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
 
-  const [snap, setSnap] = useState<Snap>("half");
+  const [snap, setSnap] = useState<Snap>("high");
   const [dragH, setDragH] = useState<number | null>(null);
 
   const [placeKey, setPlaceKey] = useState<string | null>(null);
@@ -119,8 +126,9 @@ export default function MobileShell({ rows, wishes }: { rows: Restaurant[]; wish
   const snaps = useMemo(
     () => ({
       peek: Math.min(SNAP_MAX.peek, Math.max(SHEET_MIN, vh - 260)),
-      half: Math.min(SNAP_MAX.half, Math.max(200, vh - 200)),
-      full: Math.min(SNAP_MAX.full, Math.max(260, vh - 84)),
+      low: Math.round(vh * SNAP_RATIO.low),
+      high: Math.round(vh * SNAP_RATIO.high),
+      full: Math.max(260, vh - 84),
     }),
     [vh]
   );
@@ -368,7 +376,7 @@ export default function MobileShell({ rows, wishes }: { rows: Restaurant[]; wish
     setVerifyWishId(null);
     refresh();
     setKind(record.kind);
-    setSnap("half");
+    setSnap("high");
 
     if (writeNow) {
       setPlaceKey(null);
