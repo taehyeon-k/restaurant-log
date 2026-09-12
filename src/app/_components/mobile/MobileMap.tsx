@@ -185,13 +185,16 @@ const MobileMap = forwardRef<MapHandle, {
         setLabelVisible(marker, map.getZoom() >= LABEL_ZOOM);
         marker.setZIndex(active ? 1000 : 0);
       }
-      if (frozen || !visible.length) return;
-      const key = visible.map((p) => p.key).join(",");
+      // 범위 맞추기는 목록(검색·필터) 결과 기준입니다 — 마커 필터(모두/기록만/위시만)를
+      // 눌렀다고 그 순간 지도가 다른 곳으로 튀면 안 됩니다.
+      const all = placed(places);
+      if (frozen || !all.length) return;
+      const key = all.map((p) => p.key).join(",");
       if (key === lastFit.current) return;
       lastFit.current = key;
-      if (visible.length === 1) { map.morph(new naver.maps.LatLng(visible[0].lat, visible[0].lng), 15, { duration: 500 }); return; }
-      const bounds = new naver.maps.LatLngBounds(new naver.maps.LatLng(visible[0].lat, visible[0].lng), new naver.maps.LatLng(visible[0].lat, visible[0].lng));
-      for (const p of visible.slice(1)) bounds.extend(new naver.maps.LatLng(p.lat, p.lng));
+      if (all.length === 1) { map.morph(new naver.maps.LatLng(all[0].lat, all[0].lng), 15, { duration: 500 }); return; }
+      const bounds = new naver.maps.LatLngBounds(new naver.maps.LatLng(all[0].lat, all[0].lng), new naver.maps.LatLng(all[0].lat, all[0].lng));
+      for (const p of all.slice(1)) bounds.extend(new naver.maps.LatLng(p.lat, p.lng));
       map.fitBounds(bounds, { top: 120, right: 40, bottom: 40, left: 36, maxZoom: 15 });
     };
     syncRef.current = sync;
