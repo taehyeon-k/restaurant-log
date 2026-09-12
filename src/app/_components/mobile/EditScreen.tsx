@@ -21,6 +21,8 @@ export type EditTarget =
         category?: string;
         /** 재방문 단추(§8)로 만든 새 기록이면 true — 처음부터 재방문으로 표시합니다. */
         revisit?: boolean;
+        /** 월력의 그날 화면에서 만들면 그 날짜를 방문일로 미리 채웁니다. */
+        visitedAt?: string;
       };
     }
   | { mode: "edit"; record: Restaurant };
@@ -69,7 +71,7 @@ export default function EditScreen({
 
   const [name, setName] = useState(record?.name ?? preset?.name ?? "");
   const [address, setAddress] = useState(record?.address ?? preset?.address ?? "");
-  const [visitedAt, setVisitedAt] = useState(record?.visited_at ?? today());
+  const [visitedAt, setVisitedAt] = useState(record?.visited_at ?? preset?.visitedAt ?? today());
   const [category, setCategory] = useState(record?.category ?? preset?.category ?? "");
   const [rating, setRating] = useState(record?.rating ?? 0);
   const [priceLevel, setPriceLevel] = useState(record?.price_level ?? 0);

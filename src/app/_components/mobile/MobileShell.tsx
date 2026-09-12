@@ -626,7 +626,6 @@ export default function MobileShell({ rows, wishes }: { rows: Restaurant[]; wish
           rows={visibleRows}
           wishes={wishes}
           onOpenDay={(dateKey) => setDay(dateKey)}
-          onOpenWishDay={() => setTab("wish")}
         />
       )}
 
@@ -643,12 +642,16 @@ export default function MobileShell({ rows, wishes }: { rows: Restaurant[]; wish
         <DayScreen
           dateKey={day}
           rows={visibleRows}
+          wishes={wishes}
           onBack={() => setDay(null)}
           onOpenRecord={(record) => {
             setKind(record.kind);
             setPlaceKey(null);
             setVisitId(record.id);
           }}
+          onOpenWish={(wish) => setOpenWishId(wish.id)}
+          onAddRecord={() => setEditing({ mode: "new", kind, preset: { visitedAt: day } })}
+          onAddWish={() => setWishFormTarget({ mode: "new", preset: { plan_date: day } })}
         />
       )}
 

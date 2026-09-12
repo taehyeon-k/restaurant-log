@@ -58,13 +58,11 @@ export default function CalendarScreen({
   rows,
   wishes,
   onOpenDay,
-  onOpenWishDay,
 }: {
   rows: Restaurant[];
   wishes: Wish[];
+  /** 이 달 안의 날짜면 기록이 있든 없든 늘 그날 화면을 엽니다. */
   onOpenDay: (dateKey: string) => void;
-  /** 예정만 있는 날을 눌렀을 때 — 가고싶다 화면으로 갑니다(§6). */
-  onOpenWishDay: () => void;
 }) {
   const [showWishes, setShowWishes] = useState(true);
   const maxVisitedAt = useMemo(() => {
@@ -200,8 +198,7 @@ export default function CalendarScreen({
               const shownWishes = wishChips.slice(0, Math.max(0, 2 - shownVisits.length));
               const extra = visits.length + wishChips.length - shownVisits.length - shownWishes.length;
               const isToday = key === todayKey;
-              const hasWishOnly = visits.length === 0 && wishChips.length > 0;
-              const clickable = inMonth && (visits.length > 0 || hasWishOnly);
+              const clickable = inMonth;
 
               const borderClass = isToday
                 ? "border-[1.5px] border-brick"
@@ -260,7 +257,7 @@ export default function CalendarScreen({
                 <button
                   key={key}
                   type="button"
-                  onClick={() => (hasWishOnly ? onOpenWishDay() : onOpenDay(key))}
+                  onClick={() => onOpenDay(key)}
                   aria-label={`${cursor.year}년 ${cursor.month + 1}월 ${date.getDate()}일, 기록 ${visits.length}건${wishChips.length ? ` · 예정 ${wishChips.length}건` : ""}`}
                   className={`${cellClass} cursor-pointer`}
                 >

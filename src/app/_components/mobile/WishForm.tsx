@@ -17,6 +17,8 @@ export type WishFormTarget =
         category?: string;
         lat?: number;
         lng?: number;
+        /** 월력의 그날 화면에서 만들면 그 날짜를 예정일로 미리 채웁니다. */
+        plan_date?: string;
       };
     }
   | { mode: "edit"; wish: Wish };
@@ -56,7 +58,7 @@ export default function WishForm({
   const [whereText, setWhereText] = useState(wish?.where_text ?? preset?.where_text ?? "");
   const [category, setCategory] = useState(wish?.category ?? preset?.category ?? "");
   const [note, setNote] = useState(wish?.note ?? "");
-  const [planDate, setPlanDate] = useState(wish?.plan_date ?? "");
+  const [planDate, setPlanDate] = useState(wish?.plan_date ?? preset?.plan_date ?? "");
   const [notify, setNotify] = useState(wish?.notify ?? false);
   const [spot, setSpot] = useState<{ lat: number; lng: number } | null>(
     wish?.lat != null && wish?.lng != null
