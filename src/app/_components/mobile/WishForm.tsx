@@ -41,6 +41,7 @@ export default function WishForm({
   onCancel,
   onSaved,
   onDuplicate,
+  onDeleted,
 }: {
   target: WishFormTarget;
   /** 새로 담을 때 같은 이름 방어에 씁니다(§9) — saveWish 쪽 안전망. */
@@ -49,10 +50,15 @@ export default function WishForm({
   onSaved: () => void;
   /** 이미 같은 이름의 위시가 있으면 새로 만들지 않고 그 위시를 돌려줍니다. */
   onDuplicate: (wish: Wish) => void;
+  onDeleted: () => void;
 }) {
   const wish = target.mode === "edit" ? target.wish : null;
   const isNew = wish === null;
   const preset = target.mode === "new" ? target.preset : undefined;
+
+  /** 「계획 삭제」— 한 번 더 눌러야 실제로 지워집니다. */
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const [name, setName] = useState(wish?.name ?? preset?.name ?? "");
   const [whereText, setWhereText] = useState(wish?.where_text ?? preset?.where_text ?? "");
@@ -153,6 +159,16 @@ export default function WishForm({
     setSaving(false);
     if (error) return setError(error.message);
     onSaved();
+  }
+
+  async function remove() {
+    if (!wish) return;
+    setDeleting(true);
+    setError("");
+    const { error } = await supabase.from("wishes").delete().eq("id", wish.id);
+    setDeleting(false);
+    if (error) return setError(error.message);
+    onDeleted();
   }
 
   if (picking) {
@@ -316,6 +332,38 @@ export default function WishForm({
             {missing}
           </span>
         )}
+
+        {!isNew &&
+          (confirmingDelete ? (
+            <div className="mt-3 rounded-[18px] border border-[#e2c9bb] bg-[#f9f0e9] p-4 text-center">
+              <div className="text-[13px] text-[#6b665e]">정말 삭제하시겠습니까?</div>
+              <div className="mt-3 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setConfirmingDelete(false)}
+                  className="min-h-11 flex-1 cursor-pointer rounded-[16px] border border-[#ded8cb] bg-card text-[13px] text-muted"
+                >
+                  취소
+                </button>
+                <button
+                  type="button"
+                  onClick={remove}
+                  disabled={deleting}
+                  className="min-h-11 flex-1 cursor-pointer rounded-[16px] border-none bg-[#9a4a52] text-[13px] font-medium text-card disabled:opacity-60"
+                >
+                  {deleting ? "삭제 중…" : "삭제"}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setConfirmingDelete(true)}
+              className="mt-3 w-full cursor-pointer rounded-[20px] border border-[#e4dfd3] bg-transparent p-3.5 text-[13px] text-faint hover:border-[#9a4a52] hover:text-[#9a4a52]"
+            >
+              계획 삭제
+            </button>
+          ))}
       </div>
     </div>
   );

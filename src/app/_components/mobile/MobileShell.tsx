@@ -790,6 +790,10 @@ export default function MobileShell({ rows, wishes }: { rows: Restaurant[]; wish
             setWishFormTarget(null);
             setOpenWishId(dup.id);
           }}
+          onDeleted={() => {
+            setWishFormTarget(null);
+            refresh();
+          }}
         />
       )}
 

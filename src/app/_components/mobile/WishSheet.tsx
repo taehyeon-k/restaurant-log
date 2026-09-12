@@ -34,7 +34,7 @@ export default function WishSheet({
   }
 
   async function remove() {
-    if (!confirm(`"${wish.name}" 을(를) 위시리스트에서 지울까요?`)) return;
+    if (!confirm(`"${wish.name}" 을(를) 위시리스트에서 삭제할까요?`)) return;
     setBusy(true);
     await supabase.from("wishes").delete().eq("id", wish.id);
     setBusy(false);
@@ -120,7 +120,7 @@ export default function WishSheet({
             disabled={busy}
             className="cursor-pointer border-none bg-transparent px-2 py-1 text-center text-[12px] text-faint hover:text-[#9a4a52] disabled:opacity-50"
           >
-            지우기
+            삭제
           </button>
         </div>
       </div>
