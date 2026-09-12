@@ -770,6 +770,10 @@ export default function MobileShell({ rows, wishes }: { rows: Restaurant[]; wish
             setTab("wish");
           }}
           onChanged={refresh}
+          onDeleted={() => {
+            setOpenWishId(null);
+            refresh();
+          }}
         />
       )}
 

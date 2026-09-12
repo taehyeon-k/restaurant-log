@@ -13,12 +13,14 @@ export default function WishSheet({
   onCaptureHere,
   onViewList,
   onChanged,
+  onDeleted,
 }: {
   wish: Wish;
   onClose: () => void;
   onCaptureHere: () => void;
   onViewList: () => void;
   onChanged: () => void;
+  onDeleted: () => void;
 }) {
   const [busy, setBusy] = useState(false);
   const url = firstUrl(wish.note);
@@ -29,6 +31,14 @@ export default function WishSheet({
     await supabase.from("wishes").update({ notify: !wish.notify }).eq("id", wish.id);
     setBusy(false);
     onChanged();
+  }
+
+  async function remove() {
+    if (!confirm(`"${wish.name}" 을(를) 위시리스트에서 지울까요?`)) return;
+    setBusy(true);
+    await supabase.from("wishes").delete().eq("id", wish.id);
+    setBusy(false);
+    onDeleted();
   }
 
   return (
@@ -95,13 +105,24 @@ export default function WishSheet({
           )}
         </div>
 
-        <button
-          type="button"
-          onClick={onViewList}
-          className="mt-3 w-full cursor-pointer border-none bg-transparent text-center text-[12px] text-faint"
-        >
-          위시리스트에서 보기
-        </button>
+        <div className="mt-3 flex items-center justify-center gap-1">
+          <button
+            type="button"
+            onClick={onViewList}
+            className="cursor-pointer border-none bg-transparent px-2 py-1 text-center text-[12px] text-faint"
+          >
+            위시리스트에서 보기
+          </button>
+          <span className="text-[12px] text-[#d8d3c8]">·</span>
+          <button
+            type="button"
+            onClick={remove}
+            disabled={busy}
+            className="cursor-pointer border-none bg-transparent px-2 py-1 text-center text-[12px] text-faint hover:text-[#9a4a52] disabled:opacity-50"
+          >
+            지우기
+          </button>
+        </div>
       </div>
     </div>
   );

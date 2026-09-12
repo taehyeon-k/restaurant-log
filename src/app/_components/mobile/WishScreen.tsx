@@ -51,6 +51,14 @@ export default function WishScreen({
   const dated = wishes.filter((w) => w.plan_date).sort((a, b) => (a.plan_date! < b.plan_date! ? -1 : 1));
   const someday = wishes.filter((w) => !w.plan_date);
 
+  async function remove(id: string, name: string) {
+    if (!confirm(`"${name}" 을(를) 위시리스트에서 지울까요?`)) return;
+    setBusyId(id);
+    await supabase.from("wishes").delete().eq("id", id);
+    setBusyId(null);
+    onChanged();
+  }
+
   async function clearDate(id: string) {
     setBusyId(id);
     await supabase.from("wishes").update({ plan_date: null }).eq("id", id);
@@ -119,6 +127,7 @@ export default function WishScreen({
                     onSetDate={(d) => setDate(w.id, d)}
                     onToggleNotify={() => toggleNotify(w)}
                     onVerify={() => onVerify(w)}
+                    onDelete={() => remove(w.id, w.name)}
                   />
                 ))}
               </Section>
@@ -140,6 +149,7 @@ export default function WishScreen({
                     onSetDate={(d) => setDate(w.id, d)}
                     onToggleNotify={() => toggleNotify(w)}
                     onVerify={() => onVerify(w)}
+                    onDelete={() => remove(w.id, w.name)}
                   />
                 ))}
               </Section>
@@ -172,6 +182,7 @@ function WishCard({
   onSetDate,
   onToggleNotify,
   onVerify,
+  onDelete,
 }: {
   wish: Wish;
   dated: boolean;
@@ -184,6 +195,7 @@ function WishCard({
   onSetDate: (date: string) => void;
   onToggleNotify: () => void;
   onVerify: () => void;
+  onDelete: () => void;
 }) {
   const url = firstUrl(wish.note);
   const noteBody = noteWithoutUrl(wish.note, url);
@@ -271,6 +283,14 @@ function WishCard({
           ))}
 
         <div className="ml-auto flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={onDelete}
+            disabled={busy}
+            className="min-h-[30px] cursor-pointer rounded-[15px] border border-transparent bg-transparent px-[9px] text-[11px] text-faint hover:text-[#9a4a52] disabled:opacity-50"
+          >
+            지우기
+          </button>
           <button
             type="button"
             onClick={onOpen}

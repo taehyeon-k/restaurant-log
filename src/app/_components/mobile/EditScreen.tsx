@@ -105,6 +105,9 @@ export default function EditScreen({
     ? `${namedMenus.length}개 · ${menuTotal.toLocaleString("ko-KR")}원`
     : "";
 
+  /** 캘린더의 그날 화면 등에서 오늘이 아닌 날짜로 새 기록을 시작하면 제목도 그날에 맞춥니다. */
+  const newRecordTitle = visitedAt && visitedAt !== today() ? "이날 뭐 먹었나요" : "오늘 뭐 먹었나요";
+
   const ratingText = rating ? rating.toFixed(1) : "고르지 않음";
   const feltLabel = priceLevel ? FELT_PRICE[priceLevel - 1] : "고르지 않음";
   const revisitNote = revisit
@@ -254,7 +257,7 @@ export default function EditScreen({
 
       <div className="no-bar min-h-0 flex-1 overflow-y-auto px-[22px] pt-5 pb-10">
         <h1 className="font-serif text-[25px] font-bold">
-          {isNew ? "오늘 뭐 먹었나요" : "기록 고치기"}
+          {isNew ? newRecordTitle : "기록 고치기"}
         </h1>
 
         {isNew && !preset?.revisit && (
