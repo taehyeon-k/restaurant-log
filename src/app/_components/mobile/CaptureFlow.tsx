@@ -104,8 +104,8 @@ export default function CaptureFlow({
   /** 「방문 인증」으로 들어왔으면 인증 대상 위시 id(HANDOFF-verify.md §3). */
   verifyWishId?: string | null;
   onCancel: () => void;
-  /** 인증 없이 기록만 남깁니다(§1·§2) — 이름이 있으면 채워서 기록 입력을 엽니다. */
-  onUnverified: (name?: string) => void;
+  /** 인증 없이 기록만 남깁니다(§1·§2) — 이름이 있으면 채워서 기록 입력을 엽니다. 종류는 「여기 어디예요?」에서 고른 kind 를 그대로 넘깁니다. */
+  onUnverified: (name?: string, kind?: Kind) => void;
   onDone: (result: Verified) => void;
 }) {
   const verifyWish = useMemo(
@@ -873,7 +873,7 @@ export default function CaptureFlow({
                   onClick={() => {
                     if (far) {
                       setSearchOpen(false);
-                      onUnverified(c.name);
+                      onUnverified(c.name, c.kind);
                       return;
                     }
                     setPicked(c);
@@ -916,7 +916,7 @@ export default function CaptureFlow({
                 type="button"
                 onClick={() => {
                   setSearchOpen(false);
-                  onUnverified(typed);
+                  onUnverified(typed, pickKind);
                 }}
                 className="mt-1 flex min-h-[50px] cursor-pointer items-center justify-center rounded-[20px] border border-dashed border-[#cdc6b8] bg-transparent px-3.5 text-center text-[12.5px] text-[#6b665e] hover:border-brick hover:text-brick"
               >
@@ -980,7 +980,7 @@ export default function CaptureFlow({
                 </div>
                 <button
                   type="button"
-                  onClick={() => onUnverified()}
+                  onClick={() => onUnverified(undefined, pickKind)}
                   className="mt-[11px] min-h-11 w-full cursor-pointer rounded-[14px] border border-[#ded8cb] bg-[#fbfaf6] text-[12.5px] text-ink hover:border-brick hover:text-brick"
                 >
                   인증 없이 기록만 남기기
