@@ -66,6 +66,13 @@ const hhmm = (d: Date) => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 const isoDate = (d: Date) =>
   `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 
+/** 1000m 가 넘으면 km 로 바꿔 보여줍니다 — 숫자가 너무 길어지지 않게. */
+function formatDistance(m: number) {
+  if (m < 1000) return `${m}m`;
+  const km = m / 1000;
+  return `${km % 1 === 0 ? km.toFixed(0) : km.toFixed(1)}km`;
+}
+
 /** 두 좌표 사이 거리(m) */
 function metersBetween(a: Geo, lat: number, lng: number) {
   const R = 6371000;
@@ -864,8 +871,8 @@ export default function CaptureFlow({
                 c.distance == null
                   ? "인증할 수 있습니다"
                   : far
-                    ? `${c.distance}m · 인증 없이 기록됩니다`
-                    : `${c.distance}m · 인증할 수 있습니다`;
+                    ? `${formatDistance(c.distance)} · 인증 없이 기록됩니다`
+                    : `${formatDistance(c.distance)} · 인증할 수 있습니다`;
               return (
                 <button
                   key={c.id}
@@ -888,7 +895,7 @@ export default function CaptureFlow({
                       far ? "bg-[#f1ede4] text-[#a29a8c]" : "bg-brick-soft text-brick"
                     }`}
                   >
-                    {c.distance == null ? "—" : `${c.distance}m`}
+                    {c.distance == null ? "—" : formatDistance(c.distance)}
                   </span>
                   <span className="min-w-0 flex-1 text-left">
                     <span className="block truncate font-serif text-[16px] font-bold text-ink">
@@ -1013,7 +1020,7 @@ export default function CaptureFlow({
                     !c.far && (c.hot || c.wish) ? "bg-brick-soft text-brick" : "bg-[#f1ede4] text-muted"
                   }`}
                 >
-                  {c.distance == null ? "—" : `${c.distance}m`}
+                  {c.distance == null ? "—" : formatDistance(c.distance)}
                 </span>
                 <span className="min-w-0 flex-1 text-left">
                   {c.wish && (
