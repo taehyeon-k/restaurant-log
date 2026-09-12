@@ -41,9 +41,14 @@ function metersBetween(aLat: number, aLng: number, bLat: number, bLng: number) {
 }
 
 /** 시트가 멈추는 높이. 화면이 낮으면 그만큼 줄여 잡습니다. */
-const SNAP_MAX = { peek: 192, half: 462, full: 668 };
+const SNAP_MAX = { peek: 96, half: 462, full: 668 };
 const ORDER = ["peek", "half", "full"] as const;
 export type Snap = (typeof ORDER)[number];
+
+/** 손가락으로 끌 수 있는 가장 낮은 높이 — 손잡이만 남기고 지도를 최대한 보여줍니다. */
+const SHEET_MIN = 56;
+/** 이 높이보다 낮아지면 검색·정렬줄을 접고 한 줄 요약만 보여줍니다. */
+const COMPACT_BELOW = 200;
 
 /** 상태바를 피해 앉는 위치 — 노치가 없으면 디자인 값 그대로 50px. */
 export const SAFE_TOP = "max(50px, calc(env(safe-area-inset-top) + 8px))";
@@ -113,7 +118,7 @@ export default function MobileShell({ rows, wishes }: { rows: Restaurant[]; wish
 
   const snaps = useMemo(
     () => ({
-      peek: Math.min(SNAP_MAX.peek, Math.max(120, vh - 260)),
+      peek: Math.min(SNAP_MAX.peek, Math.max(SHEET_MIN, vh - 260)),
       half: Math.min(SNAP_MAX.half, Math.max(200, vh - 200)),
       full: Math.min(SNAP_MAX.full, Math.max(260, vh - 84)),
     }),
@@ -329,7 +334,7 @@ export default function MobileShell({ rows, wishes }: { rows: Restaurant[]; wish
     const move = (ev: PointerEvent) => {
       const next = h0 - (ev.clientY - y0);
       if (Math.abs(ev.clientY - y0) > 6) moved = true;
-      setDragH(Math.max(120, Math.min(snaps.full + 20, next)));
+      setDragH(Math.max(SHEET_MIN, Math.min(snaps.full + 20, next)));
     };
 
     const up = (ev: PointerEvent) => {
@@ -343,7 +348,7 @@ export default function MobileShell({ rows, wishes }: { rows: Restaurant[]; wish
         return;
       }
 
-      const h = Math.max(120, Math.min(snaps.full + 20, h0 - (ev.clientY - y0)));
+      const h = Math.max(SHEET_MIN, Math.min(snaps.full + 20, h0 - (ev.clientY - y0)));
       setSnap(
         ORDER.reduce((a, b) =>
           Math.abs(snaps[b] - h) < Math.abs(snaps[a] - h) ? b : a
@@ -566,7 +571,7 @@ export default function MobileShell({ rows, wishes }: { rows: Restaurant[]; wish
 
       {/* 바텀시트 — 하단 바(74px) 위에 얹힙니다 */}
       <div
-        className="absolute inset-x-0 bottom-[74px] z-[1100] flex flex-col rounded-t-[28px] bg-paper shadow-[0_-8px_30px_rgba(28,26,23,.16)]"
+        className="absolute inset-x-0 bottom-[74px] z-[1100] flex flex-col overflow-hidden rounded-t-[28px] bg-paper shadow-[0_-8px_30px_rgba(28,26,23,.16)]"
         style={{
           height: sheetH,
           transition: dragH === null ? `height .26s ${EASE}` : undefined,
@@ -579,14 +584,22 @@ export default function MobileShell({ rows, wishes }: { rows: Restaurant[]; wish
           <div className="mx-auto h-1 w-[42px] rounded-sm bg-[#cfc8ba]" />
         </div>
 
-        <div className="flex shrink-0 items-center gap-3 px-5 pb-2.5">
-          <div className="min-w-0 shrink-0"><div className="font-serif text-[18px] font-bold">{kind === "cafe" ? "카페 기록" : "맛집 기록"}</div><div className="mt-[3px] font-mono text-[10.5px] text-faint">가게 {filtered.length} · 기록 {inKind.length}</div></div>
-          <div className="flex h-10 min-w-0 flex-1 items-center gap-2 rounded-[20px] border border-[#ded8cb] bg-card px-3"><SearchIcon size={14} /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="가게 · 지역 · 메뉴 · 메모" className="min-w-0 flex-1 bg-transparent text-[12.5px] text-ink outline-none placeholder:text-[#a8a196]" /></div>
-        </div>
-        <div className="flex shrink-0 items-center justify-between border-b border-[#e6e0d3] px-5 pb-2.5">
-          <div className="flex items-center gap-4">{SORTS.map((s) => <button key={s.value} type="button" onClick={() => setSort(s.value)} className={`cursor-pointer border-none bg-transparent pb-[3px] text-[12.5px] ${sort === s.value ? "border-b border-ink font-medium text-ink" : "border-b border-transparent text-[#a8a196]"}`}>{s.label}</button>)}</div>
-          <button type="button" onClick={() => setFiltersOpen(true)} className={`min-h-[38px] cursor-pointer rounded-[19px] px-[15px] text-[12.5px] ${activeFilters ? "border-none bg-ink text-card" : "border border-[#ded8cb] bg-card text-muted"}`}>{activeFilters ? `필터 ${activeFilters}` : "필터"}</button>
-        </div>
+        {sheetH < COMPACT_BELOW ? (
+          <div className="shrink-0 px-5 pb-3 font-mono text-[11.5px] text-faint">
+            {kind === "cafe" ? "카페 기록" : "맛집 기록"} · 가게 {filtered.length} · 기록 {inKind.length}
+          </div>
+        ) : (
+          <>
+            <div className="flex shrink-0 items-center gap-3 px-5 pb-2.5">
+              <div className="min-w-0 shrink-0"><div className="font-serif text-[18px] font-bold">{kind === "cafe" ? "카페 기록" : "맛집 기록"}</div><div className="mt-[3px] font-mono text-[10.5px] text-faint">가게 {filtered.length} · 기록 {inKind.length}</div></div>
+              <div className="flex h-10 min-w-0 flex-1 items-center gap-2 rounded-[20px] border border-[#ded8cb] bg-card px-3"><SearchIcon size={14} /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="가게 · 지역 · 메뉴 · 메모" className="min-w-0 flex-1 bg-transparent text-[12.5px] text-ink outline-none placeholder:text-[#a8a196]" /></div>
+            </div>
+            <div className="flex shrink-0 items-center justify-between border-b border-[#e6e0d3] px-5 pb-2.5">
+              <div className="flex items-center gap-4">{SORTS.map((s) => <button key={s.value} type="button" onClick={() => setSort(s.value)} className={`cursor-pointer border-none bg-transparent pb-[3px] text-[12.5px] ${sort === s.value ? "border-b border-ink font-medium text-ink" : "border-b border-transparent text-[#a8a196]"}`}>{s.label}</button>)}</div>
+              <button type="button" onClick={() => setFiltersOpen(true)} className={`min-h-[38px] cursor-pointer rounded-[19px] px-[15px] text-[12.5px] ${activeFilters ? "border-none bg-ink text-card" : "border border-[#ded8cb] bg-card text-muted"}`}>{activeFilters ? `필터 ${activeFilters}` : "필터"}</button>
+            </div>
+          </>
+        )}
 
         <div
           className="no-bar min-h-0 flex-1 overflow-y-auto px-4 pt-3"

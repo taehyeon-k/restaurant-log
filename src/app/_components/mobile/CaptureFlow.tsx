@@ -14,7 +14,7 @@ import {
   type Restaurant,
   type Wish,
 } from "@/lib/types";
-import { BookmarkIcon, CameraIcon, PinIcon, VerifiedMark, photoFill } from "./ui";
+import { BookmarkIcon, CameraIcon, chipClass, Eyebrow, PinIcon, VerifiedMark, photoFill } from "./ui";
 
 export type Verified = { record: Restaurant; writeNow: boolean };
 
@@ -139,8 +139,12 @@ export default function CaptureFlow({
 
   const [extra, setExtra] = useState<Candidate[]>([]);
   const [picked, setPicked] = useState<Candidate | null>(null);
+  /** 인증 완료 화면에서 고른 종류 — 자동으로 찾은 kind 를 사람이 고쳐 잡을 수 있게 합니다. */
+  const [kindPick, setKindPick] = useState<Kind | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  const doneKind: Kind = kindPick ?? picked?.kind ?? kind;
 
   /** 「여기 없어요 · 직접 찾기」로 연 가게 찾기 화면(§2). */
   const [searchOpen, setSearchOpen] = useState(false);
@@ -547,7 +551,7 @@ export default function CaptureFlow({
       const at = shotAt ?? new Date();
 
       const twin = rows.find(
-        (r) => r.name === picked.name && r.kind === picked.kind
+        (r) => r.name === picked.name && r.kind === doneKind
       );
 
       const address = twin?.address ?? picked.address ?? null;
@@ -560,7 +564,7 @@ export default function CaptureFlow({
       const { data, error } = await supabase
         .from("restaurants")
         .insert({
-          kind: picked.kind,
+          kind: doneKind,
           name: picked.name,
           category: twin?.category ?? picked.category,
           region: twin?.region ?? picked.region,
@@ -858,6 +862,7 @@ export default function CaptureFlow({
                       return;
                     }
                     setPicked(c);
+                    setKindPick(null);
                     setStep("done");
                   }}
                   className={`flex min-h-[62px] w-full cursor-pointer items-center gap-3 rounded-[20px] border px-[15px] py-[13px] ${
@@ -960,6 +965,7 @@ export default function CaptureFlow({
                 onClick={() => {
                   if (c.far) return;
                   setPicked(c);
+                  setKindPick(null);
                   setStep("done");
                 }}
                 className={`flex min-h-[62px] w-full items-center gap-3 rounded-[20px] px-[15px] py-[13px] ${
@@ -1062,6 +1068,23 @@ export default function CaptureFlow({
           <div className="mt-[7px] text-[12px] leading-[1.6] text-muted">
             {picked?.name} · {isoDate(at).replaceAll("-", ".")} {hhmm(at)}
           </div>
+
+          <div className="mt-4">
+            <div className="text-left"><Eyebrow>종류</Eyebrow></div>
+            <div className="mt-[9px] flex justify-center gap-[7px]">
+              {(["restaurant", "cafe"] as Kind[]).map((k) => (
+                <button
+                  key={k}
+                  type="button"
+                  onClick={() => setKindPick(k)}
+                  className={chipClass(doneKind === k)}
+                >
+                  {k === "restaurant" ? "맛집" : "카페"}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {autoMatched && (
             <div className="mt-3 flex items-center justify-center gap-1.5 rounded-[14px] border border-[#e0c3b1] bg-[#f9f0e9] px-3 py-[7px]">
               <BookmarkIcon size={12} fill="#b4552d" stroke="#b4552d" />

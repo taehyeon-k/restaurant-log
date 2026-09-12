@@ -168,9 +168,26 @@ export default function RecordScreen({
             </Row>
 
             <Row label="메뉴">
-              <span className="text-[13.5px] leading-[1.6]">
-                {record.menu || "아직 쓰지 않았습니다"}
-              </span>
+              {record.menus.some((m) => m.name.trim()) ? (
+                <div className="flex flex-col gap-[5px]">
+                  {record.menus
+                    .filter((m) => m.name.trim())
+                    .map((m, i) => (
+                      <div key={i} className="flex items-baseline justify-between gap-3 text-[13.5px] leading-[1.6]">
+                        <span>{m.name}</span>
+                        {m.price != null && (
+                          <span className="shrink-0 font-mono text-[12.5px] text-muted">
+                            {m.price.toLocaleString("ko-KR")}원
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                </div>
+              ) : (
+                <span className="text-[13.5px] leading-[1.6]">
+                  {record.menu || "아직 쓰지 않았습니다"}
+                </span>
+              )}
             </Row>
 
             <Row label="메모">
