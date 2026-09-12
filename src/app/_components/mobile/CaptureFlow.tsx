@@ -14,7 +14,7 @@ import {
   type Restaurant,
   type Wish,
 } from "@/lib/types";
-import { BookmarkIcon, CameraIcon, chipClass, Eyebrow, PinIcon, VerifiedMark, photoFill } from "./ui";
+import { BookmarkIcon, CameraIcon, PinIcon, VerifiedMark, photoFill } from "./ui";
 
 export type Verified = { record: Restaurant; writeNow: boolean };
 
@@ -139,12 +139,10 @@ export default function CaptureFlow({
 
   const [extra, setExtra] = useState<Candidate[]>([]);
   const [picked, setPicked] = useState<Candidate | null>(null);
-  /** 인증 완료 화면에서 고른 종류 — 자동으로 찾은 kind 를 사람이 고쳐 잡을 수 있게 합니다. */
-  const [kindPick, setKindPick] = useState<Kind | null>(null);
+  /** 「여기 어디예요?」에서 고르는 종류 — 이걸로 근처 후보 목록을 걸러 보여주고, 그대로 기록의 kind 가 됩니다. */
+  const [pickKind, setPickKind] = useState<Kind>(kind);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-
-  const doneKind: Kind = kindPick ?? picked?.kind ?? kind;
 
   /** 「여기 없어요 · 직접 찾기」로 연 가게 찾기 화면(§2). */
   const [searchOpen, setSearchOpen] = useState(false);
@@ -383,9 +381,10 @@ export default function CaptureFlow({
   const candidates = useMemo(() => {
     const taken = new Set(mine.map((c) => c.name));
     return [...mine, ...extra.filter((c) => !taken.has(c.name))]
+      .filter((c) => c.kind === pickKind)
       .sort((a, b) => (a.distance ?? 1e9) - (b.distance ?? 1e9))
       .slice(0, 8);
-  }, [mine, extra]);
+  }, [mine, extra, pickKind]);
 
   /**
    * 담아둔 곳을 맨 위로(§1) — 위치를 읽었고, 후보 중 가고싶다에 담긴 가게이며
@@ -420,7 +419,7 @@ export default function CaptureFlow({
   /** 가게 찾기(§2)의 검색 대상 — 800m·8곳 제한 없이 내 기록 전체 + 둘레 검색 결과. */
   const searchPool = useMemo<Candidate[]>(() => {
     const mineAll = groupPlaces(rows)
-      .filter((p) => p.lat != null && p.lng != null)
+      .filter((p) => p.lat != null && p.lng != null && p.kind === pickKind)
       .map((p) => ({
         id: `mine:${p.key}`,
         name: p.name,
@@ -434,10 +433,11 @@ export default function CaptureFlow({
         mine: true,
       }));
     const taken = new Set(mineAll.map((c) => c.name));
-    return [...mineAll, ...extra.filter((c) => !taken.has(c.name))].sort(
-      (a, b) => (a.distance ?? 1e9) - (b.distance ?? 1e9)
-    );
-  }, [rows, extra, geo]);
+    return [
+      ...mineAll,
+      ...extra.filter((c) => !taken.has(c.name) && c.kind === pickKind),
+    ].sort((a, b) => (a.distance ?? 1e9) - (b.distance ?? 1e9));
+  }, [rows, extra, geo, pickKind]);
 
   /**
    * 두 글자 미만이면 내 기록·둘레만 거리순으로 보여주고, 그 이상이면 그 이름·주소를
@@ -459,6 +459,7 @@ export default function CaptureFlow({
     }
 
     for (const p of apiHits) {
+      if (p.kind !== pickKind) continue;
       const name = p.name || p.address;
       const key = norm(name);
       if (seen.has(key)) continue;
@@ -478,7 +479,7 @@ export default function CaptureFlow({
     }
 
     return hits.sort((a, b) => (a.distance ?? 1e9) - (b.distance ?? 1e9));
-  }, [searchPool, apiHits, pickQuery, geo]);
+  }, [searchPool, apiHits, pickQuery, geo, pickKind]);
 
   /**
    * 인증 대상 위시가 있고 100m 이내면 후보 목록을 건너뛰고 곧바로 그 가게로
@@ -551,7 +552,7 @@ export default function CaptureFlow({
       const at = shotAt ?? new Date();
 
       const twin = rows.find(
-        (r) => r.name === picked.name && r.kind === doneKind
+        (r) => r.name === picked.name && r.kind === picked.kind
       );
 
       const address = twin?.address ?? picked.address ?? null;
@@ -564,7 +565,7 @@ export default function CaptureFlow({
       const { data, error } = await supabase
         .from("restaurants")
         .insert({
-          kind: doneKind,
+          kind: picked.kind,
           name: picked.name,
           category: twin?.category ?? picked.category,
           region: twin?.region ?? picked.region,
@@ -827,7 +828,21 @@ export default function CaptureFlow({
             >
               ←
             </button>
-            <div className="font-serif text-[18px] font-bold">가게 찾기</div>
+            <div className="min-w-0 flex-1 font-serif text-[18px] font-bold">가게 찾기</div>
+            <div className="flex shrink-0 items-center gap-[3px] rounded-[18px] border border-[#d8d3c8] bg-card p-[3px]">
+              {(["restaurant", "cafe"] as Kind[]).map((k) => (
+                <button
+                  key={k}
+                  type="button"
+                  onClick={() => setPickKind(k)}
+                  className={`min-h-[30px] cursor-pointer rounded-[15px] px-[11px] text-[11.5px] ${
+                    pickKind === k ? "border-none bg-brick text-card" : "border-none bg-transparent text-muted"
+                  }`}
+                >
+                  {k === "restaurant" ? "맛집" : "카페"}
+                </button>
+              ))}
+            </div>
           </div>
           <input
             value={pickQuery}
@@ -862,7 +877,6 @@ export default function CaptureFlow({
                       return;
                     }
                     setPicked(c);
-                    setKindPick(null);
                     setStep("done");
                   }}
                   className={`flex min-h-[62px] w-full cursor-pointer items-center gap-3 rounded-[20px] border px-[15px] py-[13px] ${
@@ -921,26 +935,43 @@ export default function CaptureFlow({
     return (
       <div className="absolute inset-0 z-[1400] bg-paper">
         <div
-          className="absolute inset-x-5 flex items-center gap-3.5"
+          className="absolute inset-x-5"
           style={{ top: "max(62px, calc(env(safe-area-inset-top) + 20px))" }}
         >
-          <div
-            className="size-[74px] shrink-0 rounded-[18px]"
-            style={photoFill(shot, "한식")}
-          />
-          <div className="min-w-0 flex-1">
-            <div className="font-serif text-[20px] leading-[1.35] font-bold">
-              여기 어디예요?
+          <div className="flex items-center gap-3.5">
+            <div
+              className="size-[74px] shrink-0 rounded-[18px]"
+              style={photoFill(shot, "한식")}
+            />
+            <div className="min-w-0 flex-1">
+              <div className="font-serif text-[20px] leading-[1.35] font-bold">
+                여기 어디예요?
+              </div>
+              <div className="mt-[5px] text-[11.5px] leading-[1.55] text-muted">
+                {geo
+                  ? `지금 위치에서 가까운 곳입니다 (정확도 ${geo.acc}m)`
+                  : geoErr ?? "위치를 읽는 중입니다…"}
+              </div>
             </div>
-            <div className="mt-[5px] text-[11.5px] leading-[1.55] text-muted">
-              {geo
-                ? `지금 위치에서 가까운 곳입니다 (정확도 ${geo.acc}m)`
-                : geoErr ?? "위치를 읽는 중입니다…"}
-            </div>
+          </div>
+
+          <div className="mt-3 flex items-center justify-end gap-[3px] rounded-[18px] border border-[#d8d3c8] bg-card p-[3px]">
+            {(["restaurant", "cafe"] as Kind[]).map((k) => (
+              <button
+                key={k}
+                type="button"
+                onClick={() => setPickKind(k)}
+                className={`min-h-[30px] flex-1 cursor-pointer rounded-[15px] px-[11px] text-[11.5px] ${
+                  pickKind === k ? "border-none bg-brick text-card" : "border-none bg-transparent text-muted"
+                }`}
+              >
+                {k === "restaurant" ? "맛집" : "카페"}
+              </button>
+            ))}
           </div>
         </div>
 
-        <div className="no-bar absolute inset-x-0 top-[158px] bottom-[104px] overflow-y-auto px-5">
+        <div className="no-bar absolute inset-x-0 top-[206px] bottom-[104px] overflow-y-auto px-5">
           <div className="flex flex-col gap-[9px]">
             {noneNear && (
               <div className="mb-1 rounded-[18px] border border-[#e2c9bb] bg-[#f9f0e9] px-4 py-3.5">
@@ -965,7 +996,6 @@ export default function CaptureFlow({
                 onClick={() => {
                   if (c.far) return;
                   setPicked(c);
-                  setKindPick(null);
                   setStep("done");
                 }}
                 className={`flex min-h-[62px] w-full items-center gap-3 rounded-[20px] px-[15px] py-[13px] ${
@@ -1067,22 +1097,6 @@ export default function CaptureFlow({
           <div className="font-serif text-[22px] font-bold">방문이 인증되었습니다</div>
           <div className="mt-[7px] text-[12px] leading-[1.6] text-muted">
             {picked?.name} · {isoDate(at).replaceAll("-", ".")} {hhmm(at)}
-          </div>
-
-          <div className="mt-4">
-            <div className="text-left"><Eyebrow>종류</Eyebrow></div>
-            <div className="mt-[9px] flex justify-center gap-[7px]">
-              {(["restaurant", "cafe"] as Kind[]).map((k) => (
-                <button
-                  key={k}
-                  type="button"
-                  onClick={() => setKindPick(k)}
-                  className={chipClass(doneKind === k)}
-                >
-                  {k === "restaurant" ? "맛집" : "카페"}
-                </button>
-              ))}
-            </div>
           </div>
 
           {autoMatched && (
