@@ -158,9 +158,10 @@ export default function WishForm({
       <SpotPicker
         initial={spot}
         onCancel={() => setPicking(false)}
-        onPick={(lat, lng) => {
+        onPick={(lat, lng, found) => {
           setSpot({ lat, lng });
-          if (!whereText.trim()) setWhereText("지도에서 고른 자리");
+          if (!whereText.trim()) setWhereText(found ? found.name || found.address : "지도에서 고른 자리");
+          if (found?.name && !name.trim()) setName(found.name);
           setPicking(false);
         }}
       />
