@@ -80,8 +80,7 @@ export default function SpotPicker({
         center: new maps.LatLng(centerRef.current.lat, centerRef.current.lng),
         zoom: initial ? 16 : 13,
         keyboardShortcuts: false,
-        zoomControl: true,
-        zoomControlOptions: { position: maps.Position.BOTTOM_RIGHT },
+        zoomControl: false,
       });
       maps.Event.addListener(map, "idle", () => {
         const c = map.getCenter() as naver.maps.LatLng;

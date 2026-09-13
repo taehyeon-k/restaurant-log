@@ -115,8 +115,7 @@ const MobileMap = forwardRef<MapHandle, {
       if (cancelled || !containerRef.current || mapRef.current) return;
       mapRef.current = new naver.maps.Map(containerRef.current, {
         center: new naver.maps.LatLng(37.5605, 126.982), zoom: 12,
-        keyboardShortcuts: false, zoomControl: true,
-        zoomControlOptions: { position: naver.maps.Position.BOTTOM_RIGHT },
+        keyboardShortcuts: false, zoomControl: false,
       });
       readyRef.current = true;
       naver.maps.Event.addListener(mapRef.current, "zoom_changed", () => {
