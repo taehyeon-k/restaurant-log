@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { groupPlaces, type Place } from "@/lib/places";
 import { dottedDate, matchWish, wishKind, type Kind, type Restaurant, type Sort, type Wish } from "@/lib/types";
 import type { Place as GeocodePlace } from "@/lib/geocode";
-import { inRegion, matchRegionName, regionFromAddress, regionNamesFrom } from "@/lib/regions";
+import { inRegion, inSearchedRegion, matchRegionName, regionFromSearch, regionNamesFrom } from "@/lib/regions";
 import MobileMap, { type MapHandle, type MarkerFilter, type ViewBounds } from "./MobileMap";
 import PlaceCard from "./PlaceCard";
 import FilterSheet from "./FilterSheet";
@@ -410,19 +410,26 @@ export default function MobileShell({ rows, wishes }: { rows: Restaurant[]; wish
     //
     // 1) 내 기록에 이미 있는 지역 이름과 느슨하게 맞춰봅니다("신촌"→"신촌동").
     // 2) 그래도 안 걸리면 — 이름 없이 주소만 돌아온 결과(= 가게가 아니라 행정구역
-    //    자체를 찾은 결과)에 한해 regionFromAddress 로 실제 시·군·구인지 확인합니다.
+    //    자체를 찾은 결과)에 한해, 시·군·구뿐 아니라 그 다음에 오는 동까지
+    //    regionFromSearch 로 확인합니다("서울 서대문구", "마포구 연남동" 둘 다).
     //    p.name 이 있으면(가게·건물) 이 단계를 건너뛰어 "중구식당"이 지역으로
     //    잘못 빨려 들어가지 않게 막습니다. 아직 기록이 하나도 없는 지역이어도
-    //    (예: 처음 검색해 보는 구) 지역으로는 인정합니다 — enterRegionView 가
+    //    (예: 처음 검색해 보는 구·동) 지역으로는 인정합니다 — enterRegionView 가
     //    빈 목록을 그대로 보여줍니다.
-    const regionName =
-      matchRegionName(p.name || p.address, regionNames) ??
-      (!p.name ? regionFromAddress(p.address) || null : null);
-
+    const regionName = matchRegionName(p.name || p.address, regionNames);
     if (regionName) {
       const rowsInRegion = visibleRows.filter((r) => inRegion(r, regionName));
       enterRegionView(regionName, rowsInRegion, { lat: p.lat, lng: p.lng });
       return;
+    }
+
+    if (!p.name) {
+      const searched = regionFromSearch(p.address);
+      if (searched) {
+        const rowsInRegion = visibleRows.filter((r) => inSearchedRegion(r, searched));
+        enterRegionView(searched.label, rowsInRegion, { lat: p.lat, lng: p.lng });
+        return;
+      }
     }
 
     closeAll();

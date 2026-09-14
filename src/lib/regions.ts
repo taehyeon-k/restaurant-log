@@ -98,6 +98,35 @@ export function regionFromAddress(address: string | null | undefined): string {
 }
 
 /**
+ * 지도 검색으로 고른 주소가 실제 행정구역인지 봅니다(§region) — regionFromAddress
+ * 와 달리 기록의 region 칸 형식(시·군·구까지)을 그대로 쓰지 않고, 그 다음에 오는
+ * 동·읍·면·가 토큰까지 마저 읽습니다. 동 이름은 별도 사전이 없어 REGIONS 로
+ * 검증하지 않고, regionNamesFrom 과 같은 방식대로 끝 글자만 봅니다.
+ * "서울 마포구 연남동 227-6" → { label: "서울 마포구 연남동", gu: "서울 마포구", dong: "연남동" }
+ * "서울 서대문구"            → { label: "서울 서대문구", gu: "서울 서대문구", dong: null }
+ */
+export type SearchedRegion = { label: string; gu: string; dong: string | null };
+
+export function regionFromSearch(address: string | null | undefined): SearchedRegion | null {
+  const gu = regionFromAddress(address);
+  if (!gu) return null;
+
+  const parts = (address ?? "").trim().split(/\s+/).filter(Boolean);
+  const next = parts[gu.split(" ").length];
+  const dong = next && next.length >= 2 && /[동읍면가]$/.test(next) ? next : null;
+
+  return { label: dong ? `${gu} ${dong}` : gu, gu, dong };
+}
+
+/** 검색으로 찾은 지역에 이 기록이 속하는지 — 동까지 걸렸으면 동 토큰으로, 아니면 구·군·시로. */
+export function inSearchedRegion(row: Restaurant, region: SearchedRegion): boolean {
+  if (region.dong) {
+    return (row.address ?? "").trim().split(/\s+/).includes(region.dong);
+  }
+  return inRegion(row, region.gu);
+}
+
+/**
  * 기록에서 지역 이름을 모읍니다 — 별도 지역 사전을 두지 않고, 각 기록의
  * region 값 그대로와, 주소를 공백으로 쪼갠 토큰 중 구·동·가로 끝나는
  * 두 글자 이상인 것만 더합니다("신촌동", "합정동", "중구" 등).
