@@ -22,10 +22,10 @@ type Tier = {
 };
 
 const TIERS: Tier[] = [
-  { refS: 52, C: 30, K: 18, W: 3.2, A: 2, B: 3.2, shadow: "3px -3px 12px rgba(28,26,23,.28)", flat: false },
-  { refS: 24, C: 14, K: 8.5, W: 3.8, A: 1.2, B: 1.9, shadow: "1px -1px 4px rgba(28,26,23,.2)", flat: false },
-  { refS: 22, C: 13, K: 8, W: 4, A: 1.1, B: 1.8, shadow: "1px -1px 4px rgba(28,26,23,.2)", flat: false },
-  { refS: 20, C: 12, K: 7.5, W: 4.2, A: 1, B: 1.6, shadow: "1px -1px 4px rgba(28,26,23,.2)", flat: false },
+  { refS: 52, C: 26.1, K: 15.7, W: 3.2, A: 2, B: 3.2, shadow: "3px -3px 12px rgba(28,26,23,.28)", flat: false },
+  { refS: 24, C: 12.2, K: 7.4, W: 3.8, A: 1.2, B: 1.9, shadow: "1px -1px 4px rgba(28,26,23,.2)", flat: false },
+  { refS: 22, C: 11.3, K: 7, W: 4, A: 1.1, B: 1.8, shadow: "1px -1px 4px rgba(28,26,23,.2)", flat: false },
+  { refS: 20, C: 10.4, K: 6.5, W: 4.2, A: 1, B: 1.6, shadow: "1px -1px 4px rgba(28,26,23,.2)", flat: false },
 ];
 
 function tierFor(size: number): Tier {
@@ -35,7 +35,7 @@ function tierFor(size: number): Tier {
   if (size >= 20) return TIERS[3];
   // 20px 밑 — 파인 테두리 없이 단색으로, 가장 가까운 위 단계(20)의 비율을 그대로 줄여 씁니다.
   // refS 를 size 그대로 두어 아래에서 다시 비례 배율을 곱하지 않게 합니다(C·K 는 이미 최종값).
-  return { refS: size, C: 0.6 * size, K: 0.375 * size, W: 4.4, A: 0, B: 0, shadow: "1px -1px 4px rgba(28,26,23,.2)", flat: true };
+  return { refS: size, C: 0.52 * size, K: 0.33 * size, W: 4.4, A: 0, B: 0, shadow: "1px -1px 4px rgba(28,26,23,.2)", flat: true };
 }
 
 export default function VerifiedMark({
