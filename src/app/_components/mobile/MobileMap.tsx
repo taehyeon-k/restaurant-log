@@ -86,8 +86,13 @@ const MobileMap = forwardRef<MapHandle, {
   const onGhostClickRef = useRef(onGhostClick);
   const onSelectWishRef = useRef(onSelectWish);
   const onMapMovedRef = useRef(onMapMoved);
-  /** 다음 moveend 한 번을 건너뜁니다 — 코드가 직접 카메라를 움직였을 때 씁니다. */
-  const suppressMoveRef = useRef(false);
+  /**
+   * 다음 idle 한 번을 건너뜁니다 — 코드가 직접 카메라를 움직였을 때 씁니다.
+   * 네이버 지도 JS API 는 moveend 이벤트를 주지 않아, 이 SDK 안 다른 화면들과
+   * 같은 방식대로 "움직임이 끝났다"는 idle 로 대신 잡습니다. 지도가 막 생성된
+   * 첫 idle 도 사용자가 손댄 게 아니므로 true 로 시작합니다.
+   */
+  const suppressMoveRef = useRef(true);
   useEffect(() => { onSelectRef.current = onSelect; }, [onSelect]);
   useEffect(() => { onGhostClickRef.current = onGhostClick; }, [onGhostClick]);
   useEffect(() => { onSelectWishRef.current = onSelectWish; }, [onSelectWish]);
@@ -146,7 +151,7 @@ const MobileMap = forwardRef<MapHandle, {
         for (const marker of markers.current.values()) setLabelVisible(marker, visible);
         for (const marker of wishMarkers.current.values()) setLabelVisible(marker, visible);
       });
-      naver.maps.Event.addListener(mapRef.current, "moveend", () => {
+      naver.maps.Event.addListener(mapRef.current, "idle", () => {
         if (suppressMoveRef.current) { suppressMoveRef.current = false; return; }
         onMapMovedRef.current?.();
       });
