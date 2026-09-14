@@ -1,43 +1,9 @@
 /**
  * 방문 인증 뱃지 — 지도 핀과 같은 물방울(정사각형을 45도 돌려 모서리 하나를
  * 뾰족하게 만든 모양) 위에 흰 원을 얹고, 그 안에 벽돌색 체크를 넣습니다.
- *
- * 손으로 찍은 인주(印朱) 도장처럼 보이도록 세 가지를 더합니다.
- * 1) 파인 테두리 — 흰 선 한 겹 + 그 안쪽 어두운 선 한 겹으로 홈을 팜
- * 2) 2.5° 기울기 — 눌러 찍은 흔적처럼 살짝 비뚤어지게
- * 3) 잉크 번짐 — 단색 대신 한쪽에서 빛이 드는 방사 그라디언트
- *
- * 20px 밑으로는 흰 선이 1px 아래로 내려가지 않게 하고, 그보다도 더
- * 작아지면(예: 인라인 배지) 파인 테두리를 빼고 단색으로 둡니다.
+ * 벽돌 단색 채움 + 종이색 얇은 테두리 한 겹뿐인 평평한 스티커 모양입니다
+ * (마커.PNG 시안 기준 — 기울임·그라디언트·이중 테두리 없음).
  */
-type Tier = {
-  refS: number;
-  C: number;
-  K: number;
-  W: number;
-  A: number;
-  B: number;
-  shadow: string;
-  flat: boolean;
-};
-
-const TIERS: Tier[] = [
-  { refS: 52, C: 26.1, K: 15.7, W: 3.2, A: 2, B: 3.2, shadow: "3px -3px 12px rgba(28,26,23,.28)", flat: false },
-  { refS: 24, C: 12.2, K: 7.4, W: 3.8, A: 1.2, B: 1.9, shadow: "1px -1px 4px rgba(28,26,23,.2)", flat: false },
-  { refS: 22, C: 11.3, K: 7, W: 4, A: 1.1, B: 1.8, shadow: "1px -1px 4px rgba(28,26,23,.2)", flat: false },
-  { refS: 20, C: 10.4, K: 6.5, W: 4.2, A: 1, B: 1.6, shadow: "1px -1px 4px rgba(28,26,23,.2)", flat: false },
-];
-
-function tierFor(size: number): Tier {
-  if (size >= 40) return TIERS[0];
-  if (size >= 24) return TIERS[1];
-  if (size >= 22) return TIERS[2];
-  if (size >= 20) return TIERS[3];
-  // 20px 밑 — 파인 테두리 없이 단색으로, 가장 가까운 위 단계(20)의 비율을 그대로 줄여 씁니다.
-  // refS 를 size 그대로 두어 아래에서 다시 비례 배율을 곱하지 않게 합니다(C·K 는 이미 최종값).
-  return { refS: size, C: 0.52 * size, K: 0.33 * size, W: 4.4, A: 0, B: 0, shadow: "1px -1px 4px rgba(28,26,23,.2)", flat: true };
-}
-
 export default function VerifiedMark({
   size = 26,
   shadow = false,
@@ -46,20 +12,20 @@ export default function VerifiedMark({
   shadow?: boolean;
 }) {
   const drop = size / Math.SQRT2;
-  const tier = tierFor(size);
-  const scale = size / tier.refS;
-  const circle = tier.C * scale;
-  const check = tier.K * scale;
+  const circle = drop * 0.58;
+  const check = circle * 0.6;
+  const border = Math.max(1, drop * 0.045);
+  const strokeWidth = Math.max(1.6, check * 0.22);
   /**
    * 물방울은 한쪽 모서리가 뾰족해 무게 중심이 그 반대쪽(위)으로 쏠립니다.
    * 원을 사각형의 기하학적 가운데 그대로 두면 뾰족한 쪽으로 처져 보이므로,
-   * 그만큼 위로 살짝 올립니다. 두 rotate 뒤에 translateY 를 붙이면(행렬이
-   * R(45)·R(-2.5)·T 가 되어 바깥 rotate(-45)·rotate(2.5) 와 상쇄되고) 화면
-   * 기준 수직 이동만 남아, 기울기와 무관하게 항상 곧게 위로 올라갑니다.
+   * 그만큼 위로 살짝 올립니다. rotate(45deg) 뒤에 translateY 를 붙이면(행렬이
+   * R(45)·T 가 되어 바깥 rotate(-45) 와 상쇄되고) 화면 기준 수직 이동만
+   * 남아 항상 곧게 위로 올라갑니다.
    */
-  const centerNudge = drop * 0.1;
+  const centerNudge = drop * 0.09;
 
-  const dropShadow = shadow ? `drop-shadow(${tier.shadow})` : undefined;
+  const dropShadow = shadow ? "drop-shadow(1px -1px 4px rgba(28,26,23,.22))" : undefined;
 
   return (
     <span
@@ -75,19 +41,16 @@ export default function VerifiedMark({
           height: drop,
           left: (size - drop) / 2,
           top: (size - drop) / 2,
+          boxSizing: "border-box",
           borderRadius: "50% 50% 50% 0",
-          background: tier.flat
-            ? "#ac4f28"
-            : "radial-gradient(circle at 62% 34%, #bd5c31 0%, #ac4f28 65%, #9a4422 100%)",
-          boxShadow: tier.flat
-            ? undefined
-            : `inset 0 0 0 ${tier.A}px rgba(251,250,246,.9), inset 0 0 0 ${tier.B}px #ac4f28`,
-          transform: "rotate(-45deg) rotate(2.5deg)",
+          background: "#b4552d",
+          border: `${border}px solid #f7ece5`,
+          transform: "rotate(-45deg)",
         }}
       >
         <span
           className="grid place-items-center rounded-full bg-[#fbfaf6]"
-          style={{ width: circle, height: circle, transform: `rotate(45deg) rotate(-2.5deg) translateY(-${centerNudge}px)` }}
+          style={{ width: circle, height: circle, transform: `rotate(45deg) translateY(-${centerNudge}px)` }}
         >
           <svg
             width={check}
@@ -95,7 +58,7 @@ export default function VerifiedMark({
             viewBox="0 0 24 24"
             fill="none"
             stroke="#a8491f"
-            strokeWidth={tier.W}
+            strokeWidth={strokeWidth}
             strokeLinecap="round"
             strokeLinejoin="round"
           >
