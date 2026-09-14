@@ -50,6 +50,14 @@ export default function VerifiedMark({
   const scale = size / tier.refS;
   const circle = tier.C * scale;
   const check = tier.K * scale;
+  /**
+   * 물방울은 한쪽 모서리가 뾰족해 무게 중심이 그 반대쪽(위)으로 쏠립니다.
+   * 원을 사각형의 기하학적 가운데 그대로 두면 뾰족한 쪽으로 처져 보이므로,
+   * 그만큼 위로 살짝 올립니다. 두 rotate 뒤에 translateY 를 붙이면(행렬이
+   * R(45)·R(-2.5)·T 가 되어 바깥 rotate(-45)·rotate(2.5) 와 상쇄되고) 화면
+   * 기준 수직 이동만 남아, 기울기와 무관하게 항상 곧게 위로 올라갑니다.
+   */
+  const centerNudge = drop * 0.1;
 
   const dropShadow = shadow ? `drop-shadow(${tier.shadow})` : undefined;
 
@@ -79,7 +87,7 @@ export default function VerifiedMark({
       >
         <span
           className="grid place-items-center rounded-full bg-[#fbfaf6]"
-          style={{ width: circle, height: circle, transform: "rotate(45deg) rotate(-2.5deg)" }}
+          style={{ width: circle, height: circle, transform: `rotate(45deg) rotate(-2.5deg) translateY(-${centerNudge}px)` }}
         >
           <svg
             width={check}
