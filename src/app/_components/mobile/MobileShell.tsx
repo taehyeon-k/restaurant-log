@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { groupPlaces, type Place } from "@/lib/places";
 import { dottedDate, matchWish, wishKind, type Kind, type Restaurant, type Sort, type Wish } from "@/lib/types";
 import type { Place as GeocodePlace } from "@/lib/geocode";
-import { inRegion, matchRegionName, regionNamesFrom } from "@/lib/regions";
+import { inRegion, matchRegionName, regionFromAddress, regionNamesFrom } from "@/lib/regions";
 import MobileMap, { type MapHandle, type MarkerFilter, type ViewBounds } from "./MobileMap";
 import PlaceCard from "./PlaceCard";
 import FilterSheet from "./FilterSheet";
@@ -334,7 +334,12 @@ export default function MobileShell({ rows, wishes }: { rows: Restaurant[]; wish
    * 지역 보기 — 「신촌」처럼 지역을 검색했을 때. 기록 추가 시트 대신 그 지역
    * 기록 전체가 보이게 범위를 맞추고, 검색어·필터·열린 시트를 모두 비웁니다.
    */
-  function enterRegionView(name: string, rowsInRegion: Restaurant[]) {
+  function enterRegionView(
+    name: string,
+    rowsInRegion: Restaurant[],
+    /** 이 지역에 기록이 하나도 없을 때 대신 날아갈 자리 — 검색으로 찾은 좌표. */
+    fallbackCenter?: { lat: number; lng: number }
+  ) {
     closeAll();
     setEditing(null);
     setFoundHit(null);
@@ -359,7 +364,11 @@ export default function MobileShell({ rows, wishes }: { rows: Restaurant[]; wish
     const points = rowsInRegion
       .filter((r) => r.lat != null && r.lng != null)
       .map((r) => [r.lat as number, r.lng as number] as [number, number]);
-    mapRef.current?.fitRegion(points);
+    if (points.length) {
+      mapRef.current?.fitRegion(points);
+    } else if (fallbackCenter) {
+      mapRef.current?.flyTo(fallbackCenter.lat, fallbackCenter.lng, 13);
+    }
   }
 
   function handleChoosePlace(p: GeocodePlace) {
@@ -398,13 +407,22 @@ export default function MobileShell({ rows, wishes }: { rows: Restaurant[]; wish
 
     // 가게·위시 어디에도 없으면 지역인지 봅니다 — "중구식당" 같은 가게 이름이 지역으로
     // 빨려 들어가지 않게, 이 확인은 반드시 위 두 검사 다음입니다.
-    const regionName = matchRegionName(p.name || p.address, regionNames);
+    //
+    // 1) 내 기록에 이미 있는 지역 이름과 느슨하게 맞춰봅니다("신촌"→"신촌동").
+    // 2) 그래도 안 걸리면 — 이름 없이 주소만 돌아온 결과(= 가게가 아니라 행정구역
+    //    자체를 찾은 결과)에 한해 regionFromAddress 로 실제 시·군·구인지 확인합니다.
+    //    p.name 이 있으면(가게·건물) 이 단계를 건너뛰어 "중구식당"이 지역으로
+    //    잘못 빨려 들어가지 않게 막습니다. 아직 기록이 하나도 없는 지역이어도
+    //    (예: 처음 검색해 보는 구) 지역으로는 인정합니다 — enterRegionView 가
+    //    빈 목록을 그대로 보여줍니다.
+    const regionName =
+      matchRegionName(p.name || p.address, regionNames) ??
+      (!p.name ? regionFromAddress(p.address) || null : null);
+
     if (regionName) {
       const rowsInRegion = visibleRows.filter((r) => inRegion(r, regionName));
-      if (rowsInRegion.length) {
-        enterRegionView(regionName, rowsInRegion);
-        return;
-      }
+      enterRegionView(regionName, rowsInRegion, { lat: p.lat, lng: p.lng });
+      return;
     }
 
     closeAll();
