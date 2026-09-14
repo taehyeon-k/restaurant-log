@@ -11,12 +11,16 @@ export type MarkerFilter = "all" | "visited" | "wish";
 export type Placed = Place & { lat: number; lng: number };
 export const placed = (places: Place[]) => places.filter((p): p is Placed => p.lat !== null && p.lng !== null);
 
+export type ViewBounds = { s: number; w: number; n: number; e: number };
+
 export type MapHandle = {
   flyTo: (lat: number, lng: number, zoom?: number) => void;
   fitTo: (points: [number, number][]) => void;
   /** 지역 보기 — 위 검색줄·지역 띠에 가리지 않게 여유를 더 두고, 한 점으로는 파고들지 않게 maxZoom 을 14 로 묶습니다. */
   fitRegion: (points: [number, number][]) => void;
   invalidate: () => void;
+  /** 지금 보이는 지도 범위 — 「현 지도에 있는 기록만」(HANDOFF-SEARCH-20260914.md §4). */
+  getBounds: () => ViewBounds | null;
 };
 
 const norm = (s: string) => s.replace(/\s+/g, "").toLowerCase();
@@ -60,8 +64,13 @@ const MobileMap = forwardRef<MapHandle, {
   wishes?: Wish[];
   markerFilter?: MarkerFilter;
   onSelectWish?: (id: string) => void;
+  /**
+   * 사용자가 손으로 지도를 옮겼을 때만 부릅니다 — 검색·핀 선택·범위 맞추기처럼
+   * 코드가 직접 카메라를 움직인 경우는 걸러냅니다(HANDOFF-SEARCH-20260914.md §4).
+   */
+  onMapMoved?: () => void;
 }>(function MobileMap(
-  { places, selectedKey, onSelect, frozen, ghost = null, onGhostClick, wishes = [], markerFilter = "all", onSelectWish },
+  { places, selectedKey, onSelect, frozen, ghost = null, onGhostClick, wishes = [], markerFilter = "all", onSelectWish, onMapMoved },
   ref
 ) {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -76,20 +85,25 @@ const MobileMap = forwardRef<MapHandle, {
   const onSelectRef = useRef(onSelect);
   const onGhostClickRef = useRef(onGhostClick);
   const onSelectWishRef = useRef(onSelectWish);
+  const onMapMovedRef = useRef(onMapMoved);
+  /** 다음 moveend 한 번을 건너뜁니다 — 코드가 직접 카메라를 움직였을 때 씁니다. */
+  const suppressMoveRef = useRef(false);
   useEffect(() => { onSelectRef.current = onSelect; }, [onSelect]);
   useEffect(() => { onGhostClickRef.current = onGhostClick; }, [onGhostClick]);
   useEffect(() => { onSelectWishRef.current = onSelectWish; }, [onSelectWish]);
+  useEffect(() => { onMapMovedRef.current = onMapMoved; }, [onMapMoved]);
 
   useImperativeHandle(ref, () => ({
     flyTo: (lat, lng, zoom = 15) => {
       lastFit.current = "fly:" + lat + "," + lng;
       const map = mapRef.current;
-      if (map) map.morph(new naver.maps.LatLng(lat, lng), zoom, { duration: 700 });
+      if (map) { suppressMoveRef.current = true; map.morph(new naver.maps.LatLng(lat, lng), zoom, { duration: 700 }); }
     },
     fitTo: (points) => {
       const map = mapRef.current;
       if (!map || !points.length) return;
       lastFit.current = "fit:" + points.length + ":" + points[0].join(",");
+      suppressMoveRef.current = true;
       const bounds = new naver.maps.LatLngBounds(new naver.maps.LatLng(points[0][0], points[0][1]), new naver.maps.LatLng(points[0][0], points[0][1]));
       for (const point of points.slice(1)) bounds.extend(new naver.maps.LatLng(point[0], point[1]));
       map.fitBounds(bounds, { top: 120, right: 40, bottom: 40, left: 36, maxZoom: 15 });
@@ -98,6 +112,7 @@ const MobileMap = forwardRef<MapHandle, {
       const map = mapRef.current;
       if (!map || !points.length) return;
       lastFit.current = "region:" + points.length + ":" + points[0].join(",");
+      suppressMoveRef.current = true;
       if (points.length === 1) {
         map.morph(new naver.maps.LatLng(points[0][0], points[0][1]), 14, { duration: 700 });
         return;
@@ -107,6 +122,12 @@ const MobileMap = forwardRef<MapHandle, {
       map.fitBounds(bounds, { top: 150, right: 40, bottom: 60, left: 40, maxZoom: 14 });
     },
     invalidate: () => mapRef.current?.autoResize(),
+    getBounds: () => {
+      const map = mapRef.current;
+      if (!map) return null;
+      const b = map.getBounds() as naver.maps.LatLngBounds;
+      return { s: b.south(), w: b.west(), n: b.north(), e: b.east() };
+    },
   }), []);
 
   useEffect(() => {
@@ -124,6 +145,10 @@ const MobileMap = forwardRef<MapHandle, {
         const visible = map.getZoom() >= LABEL_ZOOM;
         for (const marker of markers.current.values()) setLabelVisible(marker, visible);
         for (const marker of wishMarkers.current.values()) setLabelVisible(marker, visible);
+      });
+      naver.maps.Event.addListener(mapRef.current, "moveend", () => {
+        if (suppressMoveRef.current) { suppressMoveRef.current = false; return; }
+        onMapMovedRef.current?.();
       });
       syncRef.current?.();
       syncWishRef.current?.();
@@ -166,6 +191,7 @@ const MobileMap = forwardRef<MapHandle, {
     });
     maps.Event.addListener(marker, "click", () => onGhostClickRef.current?.());
     ghostRef.current = marker;
+    suppressMoveRef.current = true;
     map.morph(new maps.LatLng(ghost.lat, ghost.lng), 16, { duration: 700 });
   }, [ghost]);
 
@@ -209,6 +235,7 @@ const MobileMap = forwardRef<MapHandle, {
       // 튀지 않습니다.
       lastFit.current = key;
       if (frozen) return;
+      suppressMoveRef.current = true;
       if (all.length === 1) { map.morph(new naver.maps.LatLng(all[0].lat, all[0].lng), 15, { duration: 500 }); return; }
       const bounds = new naver.maps.LatLngBounds(new naver.maps.LatLng(all[0].lat, all[0].lng), new naver.maps.LatLng(all[0].lat, all[0].lng));
       for (const p of all.slice(1)) bounds.extend(new naver.maps.LatLng(p.lat, p.lng));

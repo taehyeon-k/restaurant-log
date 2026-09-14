@@ -6,7 +6,7 @@ import { groupPlaces, type Place } from "@/lib/places";
 import { dottedDate, matchWish, wishKind, type Kind, type Restaurant, type Sort, type Wish } from "@/lib/types";
 import type { Place as GeocodePlace } from "@/lib/geocode";
 import { inRegion, matchRegionName, regionNamesFrom } from "@/lib/regions";
-import MobileMap, { type MapHandle, type MarkerFilter } from "./MobileMap";
+import MobileMap, { type MapHandle, type MarkerFilter, type ViewBounds } from "./MobileMap";
 import PlaceCard from "./PlaceCard";
 import FilterSheet from "./FilterSheet";
 import PlaceScreen from "./PlaceScreen";
@@ -86,6 +86,9 @@ export default function MobileShell({ rows, wishes }: { rows: Restaurant[]; wish
   const [revisitOnly, setRevisitOnly] = useState(false);
   const [verifiedOnly, setVerifiedOnly] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  /** 「현 지도에 있는 기록만」(HANDOFF-SEARCH-20260914.md §4) — 지도를 옮겼는지, 걸어 둔 범위. */
+  const [mapMoved, setMapMoved] = useState(false);
+  const [viewBounds, setViewBounds] = useState<ViewBounds | null>(null);
 
   const [snap, setSnap] = useState<Snap>("high");
   const [dragH, setDragH] = useState<number | null>(null);
@@ -180,6 +183,16 @@ export default function MobileShell({ rows, wishes }: { rows: Restaurant[]; wish
       );
 
     const list = allPlaces
+      .filter(
+        (p) =>
+          !viewBounds ||
+          (p.lat != null &&
+            p.lng != null &&
+            p.lat >= viewBounds.s &&
+            p.lat <= viewBounds.n &&
+            p.lng >= viewBounds.w &&
+            p.lng <= viewBounds.e)
+      )
       .filter((p) => !categories.length || categories.includes(p.category ?? ""))
       .filter((p) => !keywords.length || p.keywords.some((k) => keywords.includes(k)))
       .filter((p) => !revisitOnly || p.revisit)
@@ -191,7 +204,7 @@ export default function MobileShell({ rows, wishes }: { rows: Restaurant[]; wish
       if (sort === "price") return (a.price_range ?? 0) - (b.price_range ?? 0);
       return (a.latest.visited_at ?? "") < (b.latest.visited_at ?? "") ? 1 : -1;
     });
-  }, [allPlaces, q, categories, keywords, revisitOnly, verifiedOnly, sort]);
+  }, [allPlaces, q, categories, keywords, revisitOnly, verifiedOnly, viewBounds, sort]);
 
   const place = placeKey ? allPlaces.find((p) => p.key === placeKey) ?? null : null;
   const visit = visitId != null ? rows.find((r) => r.id === visitId) ?? null : null;
@@ -201,6 +214,22 @@ export default function MobileShell({ rows, wishes }: { rows: Restaurant[]; wish
 
   const activeFilters =
     categories.length + keywords.length + (revisitOnly ? 1 : 0) + (verifiedOnly ? 1 : 0);
+
+  const applyViewBounds = useCallback(() => {
+    const bounds = mapRef.current?.getBounds();
+    if (!bounds) return;
+    setViewBounds(bounds);
+    setMapMoved(false);
+    setSnap((s) => (s === "peek" ? "low" : s));
+  }, []);
+
+  const clearAllFilters = useCallback(() => {
+    setCategories([]);
+    setKeywords([]);
+    setRevisitOnly(false);
+    setVerifiedOnly(false);
+    setViewBounds(null);
+  }, []);
 
   /* ── 열기 ─────────────────────────────────────── */
 
@@ -322,6 +351,8 @@ export default function MobileShell({ rows, wishes }: { rows: Restaurant[]; wish
     setKeywords([]);
     setRevisitOnly(false);
     setVerifiedOnly(false);
+    setViewBounds(null);
+    setMapMoved(false);
     setSnap("high");
     setRegionView({ name, count: rowsInRegion.length });
 
@@ -448,6 +479,21 @@ export default function MobileShell({ rows, wishes }: { rows: Restaurant[]; wish
     pickedPlace !== null ||
     regionView !== null;
 
+  /**
+   * 「현 지도에 있는 기록만」 칩 — 지도 탭이고, 촬영 흐름·기록 상세·가게 상세가
+   * 열려 있지 않을 때만 띄웁니다(HANDOFF-SEARCH-20260914.md §4).
+   */
+  const mapChipVisible = tab === "map" && mapMoved && !overlayOpen && !place && !visit;
+
+  /** 걸린 조건을 칩으로 드러냅니다(HANDOFF-SEARCH-20260914.md §3) — 맨 앞은 지도 범위. */
+  const chipItems: { key: string; label: string; bounds?: boolean; onClear: () => void }[] = [
+    ...(viewBounds ? [{ key: "bounds", label: "이 지도 범위", bounds: true, onClear: () => setViewBounds(null) }] : []),
+    ...categories.map((c) => ({ key: `cat:${c}`, label: c, onClear: () => setCategories((p) => p.filter((v) => v !== c)) })),
+    ...keywords.map((k) => ({ key: `kw:${k}`, label: k, onClear: () => setKeywords((p) => p.filter((v) => v !== k)) })),
+    ...(revisitOnly ? [{ key: "revisit", label: "재방문", onClear: () => setRevisitOnly(false) }] : []),
+    ...(verifiedOnly ? [{ key: "verified", label: "인증된 기록", onClear: () => setVerifiedOnly(false) }] : []),
+  ];
+
   const TAB_TITLE: Record<Exclude<Tab, "map" | "calendar" | "wish">, string> = {
     account: "내계정",
   };
@@ -474,6 +520,7 @@ export default function MobileShell({ rows, wishes }: { rows: Restaurant[]; wish
         wishes={wishes}
         markerFilter={markerFilter}
         onSelectWish={(id) => setOpenWishId(id)}
+        onMapMoved={() => setMapMoved(true)}
       />
 
       {/* 마커 필터 — 지도 왼쪽 아래, 시트를 따라 함께 올라갑니다(§5). */}
@@ -679,13 +726,81 @@ export default function MobileShell({ rows, wishes }: { rows: Restaurant[]; wish
           </div>
         ) : (
           <>
-            <div className="flex shrink-0 items-center gap-3 px-5 pb-2.5">
+            <div className="flex shrink-0 items-center gap-2 px-5 pb-2.5">
               <div className="min-w-0 shrink-0"><div className="font-serif text-[18px] font-bold">{kind === "cafe" ? "카페 기록" : "맛집 기록"}</div><div className="mt-[3px] font-mono text-[10.5px] text-faint">가게 {filtered.length} · 기록 {inKind.length}</div></div>
-              <div className="flex h-10 min-w-0 flex-1 items-center gap-2 rounded-[20px] border border-[#ded8cb] bg-card px-3"><SearchIcon size={14} /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="가게 · 지역 · 메뉴 · 메모" className="min-w-0 flex-1 bg-transparent text-[12.5px] text-ink outline-none placeholder:text-[#a8a196]" /></div>
+              <div className="flex h-10 min-w-0 flex-1 items-center gap-2 rounded-[20px] border border-[#ded8cb] bg-card px-3"><SearchIcon size={14} /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="내 기록에서 찾기" className="min-w-0 flex-1 bg-transparent text-[12.5px] text-ink outline-none placeholder:text-[#a8a196]" /></div>
+              <button
+                type="button"
+                onClick={() => setFiltersOpen(true)}
+                aria-label="필터"
+                className={`flex h-10 shrink-0 cursor-pointer items-center gap-[5px] rounded-[20px] px-3 text-[12.5px] ${
+                  activeFilters ? "border-none bg-ink text-card" : "border border-[#ded8cb] bg-card text-muted"
+                }`}
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round">
+                  <path d="M4 7h16" />
+                  <path d="M7 12h10" />
+                  <path d="M10 17h4" />
+                </svg>
+                {activeFilters ? activeFilters : "필터"}
+              </button>
             </div>
-            <div className="flex shrink-0 items-center justify-between border-b border-[#e6e0d3] px-5 pb-2.5">
+
+            {mapChipVisible && (
+              <div className="flex shrink-0 justify-end px-5 pb-2">
+                <button
+                  type="button"
+                  onClick={applyViewBounds}
+                  className="flex min-h-[28px] cursor-pointer items-center gap-[5px] rounded-[14px] border px-[10px] text-[11px] whitespace-nowrap"
+                  style={{ borderColor: "#e0c3b1", background: "#f9f0e9", color: "#b4552d" }}
+                >
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#b4552d" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M20.5 12a8.5 8.5 0 1 1-2.6-6.1" />
+                    <path d="M20.5 4.5v4.2h-4.2" />
+                  </svg>
+                  <span>현 지도에 있는 기록만</span>
+                </button>
+              </div>
+            )}
+
+            {chipItems.length > 0 && (
+              <div className="no-bar flex shrink-0 items-center gap-[6px] overflow-x-auto px-5 pb-2.5">
+                {chipItems.map((c) =>
+                  c.bounds ? (
+                    <button
+                      key={c.key}
+                      type="button"
+                      onClick={c.onClear}
+                      className="shrink-0 cursor-pointer rounded-[15px] border px-[10px] py-[5px] text-[11px] whitespace-nowrap"
+                      style={{ background: "#fbfaf6", borderColor: "#d8d3c8", color: "#6b665e" }}
+                    >
+                      {c.label} <span style={{ color: "#a8a196" }}>✕</span>
+                    </button>
+                  ) : (
+                    <button
+                      key={c.key}
+                      type="button"
+                      onClick={c.onClear}
+                      className="shrink-0 cursor-pointer rounded-[15px] border-none px-[10px] py-[5px] text-[11px] whitespace-nowrap"
+                      style={{ background: "#f2e0d5", color: "#a34d27" }}
+                    >
+                      {c.label} <span style={{ color: "#c08a6c" }}>✕</span>
+                    </button>
+                  )
+                )}
+                <button
+                  type="button"
+                  onClick={clearAllFilters}
+                  className="shrink-0 cursor-pointer border-none bg-transparent text-[11px]"
+                  style={{ color: "#8a8377" }}
+                >
+                  모두 지우기
+                </button>
+              </div>
+            )}
+
+            <div className="flex shrink-0 items-center border-b border-[#e6e0d3] px-5 pb-2.5">
               <div className="flex items-center gap-4">{SORTS.map((s) => <button key={s.value} type="button" onClick={() => setSort(s.value)} className={`cursor-pointer border-none bg-transparent pb-[3px] text-[12.5px] ${sort === s.value ? "border-b border-ink font-medium text-ink" : "border-b border-transparent text-[#a8a196]"}`}>{s.label}</button>)}</div>
-              <button type="button" onClick={() => setFiltersOpen(true)} className={`min-h-[38px] cursor-pointer rounded-[19px] px-[15px] text-[12.5px] ${activeFilters ? "border-none bg-ink text-card" : "border border-[#ded8cb] bg-card text-muted"}`}>{activeFilters ? `필터 ${activeFilters}` : "필터"}</button>
             </div>
           </>
         )}
