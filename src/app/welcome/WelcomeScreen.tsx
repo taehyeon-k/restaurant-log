@@ -97,10 +97,11 @@ export default function WelcomeScreen({
       return;
     }
 
+    // update 가 아니라 upsert — 가입 트리거가 생기기 전에 이미 로그인했던 계정은
+    // profiles 행이 아예 없어서, update 는 0행에 조용히 "성공"하고 아무것도 안 남습니다.
     const { error } = await supabase
       .from("profiles")
-      .update({ nickname: trimmed, avatar_url: avatarUrl })
-      .eq("id", user.id);
+      .upsert({ id: user.id, nickname: trimmed, avatar_url: avatarUrl });
 
     if (error) {
       setError(
