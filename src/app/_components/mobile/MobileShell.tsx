@@ -747,8 +747,24 @@ export default function MobileShell({ rows, wishes }: { rows: Restaurant[]; wish
         </div>
 
         {sheetH < COMPACT_BELOW ? (
-          <div className="shrink-0 px-5 pb-3 font-mono text-[11.5px] text-faint">
-            {kind === "cafe" ? "카페 기록" : "맛집 기록"} · 가게 {filtered.length} · 기록 {inKind.length}
+          <div className="flex shrink-0 items-center justify-between gap-2 px-5 pb-3">
+            <div className="min-w-0 truncate font-mono text-[11.5px] text-faint">
+              {kind === "cafe" ? "카페 기록" : "맛집 기록"} · 가게 {filtered.length} · 기록 {inKind.length}
+            </div>
+            {mapChipVisible && (
+              <button
+                type="button"
+                onClick={applyViewBounds}
+                className="flex min-h-[26px] shrink-0 cursor-pointer items-center gap-[5px] rounded-[13px] border px-[9px] text-[10.5px] whitespace-nowrap"
+                style={{ borderColor: "#e0c3b1", background: "#f9f0e9", color: "#b4552d" }}
+              >
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#b4552d" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20.5 12a8.5 8.5 0 1 1-2.6-6.1" />
+                  <path d="M20.5 4.5v4.2h-4.2" />
+                </svg>
+                <span>현 지도에 있는 기록만</span>
+              </button>
+            )}
           </div>
         ) : (
           <>
