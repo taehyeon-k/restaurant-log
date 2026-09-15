@@ -98,7 +98,6 @@ export default function AccountScreen({
   const fileRef = useRef<HTMLInputElement>(null);
   const [avatarUrl, setAvatarUrl] = useState(account.avatarUrl);
   const [avatarBusy, setAvatarBusy] = useState(false);
-  const [titleLabelId, setTitleLabelId] = useState(account.titleLabelId);
   const [labelBusy, setLabelBusy] = useState(false);
   const [busy, setBusy] = useState<"logout" | "delete" | null>(null);
   const [error, setError] = useState("");
@@ -109,6 +108,10 @@ export default function AccountScreen({
 
   const labels = earnedLabels(rows);
   const got = labels.filter((l) => l.earned);
+  // 대표 라벨은 로컬 상태로 따로 안 들고 account.titleLabelId(서버에서 온 값)를 그대로
+  // 씁니다 — 라벨첩(다른 컴포넌트)에서 바꿔도 이 화면은 탭을 벗어나지 않는 한 계속
+  // 마운트돼 있어서, 로컬 상태였다면 router.refresh() 이후에도 따로 안 맞춰졌을 겁니다.
+  const titleLabelId = account.titleLabelId;
   const titleLabel = titleLabelId ? got.find((l) => l.id === titleLabelId) ?? null : null;
 
   const connectedLine = account.providers.length
@@ -169,7 +172,6 @@ export default function AccountScreen({
       setError(error.message);
       return;
     }
-    setTitleLabelId(next);
     router.refresh();
   }
 
