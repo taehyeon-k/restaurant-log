@@ -502,6 +502,7 @@ export default function MobileShell({ rows, wishes }: { rows: Restaurant[]; wish
   const overlayOpen =
     editing !== null ||
     flow ||
+    filtersOpen ||
     labelsOpen ||
     draftsOpen ||
     tab !== "map" ||
