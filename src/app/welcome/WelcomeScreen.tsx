@@ -103,7 +103,11 @@ export default function WelcomeScreen({
       .eq("id", user.id);
 
     if (error) {
-      setError(error.message);
+      setError(
+        error.code === "23505"
+          ? "이미 쓰고 있는 닉네임이에요. 다른 닉네임을 정해주세요."
+          : error.message
+      );
       setSaving(false);
       return;
     }

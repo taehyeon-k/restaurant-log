@@ -6,6 +6,9 @@ import { supabase } from "@/lib/supabase/client";
 
 type Provider = "kakao" | "google";
 
+// 카카오 로그인에 문제가 생겨 한동안 막아둡니다 — 고치면 이 줄만 true로 되돌리면 됩니다.
+const KAKAO_ENABLED = false;
+
 /** 말풍선 마크 — 카카오 로그인 버튼 전용(카카오 브랜드 가이드가 정한 모양). */
 function KakaoIcon() {
   return (
@@ -59,17 +62,19 @@ function AuthButtons({
 
   return (
     <div className="flex w-full flex-col gap-[11px]">
-      <button
-        type="button"
-        disabled={busy !== null}
-        onClick={() => onLogin("kakao")}
-        className={`flex ${h} w-full items-center gap-3 rounded-2xl bg-kakao ${px} ${text} font-medium text-ink shadow-[0_2px_8px_rgba(28,26,23,.08)] disabled:opacity-70`}
-      >
-        <KakaoIcon />
-        <span className="flex-1 text-left">
-          {busy === "kakao" ? "연결하는 중…" : "카카오로 시작하기"}
-        </span>
-      </button>
+      {KAKAO_ENABLED && (
+        <button
+          type="button"
+          disabled={busy !== null}
+          onClick={() => onLogin("kakao")}
+          className={`flex ${h} w-full items-center gap-3 rounded-2xl bg-kakao ${px} ${text} font-medium text-ink shadow-[0_2px_8px_rgba(28,26,23,.08)] disabled:opacity-70`}
+        >
+          <KakaoIcon />
+          <span className="flex-1 text-left">
+            {busy === "kakao" ? "연결하는 중…" : "카카오로 시작하기"}
+          </span>
+        </button>
+      )}
       <button
         type="button"
         disabled={busy !== null}
