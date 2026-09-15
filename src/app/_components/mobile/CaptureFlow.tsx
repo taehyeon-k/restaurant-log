@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase/client";
 import { groupPlaces } from "@/lib/places";
 import { nearbyPlaces, searchFoodPlaces, type FoodPlace } from "@/lib/geocode";
 import { dataUrlToBlob, uploadPhoto } from "@/lib/photos";
@@ -569,9 +569,15 @@ export default function CaptureFlow({
       const matchedWish = picked.wish ?? findMatchingWish(wishes, picked, WISH_AUTO_M);
       const fromWish = matchedWish ? wishMetInfo(matchedWish, isoDate(at)) : null;
 
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error("로그인이 필요합니다");
+
       const { data, error } = await supabase
         .from("restaurants")
         .insert({
+          user_id: user.id,
           kind: picked.kind,
           name: picked.name,
           category: twin?.category ?? picked.category,

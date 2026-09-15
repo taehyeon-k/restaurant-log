@@ -16,6 +16,9 @@
   --color-map-road: #f1ede2;
   --color-map-park: #dfe4d6;
 
+  /* 카카오 로그인 버튼 — 카카오 브랜드 가이드가 정한 색이라 종이 팔레트를 따르지 않습니다. */
+  --color-kakao: #fee500;
+
   --font-serif: var(--font-gowun), serif;
   --font-sans: var(--font-noto), sans-serif;
   --font-mono: var(--font-jetbrains), monospace;

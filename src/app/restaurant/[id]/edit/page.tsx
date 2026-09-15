@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { getRestaurant } from "@/lib/queries";
+import { createClient } from "@/lib/supabase/server";
 import RecordForm from "@/app/_components/RecordForm";
 
 export default async function EditRestaurantPage({
@@ -8,7 +9,8 @@ export default async function EditRestaurantPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const place = await getRestaurant(Number(id));
+  const supabase = await createClient();
+  const place = await getRestaurant(supabase, Number(id));
 
   if (!place) notFound();
 

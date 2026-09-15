@@ -1,5 +1,9 @@
-import { supabase } from "@/lib/supabase";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Bbox, Kind, Restaurant, Sort, Wish } from "@/lib/types";
+
+// 서버 컴포넌트에서도, 클라이언트 컴포넌트에서도 불러 쓰는 파일이라
+// supabase 클라이언트를 안에서 만들지 않고 호출하는 쪽에서 넘겨받습니다
+// (서버용 클라이언트는 next/headers 를 쓰므로 브라우저 번들에 들어가면 안 됩니다).
 
 export type SearchFilters = {
   bbox?: Bbox | null;
@@ -13,8 +17,8 @@ export type SearchFilters = {
 };
 
 /** Free-text search over name/region/category/menu/review, plus chip filters. */
-export async function searchRestaurants(f: SearchFilters) {
-  let query = supabase.from("restaurants").select("*").eq("kind", f.kind);
+export async function searchRestaurants(client: SupabaseClient, f: SearchFilters) {
+  let query = client.from("restaurants").select("*").eq("kind", f.kind);
 
   if (f.q) {
     const like = `%${f.q}%`;
@@ -58,8 +62,8 @@ export async function searchRestaurants(f: SearchFilters) {
 }
 
 /** Distinct chip options for one kind — drives the CATEGORY / REGION / KEYWORD rows. */
-export async function getFacets(kind: Kind, bbox?: Bbox | null) {
-  let query = supabase
+export async function getFacets(client: SupabaseClient, kind: Kind, bbox?: Bbox | null) {
+  let query = client
     .from("restaurants")
     .select("category, region, keywords")
     .eq("kind", kind);
@@ -93,8 +97,8 @@ export async function getFacets(kind: Kind, bbox?: Bbox | null) {
   };
 }
 
-export async function getRestaurant(id: number) {
-  const { data, error } = await supabase
+export async function getRestaurant(client: SupabaseClient, id: number) {
+  const { data, error } = await client
     .from("restaurants")
     .select("*")
     .eq("id", id)
@@ -108,8 +112,8 @@ export async function getRestaurant(id: number) {
  * 모바일 화면이 쓰는 전체 목록. 거르기·정렬·묶기를 브라우저에서 하므로
  * (바텀시트가 서버를 오가지 않고 바로 반응합니다) 조건 없이 한 번만 읽습니다.
  */
-export async function getAllRestaurants() {
-  const { data, error } = await supabase
+export async function getAllRestaurants(client: SupabaseClient) {
+  const { data, error } = await client
     .from("restaurants")
     .select("*")
     .order("visited_at", { ascending: false, nullsFirst: false });
@@ -123,8 +127,8 @@ export async function getAllRestaurants() {
  * page.tsx 의 Promise.all 과 함께 도는 호출이라, 위시를 못 읽어도(마이그레이션
  * 전이거나 일시적 오류) 기록 화면은 그대로 열려야 합니다 — 던지지 않고 빈 배열.
  */
-export async function getAllWishes() {
-  const { data, error } = await supabase
+export async function getAllWishes(client: SupabaseClient) {
+  const { data, error } = await client
     .from("wishes")
     .select("*")
     .order("plan_date", { ascending: true, nullsFirst: false })
@@ -143,13 +147,13 @@ export async function getAllWishes() {
  * 호출한 쪽은 다시 불러오지 않아도 됩니다. 실패해도 화면은 그대로 두고
  * 원래 목록을 돌려줍니다.
  */
-export async function releasePastWishes(wishes: Wish[]) {
+export async function releasePastWishes(client: SupabaseClient, wishes: Wish[]) {
   const today = new Date().toISOString().slice(0, 10);
   const stale = wishes.filter((w) => w.plan_date && w.plan_date < today);
   if (!stale.length) return wishes;
 
   const ids = stale.map((w) => w.id);
-  const { error } = await supabase.from("wishes").update({ plan_date: null }).in("id", ids);
+  const { error } = await client.from("wishes").update({ plan_date: null }).in("id", ids);
   if (error) {
     console.error(error.message);
     return wishes;

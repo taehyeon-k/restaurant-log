@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase/client";
 import { coverPhoto, type Restaurant } from "@/lib/types";
 import { Eyebrow, VerifiedMark, photoFill } from "./ui";
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { dottedDate, type Wish } from "@/lib/types";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase/client";
 import { useState } from "react";
 import { BellIcon, BookmarkIcon, ExternalLinkIcon } from "./ui";
 import { firstUrl, noteWithoutUrl } from "./WishForm";

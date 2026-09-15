@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase/client";
 import { dottedDate, verifiedDateTime, type Restaurant } from "@/lib/types";
 import { photosOf } from "./record";
 import { BookmarkIcon, Eyebrow, MobileStars, Pigs, VerifiedMark, photoFill } from "./ui";

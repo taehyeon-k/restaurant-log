@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/server";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -8,6 +8,7 @@ type Props = {
 
 export default async function RestaurantDetailPage({ params }: Props) {
   const { id } = await params;
+  const supabase = await createClient();
 
   const { data: restaurant, error } = await supabase
     .from("restaurants")

@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase/client";
 import {
   CATEGORIES,
   KEYWORDS,
@@ -172,12 +172,21 @@ useEffect(() => {
         cover_index: Math.min(cover, Math.max(0, photos.length - 1)),
       };
 
-      const { error } = initial
-        ? await supabase
-            .from("restaurants")
-            .update({ ...payload, updated_at: new Date().toISOString() })
-            .eq("id", initial.id)
-        : await supabase.from("restaurants").insert(payload);
+      let error;
+      if (initial) {
+        ({ error } = await supabase
+          .from("restaurants")
+          .update({ ...payload, updated_at: new Date().toISOString() })
+          .eq("id", initial.id));
+      } else {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (!user) throw new Error("로그인이 필요합니다");
+        ({ error } = await supabase
+          .from("restaurants")
+          .insert({ ...payload, user_id: user.id }));
+      }
 
       if (error) throw new Error(error.message);
 

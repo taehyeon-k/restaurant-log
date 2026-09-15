@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase/client";
 import { ALL_CATEGORIES, matchWish, type Wish } from "@/lib/types";
 import { forwardGeocode, type Place } from "@/lib/geocode";
 import { chipClass, Eyebrow, ToggleSwitch } from "./ui";
@@ -152,9 +152,19 @@ export default function WishForm({
       lng: spot?.lng ?? null,
     };
 
-    const { error } = isNew
-      ? await supabase.from("wishes").insert(payload)
-      : await supabase.from("wishes").update(payload).eq("id", wish!.id);
+    let error;
+    if (isNew) {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) {
+        setSaving(false);
+        return setError("로그인이 필요합니다");
+      }
+      ({ error } = await supabase.from("wishes").insert({ ...payload, user_id: user.id }));
+    } else {
+      ({ error } = await supabase.from("wishes").update(payload).eq("id", wish!.id));
+    }
 
     setSaving(false);
     if (error) return setError(error.message);

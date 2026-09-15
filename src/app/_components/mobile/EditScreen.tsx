@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase/client";
 import { CATEGORIES, findMatchingWish, KEYWORDS, verifiedDateTime, wishMetInfo, WISH_AUTO_M, type Kind, type MenuItem, type Restaurant, type Wish } from "@/lib/types";
 import { FELT_PRICE } from "@/lib/price";
 import { forwardGeocode } from "@/lib/geocode";
@@ -191,9 +191,15 @@ export default function EditScreen({
       const matchedWish = findMatchingWish(wishes, { name: cleanName, lat, lng }, WISH_AUTO_M);
       const fromWish = matchedWish ? wishMetInfo(matchedWish, visitedAt || today()) : null;
 
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error("로그인이 필요합니다");
+
       const { data, error } = await supabase
         .from("restaurants")
         .insert({
+          user_id: user.id,
           kind,
           region: finalRegion,
           place_key: `${cleanName}|${finalAddress ?? ""}`.toLowerCase(),

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase/client";
 import { releasePastWishes } from "@/lib/queries";
 import { dottedDate, type Wish } from "@/lib/types";
 import { BellIcon, BookmarkIcon, CameraIcon, Eyebrow, ExternalLinkIcon } from "./ui";
@@ -42,7 +42,7 @@ export default function WishScreen({
   useEffect(() => {
     if (swept.current) return;
     swept.current = true;
-    releasePastWishes(wishes).then((next) => {
+    releasePastWishes(supabase, wishes).then((next) => {
       if (next !== wishes) onChanged();
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps

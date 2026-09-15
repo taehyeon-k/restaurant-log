@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase/client";
 import { coverPhoto, type Restaurant } from "@/lib/types";
 import type { Place } from "@/lib/places";
 import Stars from "./Stars";

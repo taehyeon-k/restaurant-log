@@ -7,8 +7,10 @@ import {
   getRestaurant,
   searchRestaurants,
 } from "@/lib/queries";
+import { createClient } from "@/lib/supabase/server";
 import { CATEGORY_COLORS, parseBbox, type Kind, type Sort } from "@/lib/types";
 import { groupPlaces } from "@/lib/places";
+import type { AccountInfo } from "./_components/mobile/AccountScreen";
 import KindTabs from "./_components/KindTabs";
 import SearchBar from "./_components/SearchBar";
 import PlaceSearch from "./_components/PlaceSearch";
@@ -27,6 +29,25 @@ export default async function Home({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const sp = await searchParams;
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("nickname, avatar_url, created_at")
+    .eq("id", user.id)
+    .single();
+
+  const account: AccountInfo = {
+    nickname: profile?.nickname ?? "",
+    avatarUrl: profile?.avatar_url ?? null,
+    since: profile?.created_at ?? user.created_at,
+    providers: (user.identities ?? []).map((i) => i.provider),
+  };
 
   const kind: Kind = sp.kind === "cafe" ? "cafe" : "restaurant";
   const sort: Sort =
@@ -39,12 +60,12 @@ export default async function Home({
   const bbox = parseBbox(typeof sp.bbox === "string" ? sp.bbox : undefined);
 
   const [rows, facets, allRows, wishes] = await Promise.all([
-    searchRestaurants({ kind, q, categories, regions, keywords, revisitOnly, sort, bbox }),
-    getFacets(kind, bbox),
+    searchRestaurants(supabase, { kind, q, categories, regions, keywords, revisitOnly, sort, bbox }),
+    getFacets(supabase, kind, bbox),
     // 모바일 화면은 거르기·정렬을 브라우저에서 하므로 전체 목록을 함께 넘깁니다.
-    getAllRestaurants(),
+    getAllRestaurants(supabase),
     // 위시도 모바일 전용 화면(가고싶다 탭·지도·월력)이 씁니다.
-    getAllWishes(),
+    getAllWishes(supabase),
   ]);
   const places = groupPlaces(rows);
    // ?rid=기록번호 → 기록 하나 / ?place=키 → 가게 화면. 옛 ?id= 도 그대로 받습니다.
@@ -53,7 +74,7 @@ export default async function Home({
 
   const record =
     recordId != null && !Number.isNaN(recordId)
-      ? await getRestaurant(recordId)
+      ? await getRestaurant(supabase, recordId)
       : null;
 
   // 지워진 기록 번호가 주소에 남아 있으면 빈 창이 뜨지 않게 되돌립니다.
@@ -162,5 +183,5 @@ export default async function Home({
     </main>
   );
 
-  return <Shell rows={allRows} wishes={wishes} desktop={desktop} />;
+  return <Shell rows={allRows} wishes={wishes} account={account} desktop={desktop} />;
 }

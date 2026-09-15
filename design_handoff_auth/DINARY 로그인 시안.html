@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+<link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&amp;family=Noto+Sans+KR:wght@300;400;500;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; background: #e5e0d5; color: #1c1a17; font-family: "Noto Sans KR", sans-serif; -webkit-tap-highlight-color: transparent; }
+  a { color: #b4552d; text-decoration: none; }
+  a:hover { color: #8f4224; }
+  input, button { font-family: inherit; }
+</style>
+<template id="__bundler_thumbnail">
+  <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+    <rect width="200" height="200" fill="#b4552d"></rect>
+    <text x="100" y="124" text-anchor="middle" font-family="Georgia, serif" font-size="76" font-weight="700" fill="#fbfaf6">D</text>
+  </svg>
+</template>
+</helmet>
+
+<div style="min-height:100%; box-sizing:border-box; padding:56px 48px 72px; background:#e5e0d5">
+  <div style="max-width:1760px; margin:0 auto">
+    <div style="font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:.2em; color:#8a8377">ACCOUNT / 2026-09-15</div>
+    <h1 style="margin:10px 0 0; font-family:'Gowun Batang',serif; font-size:30px; font-weight:700">로그인과 내 기록장</h1>
+    <p style="margin:10px 0 0; max-width:620px; font-size:13.5px; line-height:1.75; color:#6b665e; text-wrap:pretty">앱을 열면 먼저 로그인합니다. 기록은 전부 비공개이고, 지도·캘린더·라벨첩은 로그인한 사람의 기록만 보여줍니다.</p>
+
+    <div style="margin-top:40px; display:flex; flex-wrap:wrap; gap:44px">
+
+      <div style="display:flex; flex-direction:column; gap:12px">
+        <div style="display:flex; align-items:baseline; gap:8px">
+          <span style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:.14em; color:#b4552d">01</span>
+          <span style="font-family:'Gowun Batang',serif; font-size:16px; font-weight:700">로그인</span>
+          <span style="font-size:11.5px; color:#8a8377">앱 첫 화면</span>
+        </div>
+        <div style="position:relative; width:390px; height:844px; box-sizing:border-box; border:1px solid #cfc8ba; border-radius:38px; background:#f6f3ec; box-shadow:0 18px 44px rgba(28,26,23,.14); overflow:hidden">
+          <div style="position:absolute; top:16px; left:0; right:0; display:flex; align-items:center; justify-content:space-between; padding:0 22px; font-family:'JetBrains Mono',monospace; font-size:11px; color:#6b665e">
+            <span>9:41</span><span style="letter-spacing:.1em">▮▮▮ ◗</span>
+          </div>
+
+          <div style="position:absolute; inset:0; display:flex; flex-direction:column; padding:132px 30px 40px; box-sizing:border-box">
+            <div style="text-align:center">
+              <div style="font-family:'Gowun Batang',serif; font-size:58px; font-weight:700; letter-spacing:.14em; color:#1c1a17; line-height:1">DINARY</div>
+              <div style="margin-top:12px; font-size:12px; letter-spacing:.02em; color:#b3aa9b">다이닝에 다이어리를 더하다.</div>
+            </div>
+
+            <div style="flex:1"></div>
+
+            <div style="display:flex; flex-direction:column; gap:11px">
+              <button style="display:flex; align-items:center; gap:12px; width:100%; min-height:54px; padding:0 18px; box-sizing:border-box; border:none; border-radius:16px; background:#fee500; font-size:15px; font-weight:500; color:#1c1a17; cursor:pointer; box-shadow:0 2px 8px rgba(28,26,23,.08)" style-hover="filter:brightness(.96)">
+                <span style="position:relative; display:block; width:22px; height:20px; border-radius:50%/58%; background:#1c1a17; flex-shrink:0">
+                  <span style="position:absolute; left:4px; bottom:-3px; width:6px; height:7px; background:#1c1a17; clip-path:polygon(0 0, 100% 0, 18% 100%)"></span>
+                </span>
+                <span style="flex:1; text-align:left">카카오로 시작하기</span>
+              </button>
+              <button style="display:flex; align-items:center; gap:12px; width:100%; min-height:54px; padding:0 18px; box-sizing:border-box; border:1px solid #d8d3c8; border-radius:16px; background:#fbfaf6; font-size:15px; font-weight:500; color:#1c1a17; cursor:pointer; box-shadow:0 2px 8px rgba(28,26,23,.05)" style-hover="background:#f2eee4">
+                <span style="display:grid; place-items:center; width:22px; height:22px; border:1px dashed #c3bcae; border-radius:50%; font-family:'JetBrains Mono',monospace; font-size:11px; color:#8a8377; flex-shrink:0">G</span>
+                <span style="flex:1; text-align:left">구글로 시작하기</span>
+              </button>
+            </div>
+
+            <sc-if value="{{ showGuestPeek }}" hint-placeholder-val="{{ false }}">
+              <button style="margin-top:14px; border:none; background:transparent; font-size:12.5px; color:#8a8377; text-decoration:underline; text-underline-offset:3px; cursor:pointer">로그인 없이 둘러보기</button>
+            </sc-if>
+
+            <p style="margin:18px 0 0; font-size:11px; line-height:1.7; color:#a29a8c; text-align:center; text-wrap:pretty">계속하면 <a href="#terms">이용약관</a>과 <a href="#privacy">개인정보 처리방침</a>에 동의하는 것으로 봅니다.</p>
+          </div>
+        </div>
+      </div>
+
+      <sc-if value="{{ showNickname }}" hint-placeholder-val="{{ true }}">
+      <div style="display:flex; flex-direction:column; gap:12px">
+        <div style="display:flex; align-items:baseline; gap:8px">
+          <span style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:.14em; color:#b4552d">02</span>
+          <span style="font-family:'Gowun Batang',serif; font-size:16px; font-weight:700">닉네임 정하기</span>
+          <span style="font-size:11.5px; color:#8a8377">첫 로그인에만</span>
+        </div>
+        <div style="position:relative; width:390px; height:844px; box-sizing:border-box; border:1px solid #cfc8ba; border-radius:38px; background:#f6f3ec; box-shadow:0 18px 44px rgba(28,26,23,.14); overflow:hidden">
+          <div style="position:absolute; top:16px; left:0; right:0; display:flex; align-items:center; justify-content:space-between; padding:0 22px; font-family:'JetBrains Mono',monospace; font-size:11px; color:#6b665e">
+            <span>9:41</span><span style="letter-spacing:.1em">▮▮▮ ◗</span>
+          </div>
+
+          <div style="position:absolute; inset:0; display:flex; flex-direction:column; padding:96px 30px 40px; box-sizing:border-box">
+            <div style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:.18em; color:#8a8377">STEP 1 / 1</div>
+            <h2 style="margin:12px 0 0; font-family:'Gowun Batang',serif; font-size:24px; font-weight:700">어떻게 부를까요?</h2>
+            <p style="margin:9px 0 0; font-size:12.5px; line-height:1.75; color:#8a8377">기록장 맨 위에 쓰입니다. 나중에 바꿀 수 있습니다.</p>
+
+            <div style="margin-top:34px; display:flex; align-items:center; gap:16px">
+              <div style="position:relative; display:grid; place-items:center; width:78px; height:78px; border:1px solid #d8d3c8; border-radius:50%; background:repeating-linear-gradient(135deg, #efe9dc 0 7px, #e7e0d1 7px 14px)">
+                <span style="font-family:'JetBrains Mono',monospace; font-size:8.5px; letter-spacing:.06em; color:#8a8377">PHOTO</span>
+              </div>
+              <button style="min-height:38px; padding:0 14px; border:1px solid #d8d3c8; border-radius:19px; background:#fbfaf6; font-size:12.5px; color:#1c1a17; cursor:pointer" style-hover="background:#f2eee4">사진 고르기</button>
+            </div>
+
+            <div style="margin-top:34px">
+              <div style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:.12em; color:#8a8377">NICKNAME</div>
+              <div style="margin-top:8px; display:flex; align-items:center; gap:10px; border-bottom:1.5px solid #b4552d; padding-bottom:9px">
+                <span style="flex:1; font-family:'Gowun Batang',serif; font-size:21px; font-weight:700; color:#1c1a17">태현</span>
+                <span style="font-family:'JetBrains Mono',monospace; font-size:10.5px; color:#a29a8c">2/12</span>
+              </div>
+              <div style="margin-top:9px; font-size:11.5px; color:#8a8377">카카오 계정 이름을 가져왔습니다.</div>
+            </div>
+
+            <div style="flex:1"></div>
+
+            <button style="width:100%; min-height:54px; border:none; border-radius:16px; background:#b4552d; font-size:15px; font-weight:500; color:#fbfaf6; cursor:pointer; box-shadow:0 6px 16px rgba(160,74,38,.22)" style-hover="background:#a04a26">기록 시작하기</button>
+          </div>
+        </div>
+      </div>
+      </sc-if>
+
+      <div style="display:flex; flex-direction:column; gap:12px">
+        <div style="display:flex; align-items:baseline; gap:8px">
+          <span style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:.14em; color:#b4552d">03</span>
+          <span style="font-family:'Gowun Batang',serif; font-size:16px; font-weight:700">프로필</span>
+          <span style="font-size:11.5px; color:#8a8377">탭바 맨 오른쪽</span>
+        </div>
+        <div style="position:relative; width:390px; height:844px; box-sizing:border-box; border:1px solid #cfc8ba; border-radius:38px; background:#f6f3ec; box-shadow:0 18px 44px rgba(28,26,23,.14); overflow:hidden">
+          <div style="position:absolute; top:16px; left:0; right:0; display:flex; align-items:center; justify-content:space-between; padding:0 22px; font-family:'JetBrains Mono',monospace; font-size:11px; color:#6b665e">
+            <span>9:41</span><span style="letter-spacing:.1em">▮▮▮ ◗</span>
+          </div>
+
+          <div style="position:absolute; top:0; left:0; right:0; bottom:74px; overflow:hidden; padding:62px 20px 20px; box-sizing:border-box">
+            <div style="display:flex; align-items:center; justify-content:space-between">
+              <div style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:.18em; color:#8a8377">PROFILE</div>
+              <button style="display:grid; place-items:center; width:34px; height:34px; border:1px solid #d8d3c8; border-radius:50%; background:#fbfaf6; cursor:pointer" style-hover="background:#f2eee4">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b665e" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="3.2"></circle><path d="M12 3.4v2.2M12 18.4v2.2M20.6 12h-2.2M5.6 12H3.4M18 6l-1.6 1.6M7.6 16.4L6 18M18 18l-1.6-1.6M7.6 7.6L6 6"></path></svg>
+              </button>
+            </div>
+
+            <div style="margin-top:16px; display:flex; align-items:center; gap:14px">
+              <div style="display:grid; place-items:center; width:64px; height:64px; border:1px solid #d8d3c8; border-radius:50%; background:repeating-linear-gradient(135deg, #efe9dc 0 7px, #e7e0d1 7px 14px); flex-shrink:0">
+                <span style="font-family:'JetBrains Mono',monospace; font-size:8.5px; color:#8a8377">PHOTO</span>
+              </div>
+              <div style="min-width:0">
+                <div style="font-family:'Gowun Batang',serif; font-size:21px; font-weight:700">태현</div>
+                <div style="margin-top:5px; display:flex; align-items:center; gap:7px">
+                  <span style="display:flex; align-items:center; gap:5px; border-radius:11px; background:#f5edd8; padding:3px 8px; font-size:10.5px; color:#6b665e">
+                    <span style="width:7px; height:7px; border-radius:50%; background:#1c1a17"></span>카카오 연결됨
+                  </span>
+                  <span style="font-family:'JetBrains Mono',monospace; font-size:10px; color:#a29a8c">SINCE 2026.03</span>
+                </div>
+              </div>
+            </div>
+
+            <div style="margin-top:18px; display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); border:1px solid #e2dccf; border-radius:18px; background:#fbfaf6; overflow:hidden">
+              <div style="padding:14px 10px; text-align:center">
+                <div style="font-family:'JetBrains Mono',monospace; font-size:22px; color:#1c1a17">128</div>
+                <div style="margin-top:4px; font-size:11px; color:#8a8377">기록</div>
+              </div>
+              <div style="padding:14px 10px; text-align:center; border-left:1px solid #e2dccf; border-right:1px solid #e2dccf">
+                <div style="font-family:'JetBrains Mono',monospace; font-size:22px; color:#b4552d">91</div>
+                <div style="margin-top:4px; font-size:11px; color:#8a8377">인증</div>
+              </div>
+              <div style="padding:14px 10px; text-align:center">
+                <div style="font-family:'JetBrains Mono',monospace; font-size:22px; color:#1c1a17">64</div>
+                <div style="margin-top:4px; font-size:11px; color:#8a8377">식당</div>
+              </div>
+            </div>
+
+            <div style="margin-top:20px; display:flex; align-items:baseline; justify-content:space-between">
+              <span style="font-family:'Gowun Batang',serif; font-size:15px; font-weight:700">모은 라벨</span>
+              <span style="font-family:'JetBrains Mono',monospace; font-size:10.5px; color:#a29a8c">9 / 12</span>
+            </div>
+            <div style="margin-top:10px; display:flex; flex-wrap:wrap; gap:7px">
+              <span style="border:1px solid #e0c3b1; border-radius:13px; background:#f9f0e9; padding:5px 11px; font-size:11.5px; color:#b4552d">노포</span>
+              <span style="border:1px solid #e0c3b1; border-radius:13px; background:#f9f0e9; padding:5px 11px; font-size:11.5px; color:#b4552d">혼밥</span>
+              <span style="border:1px solid #e0c3b1; border-radius:13px; background:#f9f0e9; padding:5px 11px; font-size:11.5px; color:#b4552d">국물</span>
+              <span style="border:1px solid #e2dccf; border-radius:13px; background:#efe9dc; padding:5px 11px; font-size:11.5px; color:#8a8377">+6</span>
+            </div>
+
+            <div style="margin-top:22px; border:1px solid #e2dccf; border-radius:18px; background:#fbfaf6; overflow:hidden">
+              <button style="display:flex; align-items:center; justify-content:space-between; width:100%; min-height:50px; padding:0 16px; border:none; background:transparent; font-size:13.5px; color:#1c1a17; cursor:pointer" style-hover="background:#f2eee4">
+                <span>계정 연결</span><span style="font-family:'JetBrains Mono',monospace; font-size:11px; color:#a29a8c">카카오 · 구글 미연결</span>
+              </button>
+              <button style="display:flex; align-items:center; justify-content:space-between; width:100%; min-height:50px; padding:0 16px; border:none; border-top:1px solid #ece6d9; background:transparent; font-size:13.5px; color:#1c1a17; cursor:pointer" style-hover="background:#f2eee4">
+                <span>기록 내려받기</span><span style="font-size:13px; color:#c3bcae">›</span>
+              </button>
+              <button style="display:flex; align-items:center; justify-content:space-between; width:100%; min-height:50px; padding:0 16px; border:none; border-top:1px solid #ece6d9; background:transparent; font-size:13.5px; color:#1c1a17; cursor:pointer" style-hover="background:#f2eee4">
+                <span>로그아웃</span><span style="font-size:13px; color:#c3bcae">›</span>
+              </button>
+              <button style="display:flex; align-items:center; justify-content:space-between; width:100%; min-height:50px; padding:0 16px; border:none; border-top:1px solid #ece6d9; background:transparent; font-size:13.5px; color:#8a8377; cursor:pointer" style-hover="background:#f2eee4">
+                <span>회원 탈퇴</span><span style="font-size:13px; color:#c3bcae">›</span>
+              </button>
+            </div>
+          </div>
+
+          <div style="position:absolute; left:0; right:0; bottom:0; height:74px; display:grid; grid-template-columns:repeat(5, 1fr); align-items:center; border-top:1px solid #e2dccf; background:#fbfaf6; padding-bottom:10px; box-sizing:border-box">
+            <div style="display:grid; place-items:center; gap:4px; font-size:10px; color:#a29a8c"><span style="font-size:15px">◎</span>지도</div>
+            <div style="display:grid; place-items:center; gap:4px; font-size:10px; color:#a29a8c"><span style="font-size:15px">▦</span>캘린더</div>
+            <div style="display:grid; place-items:center; gap:4px; font-size:10px; color:#a29a8c"><span style="font-size:15px">✦</span>라벨첩</div>
+            <div style="display:grid; place-items:center; gap:4px; font-size:10px; color:#a29a8c"><span style="font-size:15px">♡</span>위시</div>
+            <div style="display:grid; place-items:center; gap:4px; font-size:10px; color:#b4552d"><span style="font-size:15px">●</span>프로필</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:12px">
+        <div style="display:flex; align-items:baseline; gap:8px">
+          <span style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:.14em; color:#b4552d">04</span>
+          <span style="font-family:'Gowun Batang',serif; font-size:16px; font-weight:700">데스크톱 로그인</span>
+          <span style="font-size:11.5px; color:#8a8377">1280 × 800</span>
+        </div>
+        <div style="position:relative; width:1280px; height:800px; box-sizing:border-box; border:1px solid #cfc8ba; border-radius:12px; background:#f6f3ec; box-shadow:0 18px 44px rgba(28,26,23,.14); overflow:hidden">
+          <div style="position:absolute; inset:0; display:grid; place-items:center">
+            <div style="display:flex; flex-direction:column; align-items:center; width:392px">
+              <div style="font-family:'Gowun Batang',serif; font-size:68px; font-weight:700; letter-spacing:.16em; color:#1c1a17; line-height:1; text-indent:.16em">DINARY</div>
+              <div style="margin-top:16px; font-size:13px; color:#b3aa9b">다이닝에 다이어리를 더하다.</div>
+
+              <div style="margin-top:52px; display:flex; flex-direction:column; gap:12px; width:100%">
+                <button style="display:flex; align-items:center; gap:12px; width:100%; min-height:56px; padding:0 20px; box-sizing:border-box; border:none; border-radius:16px; background:#fee500; font-size:15.5px; font-weight:500; color:#1c1a17; cursor:pointer; box-shadow:0 2px 8px rgba(28,26,23,.08)" style-hover="filter:brightness(.96)">
+                  <span style="position:relative; display:block; width:22px; height:20px; border-radius:50%/58%; background:#1c1a17; flex-shrink:0">
+                    <span style="position:absolute; left:4px; bottom:-3px; width:6px; height:7px; background:#1c1a17; clip-path:polygon(0 0, 100% 0, 18% 100%)"></span>
+                  </span>
+                  <span style="flex:1; text-align:left">카카오로 시작하기</span>
+                </button>
+                <button style="display:flex; align-items:center; gap:12px; width:100%; min-height:56px; padding:0 20px; box-sizing:border-box; border:1px solid #d8d3c8; border-radius:16px; background:#fbfaf6; font-size:15.5px; font-weight:500; color:#1c1a17; cursor:pointer; box-shadow:0 2px 8px rgba(28,26,23,.05)" style-hover="background:#f2eee4">
+                  <span style="display:grid; place-items:center; width:22px; height:22px; border:1px dashed #c3bcae; border-radius:50%; font-family:'JetBrains Mono',monospace; font-size:11px; color:#8a8377; flex-shrink:0">G</span>
+                  <span style="flex:1; text-align:left">구글로 시작하기</span>
+                </button>
+              </div>
+
+              <p style="margin:26px 0 0; font-size:11.5px; line-height:1.7; color:#a29a8c; text-align:center">계속하면 <a href="#terms">이용약관</a>과 <a href="#privacy">개인정보 처리방침</a>에 동의하는 것으로 봅니다.</p>
+            </div>
+          </div>
+
+          <div style="position:absolute; left:0; right:0; bottom:0; display:flex; align-items:center; justify-content:space-between; padding:0 28px; height:52px; font-family:'JetBrains Mono',monospace; font-size:10.5px; letter-spacing:.06em; color:#b3aa9b">
+            <span>DINARY</span><span>기록은 나만 봅니다</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="width:330px; display:flex; flex-direction:column; gap:12px">
+        <div style="display:flex; align-items:baseline; gap:8px">
+          <span style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:.14em; color:#b4552d">05</span>
+          <span style="font-family:'Gowun Batang',serif; font-size:16px; font-weight:700">규칙</span>
+        </div>
+        <div style="border:1px solid #d8d3c8; border-radius:22px; background:#fbfaf6; padding:22px 20px">
+          <div style="display:flex; flex-direction:column; gap:16px; font-size:12.5px; line-height:1.75; color:#3c3833">
+            <div>
+              <div style="font-family:'Gowun Batang',serif; font-weight:700; font-size:13.5px">전부 로그인</div>
+              <div style="margin-top:4px; color:#6b665e">로그인하지 않으면 지도까지 닿지 못합니다. 세션이 없으면 로그인 화면으로 보냅니다.</div>
+            </div>
+            <div>
+              <div style="font-family:'Gowun Batang',serif; font-weight:700; font-size:13.5px">완전 비공개</div>
+              <div style="margin-top:4px; color:#6b665e">기록·사진·위시·인증은 전부 본인만 읽고 씁니다. 남의 기록은 지도에 점으로도 뜨지 않습니다.</div>
+            </div>
+            <div>
+              <div style="font-family:'Gowun Batang',serif; font-weight:700; font-size:13.5px">기존 기록</div>
+              <div style="margin-top:4px; color:#6b665e">지금 저장소에 있는 기록은 전부 내 계정 하나로 귀속시킵니다.</div>
+            </div>
+            <div>
+              <div style="font-family:'Gowun Batang',serif; font-weight:700; font-size:13.5px">인증은 그대로</div>
+              <div style="margin-top:4px; color:#6b665e">인증마크는 촬영 자리에서만 찍힙니다. 계정이 생겨도 규칙은 바뀌지 않습니다.</div>
+            </div>
+          </div>
+          <div style="margin-top:20px; border-top:1px solid #ece6d9; padding-top:14px; font-size:11.5px; line-height:1.7; color:#8a8377">
+            반영 지시서: <a href="design_handoff_auth/HANDOFF-auth.md">design_handoff_auth/HANDOFF-auth.md</a>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;showGuestPeek&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;},&quot;showNickname&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      showGuestPeek: this.props.showGuestPeek ?? false,
+      showNickname: this.props.showNickname ?? true,
+    };
+  }
+}
+</script>
+</body>
+</html>

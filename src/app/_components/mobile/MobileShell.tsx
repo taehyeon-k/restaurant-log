@@ -23,6 +23,7 @@ import WishScreen from "./WishScreen";
 import WishForm, { type WishFormTarget } from "./WishForm";
 import WishSheet from "./WishSheet";
 import SearchMissSheet from "./SearchMissSheet";
+import AccountScreen, { type AccountInfo } from "./AccountScreen";
 import { BookmarkIcon, BURST, DraftsBoxIcon, Eyebrow, PlusIcon, SearchIcon } from "./ui";
 
 /**
@@ -73,7 +74,15 @@ const uniq = (list: (string | null | undefined)[]) => [
 
 const EASE = "cubic-bezier(.32,.72,0,1)";
 
-export default function MobileShell({ rows, wishes }: { rows: Restaurant[]; wishes: Wish[] }) {
+export default function MobileShell({
+  rows,
+  wishes,
+  account,
+}: {
+  rows: Restaurant[];
+  wishes: Wish[];
+  account: AccountInfo;
+}) {
   const router = useRouter();
 
   const [kind, setKind] = useState<Kind>("restaurant");
@@ -527,10 +536,6 @@ export default function MobileShell({ rows, wishes }: { rows: Restaurant[]; wish
     ...(verifiedOnly ? [{ key: "verified", label: "인증된 기록", onClear: () => setVerifiedOnly(false) }] : []),
   ];
 
-  const TAB_TITLE: Record<Exclude<Tab, "map" | "calendar" | "wish">, string> = {
-    account: "내계정",
-  };
-
   const openWish = openWishId ? wishes.find((w) => w.id === openWishId) ?? null : null;
 
   return (
@@ -908,13 +913,7 @@ export default function MobileShell({ rows, wishes }: { rows: Restaurant[]; wish
         />
       )}
 
-      {/* 아직 만들지 않은 탭 — 지도·월력·가고싶다 탭은 각자 화면이 있습니다 */}
-      {tab !== "map" && tab !== "calendar" && tab !== "wish" && (
-        <div className="absolute inset-x-0 top-0 bottom-[74px] z-[1160] flex flex-col items-center justify-center gap-2.5 bg-paper">
-          <div className="font-serif text-[19px] font-bold">{TAB_TITLE[tab]}</div>
-          <div className="text-[12.5px] text-faint">이 화면은 아직 만들지 않았습니다</div>
-        </div>
-      )}
+      {tab === "account" && <AccountScreen account={account} rows={rows} wishes={wishes} />}
 
       {foundHit && (
         <div className="absolute inset-x-0 top-0 bottom-[74px] z-[1150] flex flex-col justify-end">
