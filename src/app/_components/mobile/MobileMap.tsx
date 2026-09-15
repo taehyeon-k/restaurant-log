@@ -296,7 +296,7 @@ const MobileMap = forwardRef<MapHandle, {
     if (readyRef.current) sync();
   }, [wishes, markerFilter, places]);
 
-  return <div ref={containerRef} className="naver-map-tone absolute inset-x-0 top-0 h-[620px] w-full" />;
+  return <div ref={containerRef} className="naver-map-tone absolute inset-0 h-full w-full" />;
 });
 
 export default MobileMap;
