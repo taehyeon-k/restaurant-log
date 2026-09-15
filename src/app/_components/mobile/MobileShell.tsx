@@ -218,6 +218,8 @@ export default function MobileShell({ rows, wishes }: { rows: Restaurant[]; wish
   const applyViewBounds = useCallback(() => {
     const bounds = mapRef.current?.getBounds();
     if (!bounds) return;
+    // 목록만 지금 보이는 범위로 줄입니다 — 지도는 사용자가 원하는 자리에 그대로 둡니다.
+    mapRef.current?.holdFit();
     setViewBounds(bounds);
     setMapMoved(false);
     setSnap((s) => (s === "peek" ? "low" : s));
@@ -358,7 +360,6 @@ export default function MobileShell({ rows, wishes }: { rows: Restaurant[]; wish
     setVerifiedOnly(false);
     setViewBounds(null);
     setMapMoved(false);
-    setSnap("high");
     setRegionView({ name, count: rowsInRegion.length });
 
     const points = rowsInRegion

@@ -21,6 +21,12 @@ export type MapHandle = {
   invalidate: () => void;
   /** 지금 보이는 지도 범위 — 「현 지도에 있는 기록만」(HANDOFF-SEARCH-20260914.md §4). */
   getBounds: () => ViewBounds | null;
+  /**
+   * 다음 마커 목록 변화 한 번은 범위 맞추기를 건너뜁니다 — 「현 지도에 있는 기록만」을
+   * 누르면 목록이 지금 보이는 범위로 줄어들 뿐인데, 그 줄어든 점들에 맞춰 지도가
+   * 다시 확대·이동하면 안 됩니다(지도는 이미 사용자가 원하는 자리에 있습니다).
+   */
+  holdFit: () => void;
 };
 
 const norm = (s: string) => s.replace(/\s+/g, "").toLowerCase();
@@ -93,6 +99,8 @@ const MobileMap = forwardRef<MapHandle, {
    * 첫 idle 도 사용자가 손댄 게 아니므로 true 로 시작합니다.
    */
   const suppressMoveRef = useRef(true);
+  /** holdFit() 이 다음 한 번의 범위 맞추기를 건너뛰게 세우는 깃발. */
+  const holdFitRef = useRef(false);
   useEffect(() => { onSelectRef.current = onSelect; }, [onSelect]);
   useEffect(() => { onGhostClickRef.current = onGhostClick; }, [onGhostClick]);
   useEffect(() => { onSelectWishRef.current = onSelectWish; }, [onSelectWish]);
@@ -133,6 +141,7 @@ const MobileMap = forwardRef<MapHandle, {
       const b = map.getBounds() as naver.maps.LatLngBounds;
       return { s: b.south(), w: b.west(), n: b.north(), e: b.east() };
     },
+    holdFit: () => { holdFitRef.current = true; },
   }), []);
 
   useEffect(() => {
@@ -239,7 +248,7 @@ const MobileMap = forwardRef<MapHandle, {
       // 두고 카메라는 움직이지 않습니다 — 그래야 그 시트가 닫힐 때 갑자기 전체 범위로
       // 튀지 않습니다.
       lastFit.current = key;
-      if (frozen) return;
+      if (frozen || holdFitRef.current) { holdFitRef.current = false; return; }
       suppressMoveRef.current = true;
       if (all.length === 1) { map.morph(new naver.maps.LatLng(all[0].lat, all[0].lng), 15, { duration: 500 }); return; }
       const bounds = new naver.maps.LatLngBounds(new naver.maps.LatLng(all[0].lat, all[0].lng), new naver.maps.LatLng(all[0].lat, all[0].lng));
