@@ -23,7 +23,7 @@ export default function VerifiedMark({
    * R(45)·T 가 되어 바깥 rotate(-45) 와 상쇄되고) 화면 기준 수직 이동만
    * 남아 항상 곧게 위로 올라갑니다.
    */
-  const centerNudge = drop * 0.09;
+  const centerNudge = drop * 0.02;
 
   const dropShadow = shadow ? "drop-shadow(1px -1px 4px rgba(28,26,23,.22))" : undefined;
 
