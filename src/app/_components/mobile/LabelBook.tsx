@@ -27,6 +27,7 @@ export default function LabelBook({
   const router = useRouter();
   const [titleId, setTitleId] = useState(titleLabelId);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
 
   const labels = earnedLabels(rows);
   const got = labels.filter((l) => l.earned).length;
@@ -37,17 +38,23 @@ export default function LabelBook({
     if (busy) return;
     const next = titleId === id ? null : id;
     setBusy(true);
+    setError("");
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    if (user) {
-      const { error } = await supabase.from("profiles").upsert({ id: user.id, title_label_id: next });
-      if (!error) {
-        setTitleId(next);
-        router.refresh();
-      }
+    if (!user) {
+      setError("로그인이 필요합니다");
+      setBusy(false);
+      return;
     }
+    const { error } = await supabase.from("profiles").upsert({ id: user.id, title_label_id: next });
     setBusy(false);
+    if (error) {
+      setError(error.message);
+      return;
+    }
+    setTitleId(next);
+    router.refresh();
   }
 
   return (
@@ -72,6 +79,7 @@ export default function LabelBook({
           모은 라벨 {got} / {labels.length}
         </div>
         <div className="mt-1 text-[11px] text-faint">탭하면 닉네임 옆 대표 라벨로 붙습니다</div>
+        {error && <div className="mt-1.5 text-[11px] text-brick">{error}</div>}
       </div>
 
       <div

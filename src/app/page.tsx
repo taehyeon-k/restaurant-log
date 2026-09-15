@@ -36,11 +36,19 @@ export default async function Home({
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: profile } = await supabase
+  const { data: profile, error: profileError } = await supabase
     .from("profiles")
     .select("nickname, avatar_url, created_at, title_label_id")
     .eq("id", user.id)
     .single();
+
+  // 이 select 가 실패하면(예: title_label_id 처럼 새 컬럼을 추가한 마이그레이션을
+  // 프로덕션 Supabase 에 아직 안 돌린 경우) profile 이 조용히 null 이 되고,
+  // 닉네임이 실제로는 저장돼 있어도 화면엔 "이름 없음"으로만 보입니다.
+  // 그런 착오를 막기 위해 실패 원인을 서버 로그에 남깁니다.
+  if (profileError) {
+    console.error("profiles 조회 실패 — 마이그레이션이 밀렸을 수 있습니다:", profileError);
+  }
 
   const account: AccountInfo = {
     nickname: profile?.nickname ?? "",

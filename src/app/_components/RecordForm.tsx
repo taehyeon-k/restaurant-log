@@ -242,7 +242,9 @@ useEffect(() => {
             onPick={(p) => {
               setLat(p.lat);
               setLng(p.lng);
-              
+              // 모바일 WishForm 과 같은 규칙: 이름을 아직 직접 안 적었을 때만
+              // 검색으로 고른 가게 이름을 채웁니다(이미 적어둔 이름은 덮어쓰지 않음).
+              if (p.name && !name.trim()) setName(p.name);
             }}
           />
         </div>
