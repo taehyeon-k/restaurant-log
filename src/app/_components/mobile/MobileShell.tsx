@@ -206,6 +206,12 @@ export default function MobileShell({ rows, wishes }: { rows: Restaurant[]; wish
     });
   }, [allPlaces, q, categories, keywords, revisitOnly, verifiedOnly, viewBounds, sort]);
 
+  /** 「기록」 갯수 — 가게(filtered)에 걸린 조건 그대로, 그 가게들의 방문 건수 합. */
+  const filteredVisitCount = useMemo(
+    () => filtered.reduce((sum, p) => sum + p.visits.length, 0),
+    [filtered]
+  );
+
   const place = placeKey ? allPlaces.find((p) => p.key === placeKey) ?? null : null;
   const visit = visitId != null ? rows.find((r) => r.id === visitId) ?? null : null;
   const visitPlace = visit
@@ -749,7 +755,7 @@ export default function MobileShell({ rows, wishes }: { rows: Restaurant[]; wish
         {sheetH < COMPACT_BELOW ? (
           <div className="flex shrink-0 items-center justify-between gap-2 px-5 pb-3">
             <div className="min-w-0 truncate font-mono text-[11.5px] text-faint">
-              {kind === "cafe" ? "카페 기록" : "맛집 기록"} · 가게 {filtered.length} · 기록 {inKind.length}
+              {kind === "cafe" ? "카페 기록" : "맛집 기록"} · 가게 {filtered.length} · 기록 {filteredVisitCount}
             </div>
             {mapChipVisible && (
               <button
@@ -769,7 +775,7 @@ export default function MobileShell({ rows, wishes }: { rows: Restaurant[]; wish
         ) : (
           <>
             <div className="flex shrink-0 items-center gap-2 px-5 pb-2.5">
-              <div className="min-w-0 shrink-0"><div className="font-serif text-[18px] font-bold">{kind === "cafe" ? "카페 기록" : "맛집 기록"}</div><div className="mt-[3px] font-mono text-[10.5px] text-faint">가게 {filtered.length} · 기록 {inKind.length}</div></div>
+              <div className="min-w-0 shrink-0"><div className="font-serif text-[18px] font-bold">{kind === "cafe" ? "카페 기록" : "맛집 기록"}</div><div className="mt-[3px] font-mono text-[10.5px] text-faint">가게 {filtered.length} · 기록 {filteredVisitCount}</div></div>
               <div className="flex h-10 min-w-0 flex-1 items-center gap-2 rounded-[20px] border border-[#ded8cb] bg-card px-3"><SearchIcon size={14} /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="내 기록에서 찾기" className="min-w-0 flex-1 bg-transparent text-[12.5px] text-ink outline-none placeholder:text-[#a8a196]" /></div>
               <button
                 type="button"
