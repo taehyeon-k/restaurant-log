@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { earnedLabels } from "@/lib/labels";
+import { uploadPhoto } from "@/lib/photos";
 import type { Restaurant, Wish } from "@/lib/types";
 import { Eyebrow, photoFill } from "./ui";
 
@@ -89,6 +90,9 @@ export default function AccountScreen({
   wishes: Wish[];
 }) {
   const router = useRouter();
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [avatarUrl, setAvatarUrl] = useState(account.avatarUrl);
+  const [avatarBusy, setAvatarBusy] = useState(false);
   const [busy, setBusy] = useState<"logout" | "delete" | null>(null);
   const [error, setError] = useState("");
 
@@ -102,6 +106,41 @@ export default function AccountScreen({
   const connectedLine = account.providers.length
     ? account.providers.map((p) => PROVIDER_LABEL[p] ?? p).join(" · ") + " 연결됨"
     : "연결된 계정 없음";
+
+  async function saveAvatar(url: string | null) {
+    setAvatarBusy(true);
+    setError("");
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      setError("로그인이 필요합니다");
+      setAvatarBusy(false);
+      return;
+    }
+    const { error } = await supabase.from("profiles").upsert({ id: user.id, avatar_url: url });
+    setAvatarBusy(false);
+    if (error) {
+      setError(error.message);
+      return;
+    }
+    setAvatarUrl(url);
+    router.refresh();
+  }
+
+  async function handlePhoto(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setAvatarBusy(true);
+    setError("");
+    try {
+      await saveAvatar(await uploadPhoto(file, file.name));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "사진을 올리지 못했습니다");
+      setAvatarBusy(false);
+    }
+  }
 
   async function logout() {
     setBusy("logout");
@@ -136,10 +175,20 @@ export default function AccountScreen({
       <Eyebrow wide>PROFILE</Eyebrow>
 
       <div className="mt-4 flex items-center gap-3.5">
-        <div
-          className="size-16 shrink-0 rounded-full border border-line"
-          style={photoFill(account.avatarUrl, null)}
-        />
+        <button
+          type="button"
+          onClick={() => fileRef.current?.click()}
+          disabled={avatarBusy}
+          aria-label="프로필 사진 바꾸기"
+          className="relative size-16 shrink-0 cursor-pointer rounded-full border border-line bg-transparent p-0 disabled:opacity-70"
+          style={photoFill(avatarUrl, null)}
+        >
+          <span className="absolute -right-[2px] -bottom-[2px] grid size-[22px] place-items-center rounded-full border-2 border-paper bg-ink text-[10px] text-card">
+            ✎
+          </span>
+        </button>
+        <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handlePhoto} />
+
         <div className="min-w-0">
           <div className="truncate font-serif text-[21px] font-bold">
             {account.nickname || "이름 없음"}
@@ -150,6 +199,26 @@ export default function AccountScreen({
               {connectedLine}
             </span>
             <span className="font-mono text-[10px] text-faint">{since(account.since)}</span>
+          </div>
+          <div className="mt-1.5 flex items-center gap-2.5 text-[11px]">
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              disabled={avatarBusy}
+              className="cursor-pointer border-none bg-transparent p-0 text-brick disabled:opacity-60"
+            >
+              {avatarBusy ? "처리하는 중…" : "사진 바꾸기"}
+            </button>
+            {avatarUrl && (
+              <button
+                type="button"
+                onClick={() => saveAvatar(null)}
+                disabled={avatarBusy}
+                className="cursor-pointer border-none bg-transparent p-0 text-faint disabled:opacity-60"
+              >
+                기본 이미지로
+              </button>
+            )}
           </div>
         </div>
       </div>
