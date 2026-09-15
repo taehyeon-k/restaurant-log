@@ -109,7 +109,11 @@ export default function LoginScreen() {
     setError("");
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
-      options: { redirectTo: `${window.location.origin}/auth/callback` },
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+        // 카카오는 이메일 동의항목을 쓰지 않습니다(HANDOFF-auth.md §1) — 닉네임·프로필 사진만 요청합니다.
+        ...(provider === "kakao" ? { scopes: "profile_nickname profile_image" } : {}),
+      },
     });
     if (error) {
       setError(error.message);
