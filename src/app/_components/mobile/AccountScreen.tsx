@@ -15,6 +15,8 @@ export type AccountInfo = {
   since: string;
   /** 연결된 로그인 수단, 예: ["kakao"] */
   providers: string[];
+  /** 닉네임 옆에 내건 대표 라벨(src/lib/labels.ts LABELS 의 id). 없으면 null. */
+  titleLabelId: string | null;
 };
 
 const PROVIDER_LABEL: Record<string, string> = { kakao: "카카오", google: "구글" };
@@ -84,15 +86,20 @@ export default function AccountScreen({
   account,
   rows,
   wishes,
+  onOpenLabels,
 }: {
   account: AccountInfo;
   rows: Restaurant[];
   wishes: Wish[];
+  /** 라벨첩(전체 목록)을 여는 함수 — 상위 MobileShell 이 관리합니다. */
+  onOpenLabels: () => void;
 }) {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
   const [avatarUrl, setAvatarUrl] = useState(account.avatarUrl);
   const [avatarBusy, setAvatarBusy] = useState(false);
+  const [titleLabelId, setTitleLabelId] = useState(account.titleLabelId);
+  const [labelBusy, setLabelBusy] = useState(false);
   const [busy, setBusy] = useState<"logout" | "delete" | null>(null);
   const [error, setError] = useState("");
 
@@ -102,6 +109,7 @@ export default function AccountScreen({
 
   const labels = earnedLabels(rows);
   const got = labels.filter((l) => l.earned);
+  const titleLabel = titleLabelId ? got.find((l) => l.id === titleLabelId) ?? null : null;
 
   const connectedLine = account.providers.length
     ? account.providers.map((p) => PROVIDER_LABEL[p] ?? p).join(" · ") + " 연결됨"
@@ -140,6 +148,29 @@ export default function AccountScreen({
       setError(err instanceof Error ? err.message : "사진을 올리지 못했습니다");
       setAvatarBusy(false);
     }
+  }
+
+  async function selectTitleLabel(id: string) {
+    if (labelBusy) return;
+    const next = titleLabelId === id ? null : id;
+    setLabelBusy(true);
+    setError("");
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      setError("로그인이 필요합니다");
+      setLabelBusy(false);
+      return;
+    }
+    const { error } = await supabase.from("profiles").upsert({ id: user.id, title_label_id: next });
+    setLabelBusy(false);
+    if (error) {
+      setError(error.message);
+      return;
+    }
+    setTitleLabelId(next);
+    router.refresh();
   }
 
   async function logout() {
@@ -190,8 +221,22 @@ export default function AccountScreen({
         <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handlePhoto} />
 
         <div className="min-w-0">
-          <div className="truncate font-serif text-[21px] font-bold">
-            {account.nickname || "이름 없음"}
+          <div className="flex min-w-0 items-center gap-1.5">
+            <span className="truncate font-serif text-[21px] font-bold">
+              {account.nickname || "이름 없음"}
+            </span>
+            {titleLabel && (
+              <span
+                className="inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-[3px] text-[10.5px] font-bold"
+                style={{
+                  borderColor: `${titleLabel.color}4d`,
+                  background: `${titleLabel.color}1a`,
+                  color: titleLabel.color,
+                }}
+              >
+                {titleLabel.name}
+              </span>
+            )}
           </div>
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
             <span className="flex items-center gap-1.5 rounded-[11px] bg-brick-soft px-2 py-[3px] text-[10.5px] text-muted">
@@ -233,23 +278,47 @@ export default function AccountScreen({
         <>
           <div className="mt-5 flex items-baseline justify-between">
             <span className="font-serif text-[15px] font-bold">모은 라벨</span>
-            <span className="font-mono text-[10.5px] text-faint">
-              {got.length} / {labels.length}
-            </span>
+            <button
+              type="button"
+              onClick={onOpenLabels}
+              className="cursor-pointer border-none bg-transparent p-0 font-mono text-[10.5px] text-faint"
+            >
+              {got.length} / {labels.length} ›
+            </button>
           </div>
+          <div className="mt-1 text-[10.5px] text-faint">탭하면 닉네임 옆 대표 라벨로 붙습니다</div>
           <div className="mt-2.5 flex flex-wrap gap-[7px]">
-            {got.slice(0, 3).map((l) => (
-              <span
-                key={l.id}
-                className="rounded-[13px] border border-brick/20 bg-brick-soft px-2.75 py-[5px] text-[11.5px] text-brick"
-              >
-                {l.name}
-              </span>
-            ))}
+            {[...got]
+              .sort((a, b) => Number(b.id === titleLabelId) - Number(a.id === titleLabelId))
+              .slice(0, 3)
+              .map((l) => {
+                const on = l.id === titleLabelId;
+                return (
+                  <button
+                    key={l.id}
+                    type="button"
+                    onClick={() => selectTitleLabel(l.id)}
+                    disabled={labelBusy}
+                    aria-pressed={on}
+                    className={`cursor-pointer rounded-[13px] border px-2.75 py-[5px] text-[11.5px] disabled:opacity-60 ${
+                      on
+                        ? "border-brick bg-brick text-[#fdf9f3]"
+                        : "border-brick/20 bg-brick-soft text-brick"
+                    }`}
+                  >
+                    {on ? "✓ " : ""}
+                    {l.name}
+                  </button>
+                );
+              })}
             {got.length > 3 && (
-              <span className="rounded-[13px] border border-line-soft bg-line-soft px-2.75 py-[5px] text-[11.5px] text-faint">
+              <button
+                type="button"
+                onClick={onOpenLabels}
+                className="cursor-pointer rounded-[13px] border border-line-soft bg-line-soft px-2.75 py-[5px] text-[11.5px] text-faint"
+              >
                 +{got.length - 3}
-              </span>
+              </button>
             )}
           </div>
         </>

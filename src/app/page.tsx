@@ -38,7 +38,7 @@ export default async function Home({
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("nickname, avatar_url, created_at")
+    .select("nickname, avatar_url, created_at, title_label_id")
     .eq("id", user.id)
     .single();
 
@@ -47,6 +47,7 @@ export default async function Home({
     avatarUrl: profile?.avatar_url ?? null,
     since: profile?.created_at ?? user.created_at,
     providers: (user.identities ?? []).map((i) => i.provider),
+    titleLabelId: profile?.title_label_id ?? null,
   };
 
   const kind: Kind = sp.kind === "cafe" ? "cafe" : "restaurant";

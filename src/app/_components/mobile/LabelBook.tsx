@@ -1,5 +1,8 @@
 "use client";
 
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabase/client";
 import { earnedLabels, regionTitles, REGION_EN, type EarnedLabel, type RegionTitle } from "@/lib/labels";
 import type { Restaurant } from "@/lib/types";
 import { Eyebrow } from "./ui";
@@ -13,15 +16,39 @@ const SHERIFF_STAR =
  */
 export default function LabelBook({
   rows,
+  titleLabelId,
   onClose,
 }: {
   rows: Restaurant[];
+  /** 닉네임 옆에 걸어 둔 대표 라벨(id). 없으면 null. */
+  titleLabelId: string | null;
   onClose: () => void;
 }) {
+  const router = useRouter();
+  const [titleId, setTitleId] = useState(titleLabelId);
+  const [busy, setBusy] = useState(false);
+
   const labels = earnedLabels(rows);
   const got = labels.filter((l) => l.earned).length;
   const districts = regionTitles(rows);
   const gotDistricts = districts.filter((t) => t.tier).length;
+
+  async function toggleTitle(id: string) {
+    if (busy) return;
+    const next = titleId === id ? null : id;
+    setBusy(true);
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (user) {
+      const { error } = await supabase.from("profiles").upsert({ id: user.id, title_label_id: next });
+      if (!error) {
+        setTitleId(next);
+        router.refresh();
+      }
+    }
+    setBusy(false);
+  }
 
   return (
     <div className="absolute inset-0 z-[1450] bg-paper">
@@ -44,6 +71,7 @@ export default function LabelBook({
         <div className="mt-1.5 text-[12px] text-faint">
           모은 라벨 {got} / {labels.length}
         </div>
+        <div className="mt-1 text-[11px] text-faint">탭하면 닉네임 옆 대표 라벨로 붙습니다</div>
       </div>
 
       <div
@@ -72,7 +100,11 @@ export default function LabelBook({
         <div className="grid grid-cols-3 gap-x-3.5 gap-y-[26px]">
           {labels.map((l) => (
             <div key={l.id} className="flex flex-col items-center gap-2.5">
-              <Shape label={l} />
+              <Shape
+                label={l}
+                selected={l.id === titleId}
+                onToggle={l.earned ? () => toggleTitle(l.id) : undefined}
+              />
               <div className="text-center">
                 <div
                   className={`font-serif text-[13px] font-bold ${
@@ -86,6 +118,9 @@ export default function LabelBook({
                     ? l.desc
                     : `${l.desc} · ${Math.min(l.have, l.need)}/${l.need}`}
                 </div>
+                {l.id === titleId && (
+                  <div className="mt-[3px] text-[9.5px] font-bold text-brick">대표 라벨</div>
+                )}
               </div>
             </div>
           ))}
@@ -152,12 +187,44 @@ function DistrictBadge({ title }: { title: RegionTitle }) {
 }
 
 /** 도형은 clip-path — 물결과 45° 회전 사각만 예외입니다. */
-/** 통일된 도장 배지와 라벨별 인라인 선 그림. */
-function Shape({ label }: { label: EarnedLabel }) {
+/** 통일된 도장 배지와 라벨별 인라인 선 그림. earned 라벨은 탭해서 대표 라벨로 고를 수 있습니다. */
+function Shape({
+  label,
+  selected,
+  onToggle,
+}: {
+  label: EarnedLabel;
+  selected?: boolean;
+  onToggle?: () => void;
+}) {
   const progress = Math.min(1, label.have / label.need);
   const color = label.earned ? label.color : "#eae5da";
 
-  return <div className={`label-badge label-badge-${label.id} grid size-[92px] place-items-center rounded-full p-1`} style={{ background: `conic-gradient(${label.color} ${progress * 360}deg, #ded8cb 0)`, filter: label.earned ? "drop-shadow(0 4px 12px rgba(28,26,23,.12))" : undefined }}>
-    <div className="grid size-[84px] place-items-center rounded-full border border-dashed border-[#cfc7b6] font-serif text-[30px] font-bold" style={{ background: color, color: label.earned ? "#fbfaf6" : "#b3aa9a", boxShadow: "inset 0 0 0 1px rgba(251,250,246,.45)" }}><svg aria-label={label.name} width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="16" cy="16" r="9" />{label.id === "verified" ? <path d="m11 16 3 3 7-7" /> : <path d="M11 21h10M13 18h6M14 14h4" />}</svg></div>
-  </div>;
+  const badge = (
+    <div
+      className={`label-badge label-badge-${label.id} grid size-[92px] place-items-center rounded-full p-1`}
+      style={{
+        background: `conic-gradient(${label.color} ${progress * 360}deg, #ded8cb 0)`,
+        filter: label.earned ? "drop-shadow(0 4px 12px rgba(28,26,23,.12))" : undefined,
+        outline: selected ? "3px solid #b4552d" : undefined,
+        outlineOffset: selected ? 2 : undefined,
+      }}
+    >
+      <div className="grid size-[84px] place-items-center rounded-full border border-dashed border-[#cfc7b6] font-serif text-[30px] font-bold" style={{ background: color, color: label.earned ? "#fbfaf6" : "#b3aa9a", boxShadow: "inset 0 0 0 1px rgba(251,250,246,.45)" }}><svg aria-label={label.name} width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="16" cy="16" r="9" />{label.id === "verified" ? <path d="m11 16 3 3 7-7" /> : <path d="M11 21h10M13 18h6M14 14h4" />}</svg></div>
+    </div>
+  );
+
+  if (!onToggle) return badge;
+
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-pressed={selected}
+      aria-label={`${label.name} 대표 라벨로 ${selected ? "해제" : "선택"}`}
+      className="cursor-pointer rounded-full border-none bg-transparent p-0"
+    >
+      {badge}
+    </button>
+  );
 }

@@ -913,7 +913,14 @@ export default function MobileShell({
         />
       )}
 
-      {tab === "account" && <AccountScreen account={account} rows={rows} wishes={wishes} />}
+      {tab === "account" && (
+        <AccountScreen
+          account={account}
+          rows={rows}
+          wishes={wishes}
+          onOpenLabels={() => setLabelsOpen(true)}
+        />
+      )}
 
       {foundHit && (
         <div className="absolute inset-x-0 top-0 bottom-[74px] z-[1150] flex flex-col justify-end">
@@ -1179,7 +1186,9 @@ export default function MobileShell({
         />
       )}
 
-      {labelsOpen && <LabelBook rows={rows} onClose={() => setLabelsOpen(false)} />}
+      {labelsOpen && (
+        <LabelBook rows={rows} titleLabelId={account.titleLabelId} onClose={() => setLabelsOpen(false)} />
+      )}
 
       {draftsOpen && (
         <DraftsScreen
