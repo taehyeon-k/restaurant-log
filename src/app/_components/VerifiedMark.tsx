@@ -14,8 +14,8 @@ export default function VerifiedMark({
   const drop = size / Math.SQRT2;
   const circle = drop * 0.58;
   const check = circle * 0.6;
-  const border = Math.max(1, drop * 0.045);
-  const strokeWidth = Math.max(1.6, check * 0.22);
+  const border = Math.max(0.8, drop * 0.045);
+  const strokeWidth = Math.max(1.4, check * 0.22);
   /**
    * 물방울은 한쪽 모서리가 뾰족해 무게 중심이 그 반대쪽(위)으로 쏠립니다.
    * 원을 사각형의 기하학적 가운데 그대로 두면 뾰족한 쪽으로 처져 보이므로,
