@@ -20,7 +20,7 @@ export const supabase = createClient(
         : {}),
       autoRefreshToken: true,
       persistSession: true,
-      detectSessionInUrl: false,
+      detectSessionInUrl: Platform.OS === "web",
       lock: processLock,
     },
   }
