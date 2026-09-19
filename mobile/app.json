@@ -1,0 +1,94 @@
+{
+  "expo": {
+    "name": "DINARY",
+    "slug": "dinary",
+    "scheme": "dinary",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "jsEngine": "hermes",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#f6f3ec"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "app.dinary.mobile",
+      "config": { "usesNonExemptEncryption": false },
+      "infoPlist": {
+        "NSCameraUsageDescription": "가게 앞에서 찍은 사진으로 방문을 인증합니다.",
+        "NSPhotoLibraryUsageDescription": "갤러리에서 고른 사진을 기록에 붙입니다. 고른 사진에는 인증이 붙지 않습니다.",
+        "NSPhotoLibraryAddUsageDescription": "찍은 사진을 기기에 저장합니다.",
+        "NSLocationWhenInUseUsageDescription": "사진 찍는 순간 한 번만 위치를 읽어 50m 안의 가게를 찾습니다. 좌표는 기록에 남기지 않습니다.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "담아둔 위시 근처에 왔을 때 알려 드립니다.",
+        "UIBackgroundModes": ["location", "remote-notification"]
+      }
+    },
+    "android": {
+      "package": "app.dinary.mobile",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#f6f3ec"
+      },
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_BACKGROUND_LOCATION",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.READ_MEDIA_IMAGES"
+      ]
+    },
+    "plugins": [
+      "expo-router",
+      "expo-dev-client",
+      "expo-localization",
+      "expo-sqlite",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "가게 앞에서 찍은 사진으로 방문을 인증합니다.",
+          "recordAudioAndroid": false
+        }
+      ],
+      [
+        "expo-image-picker",
+        { "photosPermission": "갤러리에서 고른 사진을 기록에 붙입니다." }
+      ],
+      [
+        "expo-media-library",
+        { "photosPermission": "최근에 찍은 사진 한 장을 촬영 화면 썸네일로 보여줍니다.", "savePhotosPermission": "찍은 사진을 기기에 저장합니다.", "isAccessMediaLocationEnabled": false }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "담아둔 위시 근처에 왔을 때 알려 드립니다.",
+          "locationWhenInUsePermission": "사진 찍는 순간 한 번만 위치를 읽어 가까운 가게를 찾습니다.",
+          "isAndroidBackgroundLocationEnabled": true
+        }
+      ],
+      [
+        "expo-notifications",
+        { "color": "#b4552d" }
+      ],
+      [
+        "@mj-studio/react-native-naver-map",
+        {
+          "client_id": "SET_NAVER_MAP_CLIENT_ID",
+          "android": { "ACCESS_FINE_LOCATION": true, "ACCESS_COARSE_LOCATION": true, "ACCESS_BACKGROUND_LOCATION": true },
+          "ios": {
+            "NSLocationAlwaysAndWhenInUseUsageDescription": "담아둔 위시 근처에 왔을 때 알려 드립니다.",
+            "NSLocationWhenInUseUsageDescription": "지도에 지금 위치를 표시합니다."
+          }
+        }
+      ]
+    ],
+    "experiments": { "typedRoutes": true },
+    "extra": {
+      "eas": { "projectId": "00000000-0000-0000-0000-000000000000" }
+    }
+  }
+}
