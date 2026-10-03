@@ -32,10 +32,15 @@ export async function proxy(request: NextRequest) {
     }
   );
 
+  // 네이티브 앱(Expo)은 쿠키가 없어 Authorization: Bearer 로 /api/* 를 부릅니다 — 그 토큰도 같은 방식으로 검증합니다.
+  const bearer = request.nextUrl.pathname.startsWith("/api/")
+    ? request.headers.get("authorization")?.match(/^Bearer\s+(.+)$/i)?.[1]
+    : undefined;
+
   // getSession()이 아니라 getUser() — 토큰을 Supabase 서버에 검증받습니다.
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await supabase.auth.getUser(bearer);
 
   const isPublic = PUBLIC_PATHS.some((p) => request.nextUrl.pathname.startsWith(p));
 

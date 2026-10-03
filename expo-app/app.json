@@ -1,0 +1,101 @@
+{
+  "expo": {
+    "name": "DINARY",
+    "slug": "dinary",
+    "scheme": "dinary",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "backgroundColor": "#f6f3ec",
+    "ios": {
+      "bundleIdentifier": "app.dinary",
+      "supportsTablet": false,
+      "infoPlist": {
+        "NSCameraUsageDescription": "방문 인증 사진을 찍는 데에만 카메라를 씁니다.",
+        "NSLocationWhenInUseUsageDescription": "사진을 찍는 순간 한 번만 위치를 읽어 50m 안의 가게를 찾습니다. 좌표는 기록에 남기지 않습니다.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "담아둔 곳 50m 안에 들어오면 알려 드리기 위해 백그라운드에서 위치를 확인합니다.",
+        "NSPhotoLibraryUsageDescription": "프로필 사진을 고르거나 갤러리 썸네일을 보여주는 데에만 씁니다."
+      }
+    },
+    "android": {
+      "package": "app.dinary",
+      "permissions": [
+        "CAMERA",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "READ_MEDIA_IMAGES",
+        "POST_NOTIFICATIONS"
+      ]
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      "expo-splash-screen",
+      "expo-status-bar",
+      "expo-sqlite",
+      "expo-localization",
+      "expo-web-browser",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "방문 인증 사진을 찍는 데에만 카메라를 씁니다.",
+          "recordAudioAndroid": false
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "담아둔 곳 50m 안에 들어오면 알려 드리기 위해 백그라운드에서 위치를 확인합니다.",
+          "locationWhenInUsePermission": "사진을 찍는 순간 한 번만 위치를 읽어 50m 안의 가게를 찾습니다.",
+          "isAndroidBackgroundLocationEnabled": true
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#b4552d"
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "갤러리 썸네일을 보여주는 데에만 씁니다.",
+          "isAccessMediaLocationEnabled": false
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "프로필 사진과 갤러리 사진을 고르는 데에만 씁니다."
+        }
+      ],
+      "@react-native-community/datetimepicker",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "minSdkVersion": 24,
+            "extraMavenRepos": [
+              "https://repository.map.naver.com/archive/maven"
+            ]
+          },
+          "ios": {
+            "deploymentTarget": "16.4"
+          }
+        }
+      ],
+      "./plugins/withNaverMaven"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "4030deb1-49b3-4d9e-a9d5-6ccc97c8a4fa"
+      }
+    },
+    "owner": "dinary-project"
+  }
+}
