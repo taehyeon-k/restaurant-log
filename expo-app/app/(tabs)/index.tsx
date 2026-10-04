@@ -35,6 +35,11 @@ const FILTERS: { id: MarkerFilter; label: string }[] = [
   { id: "wish", label: "위시만" },
 ];
 
+/** 지도 콘텐츠 패딩(아래) — 카메라 중심을 시트 위로 올려둡니다. */
+const MAP_PAD_BOTTOM = 320;
+const SHEET_SNAPS = ["12%", "46%", "88%"];
+const SHEET_START = 1;
+
 type Bounds = { s: number; w: number; n: number; e: number };
 type Pt = [number, number];
 const uniq = (list: (string | null | undefined)[]) => [...new Set(list.filter((v): v is string => !!v))];
@@ -52,6 +57,13 @@ export default function MapTab() {
   const sheetRef = useRef<BottomSheet>(null);
   const lastFit = useRef("");
   const holdFit = useRef(false);
+
+  // 네이버 로고는 콘텐츠 패딩 안쪽 귀퉁이에 놓여서, 그대로 두면 바닥에서 MAP_PAD_BOTTOM 만큼 뜬 「왼쪽 중간」에 보입니다.
+  // 시트 윗변 바로 위(= 보이는 지도의 왼쪽 아래 귀퉁이)를 따라가게 logoMargin 으로 되돌립니다. 로고를 가리면 약관 위반입니다.
+  const [screenH, setScreenH] = useState(0);
+  const [sheetTop, setSheetTop] = useState<number | null>(null);
+  const sheetH = screenH ? screenH - (sheetTop ?? screenH * (1 - parseFloat(SHEET_SNAPS[SHEET_START]) / 100)) : MAP_PAD_BOTTOM;
+  const logoMargin = { bottom: sheetH + 6 - MAP_PAD_BOTTOM };
 
   const [sort, setSort] = useState<Sort>("recent");
   const [q, setQ] = useState("");
@@ -297,11 +309,13 @@ export default function MapTab() {
   );
 
   return (
-    <View style={{ flex: 1, backgroundColor: C.map }}>
+    <View style={{ flex: 1, backgroundColor: C.map }} onLayout={(e) => setScreenH(e.nativeEvent.layout.height)}>
       <PaperMap
         ref={mapRef}
         initialCamera={{ latitude: 37.5605, longitude: 126.982, zoom: 12 }}
-        mapPadding={{ top: insets.top + 130, bottom: 320, left: 20, right: 20 }}
+        mapPadding={{ top: insets.top + 130, bottom: MAP_PAD_BOTTOM, left: 20, right: 20 }}
+        logoAlign="BottomLeft"
+        logoMargin={logoMargin}
         onCameraChanged={(e) => { if (e.reason === "Gesture") setMapMoved(true); }}
         onCameraIdle={(e) => {
           regionRef.current = { s: e.region.latitude, w: e.region.longitude, n: e.region.latitude + e.region.latitudeDelta, e: e.region.longitude + e.region.longitudeDelta };
@@ -384,12 +398,14 @@ export default function MapTab() {
 
       <BottomSheet
         ref={sheetRef}
-        index={1}
-        snapPoints={["12%", "46%", "88%"]}
+        index={SHEET_START}
+        snapPoints={SHEET_SNAPS}
         backgroundStyle={[{ backgroundColor: C.card, borderTopLeftRadius: 26, borderTopRightRadius: 26 }, SHADOW.sheet]}
         handleIndicatorStyle={{ width: 38, height: 4, borderRadius: 2, backgroundColor: "#ded8cb" }}
         handleStyle={{ paddingTop: 10, paddingBottom: 8 }}
-        onChange={() => Haptics.selectionAsync()}
+        // 올라갈 땐 미리 로고를 올려 시트에 안 가리게, 내려갈 땐 다 내려간 뒤 따라 내려옵니다.
+        onAnimate={(_from, _to, fromPos, toPos) => { if (toPos < fromPos) setSheetTop(toPos); }}
+        onChange={(_i, pos) => { Haptics.selectionAsync(); setSheetTop(pos); }}
       >
         <BottomSheetFlatList
           data={filtered}

@@ -32,6 +32,14 @@ function Tag({ name, rating, cta }: { name: string; rating?: number | null; cta?
   );
 }
 
+/**
+ * 마커 안 최상위 View 에는 collapsable={false} 와 이 key 가 꼭 붙어야 합니다(라이브러리 문서).
+ * 레이아웃 스타일만 있는 View 는 New Architecture 가 납작하게 지워버려서(view flattening),
+ * 네이티브 마커가 자식 뷰를 못 받고 기본 초록 핀(image 기본값)으로 그려집니다.
+ * 네이티브는 이 뷰를 비트맵으로 한 번 찍어두므로, 생김새가 바뀌면 key 도 바꿔 다시 찍게 합니다.
+ */
+const markerKey = (...deps: unknown[]) => deps.join("/");
+
 const tagWidth = (name: string) => Math.min(190, Math.max(64, name.length * 13 + 26));
 
 type Base = { lat: number; lng: number; onTap?: () => void; zIndex?: number };
@@ -51,7 +59,7 @@ export const RecordMarker = memo(function RecordMarker(p: RecordProps) {
 
   return (
     <NaverMapMarkerOverlay latitude={p.lat} longitude={p.lng} width={w} height={labelH + size + 4} onTap={p.onTap} zIndex={p.zIndex ?? (p.active ? 1000 : 0)}>
-      <View style={{ width: w, height: labelH + size + 4, alignItems: "center", justifyContent: "flex-end" }}>
+      <View key={markerKey(w, size, fill, stroke, p.planned, p.showLabel && p.name, p.showLabel && p.rating)} collapsable={false} style={{ width: w, height: labelH + size + 4, alignItems: "center", justifyContent: "flex-end" }}>
         {p.showLabel && <View style={{ width: labelW, marginBottom: 2 }}><Tag name={p.name} rating={p.rating} /></View>}
         <Svg width={size} height={size + 4} viewBox="0 0 24 30">
           <Path d={DROP} fill={fill} stroke={stroke} strokeWidth={p.active ? 2 : 1.5} />
@@ -76,7 +84,7 @@ export const WishMarker = memo(function WishMarker(p: WishProps) {
   const labelH = p.showLabel ? 44 : 0;
   return (
     <NaverMapMarkerOverlay latitude={p.lat} longitude={p.lng} width={w} height={labelH + 30} onTap={p.onTap} zIndex={500}>
-      <View style={{ width: w, height: labelH + 30, alignItems: "center", justifyContent: "flex-end" }}>
+      <View key={markerKey(w, p.category, p.showLabel && p.name)} collapsable={false} style={{ width: w, height: labelH + 30, alignItems: "center", justifyContent: "flex-end" }}>
         {p.showLabel && <View style={{ width: labelW, marginBottom: 2 }}><Tag name={p.name} /></View>}
         <Svg width={28} height={28} viewBox="0 0 24 24" fill={pinColor(p.category)} stroke={C.card} strokeWidth={1.6} strokeLinejoin="round">
           <Path d={BOOKMARK_PATH} />
@@ -91,7 +99,7 @@ export const GhostMarker = memo(function GhostMarker(p: Base & { name: string })
   const w = tagWidth(p.name) + 30;
   return (
     <NaverMapMarkerOverlay latitude={p.lat} longitude={p.lng} width={w} height={44 + 12 + 34} onTap={p.onTap} zIndex={1200}>
-      <View style={{ width: w, height: 90, alignItems: "center", justifyContent: "flex-end" }}>
+      <View key={markerKey(w, p.name)} collapsable={false} style={{ width: w, height: 90, alignItems: "center", justifyContent: "flex-end" }}>
         <View style={{ width: w - 6, marginBottom: 2 }}><Tag name={p.name} cta="+ 여기에 기록 추가" /></View>
         <Svg width={29} height={34} viewBox="0 0 24 30">
           <Path d={DROP} fill="rgba(138,131,119,.15)" stroke={C.faint} strokeWidth={1.5} strokeDasharray="3 2.5" />

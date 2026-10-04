@@ -23,6 +23,8 @@ export default function SpotPicker() {
   /** 검색으로 옮겨간 자리 정보 — 사람이 손으로 지도를 다시 끌면 지웁니다. */
   const found = useRef<{ name: string; address: string } | null>(null);
   const [q, setQ] = useState("");
+  // 아래 안내 카드가 네이버 로고(왼쪽 아래)를 가리지 않게, 카드 높이만큼 로고를 올립니다.
+  const [hintH, setHintH] = useState(70);
 
   return (
     <View style={{ flex: 1, backgroundColor: C.paper }}>
@@ -43,6 +45,8 @@ export default function SpotPicker() {
           initialCamera={{ latitude: center.current.lat, longitude: center.current.lng, zoom: initial ? 16 : 13 }}
           onCameraChanged={(e) => { if (e.reason === "Gesture") found.current = null; }}
           onCameraIdle={(e) => { center.current = { lat: e.latitude, lng: e.longitude }; }}
+          logoAlign="BottomLeft"
+          logoMargin={{ bottom: insets.bottom + 24 + hintH + 6 }}
         />
 
         <View style={{ position: "absolute", left: 16, right: 16, top: 14, zIndex: 10 }}>
@@ -63,7 +67,7 @@ export default function SpotPicker() {
           </View>
         </View>
 
-        <View style={[{ position: "absolute", left: 20, right: 20, bottom: insets.bottom + 24, borderRadius: 16, borderWidth: 1, borderColor: C.line, backgroundColor: C.card, paddingHorizontal: 16, paddingVertical: 12 }, SHADOW.card]}>
+        <View onLayout={(e) => setHintH(e.nativeEvent.layout.height)} style={[{ position: "absolute", left: 20, right: 20, bottom: insets.bottom + 24, borderRadius: 16, borderWidth: 1, borderColor: C.line, backgroundColor: C.card, paddingHorizontal: 16, paddingVertical: 12 }, SHADOW.card]}>
           <Text style={{ textAlign: "center", fontFamily: F.sans, fontSize: 12, lineHeight: 19, color: C.muted }}>위에서 찾아 바로 옮겨가거나, 지도를 움직여 가운데 표시를 가게 자리에 맞춰주세요.</Text>
         </View>
       </View>
