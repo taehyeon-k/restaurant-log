@@ -33,7 +33,22 @@ node .ds-sync/resync.mjs --config .design-sync/config.json --node-modules .ds-sy
 - `SafeAreaProvider` is exported from the entry only so `cfg.provider` can wrap previews; it is excluded from the component list via `componentSrcMap`.
 - `ScreenHead`, `BottomSheetModal`, `Placeholder` need the provider or they render blank.
 - Single-element previews (`Chip`, `MobileStars`) are wrapped in `inline-flex`; without it they stretch to the card width and `MobileStars` partial fill stops clipping.
-- `TabBar` (expo-router) and `PaperMap` (native Naver map) are intentionally **not** synced.
+- `TabBar` is only used inside the screen frames (`Tabbed` in `design-sync-entry/screens.tsx`); `PaperMap` is replaced by a stand-in map.
+
+## Screens (real code + sample data)
+
+`design-sync-entry/screens.tsx` bundles the app's actual `app/**` screens. `AppScreen` wraps each in a 390×844 frame with a seeded React Query cache
+(`mock-data.ts`: 10 records incl. a draft and a from-wish one, 4 wishes, 1 account), a route-params context, and safe-area insets 47/34.
+Browser stand-ins for everything device/network related:
+
+- `design-sync-entry/stubs/`: `expo-router` (params via `RouteContext`), `@/lib/supabase` (always-empty success), `naver-map` (paper-tone fake map that projects the real marker views by lat/lng at the given zoom/padding), `gorhom-bottom-sheet` (fixed sheet at the first snap point).
+- `.design-sync/native-stubs.mjs`: location, camera, image-picker, notifications, sqlite, netinfo, task-manager, file-system, haptics, gesture-handler, linking/web-browser, datetimepicker, plus the app's own `queue/*`, `geofence`, `api`, `photos`, `geocode` (sample Seoul places). `useQueue` must return an **array** (drafts screen maps over it).
+- `build-dist.mjs` defines `process.env.EXPO_OS="web"` and blank `EXPO_PUBLIC_*` (no keys/URLs in the bundle).
+- Bundle-time web patch of `src/components/ui.tsx`: `MobileStars` overlay text drops `numberOfLines={1}` (react-native-web adds `max-width:100%` + ellipsis, which truncated partial stars). Prints `[web-patches]` if the pattern stops matching.
+- `AppScreen` overrides `Dimensions.get` to 390×844 (RNW forbids `Dimensions.set`) so record-detail's full-width hero fits the frame.
+- Photos are base64 SVG data URIs — RNW's `Image` did not render `data:image/svg+xml;utf8,…`.
+- `WishDetailScreen` renders over `MapTab` because the app shows it as a transparent modal.
+- Screen cards use `cardMode: column` + `viewport: 430x900`.
 
 ## Known render warns (benign — screenshots checked)
 
@@ -50,3 +65,7 @@ node .ds-sync/resync.mjs --config .design-sync/config.json --node-modules .ds-sy
 - `dtsPropsFor` for `Button` / `Row` / `PhotoBox` is hand-written (RN `ViewStyle` can't resolve in the browser `.d.ts`) — keep in step with `src/components/ui.tsx`.
 - Entry list in `design-sync-entry/index.ts` is hand-maintained; new components in `src/components` are not picked up automatically.
 - Assumes react-native-web 0.21 + Node 22; fonts come from `node_modules/@expo-google-fonts`.
+- Screens bundle real `app/**` code: a new native import in any screen breaks `build-dist` until a stub is added (esbuild names the module); a new query key must be seeded in `AppScreen.makeClient`.
+- Sample data is dated Sep–Oct 2026 and screens use the real "now" (calendar month, "today") — the calendar will look emptier as time passes; update `mock-data.ts` dates.
+- `LabelBookScreen` / `LabelBadge` shapes mirror the app's `roundedPath` bug; if that is fixed in `Badges.tsx`, regrade those cells.
+- New screens under `app/` are not picked up automatically — add them to `screens.tsx`, `gen-screens`-style previews and the `cardMode` overrides.

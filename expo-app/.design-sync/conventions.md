@@ -19,6 +19,14 @@ const { SafeAreaProvider, ScreenHead, Chip, Button } = window.Dinary;
 
 `styles.css` already loads the fonts and tokens — do not add other fonts.
 
+## Screens — the app's real pages, with sample data
+
+`window.Dinary` also exports the app's actual screens: `MapScreen`, `CalendarScreen`, `WishListScreen`, `AccountScreen` (each with the bottom tab bar), `RecordDetailScreen`, `RecordEditScreen`, `PlaceDetailScreen`, `DayDetailScreen`, `WishNewScreen`, `WishSpotScreen`, `WishDetailScreen`, `DraftsScreen`, `LabelBookScreen`, `LoginScreen`, `WelcomeScreen`, `CaptureScreen`. Each is a 390×844 phone frame filled with sample records, wishes and an account — render one as-is, or copy its layout.
+
+- Route values go in `params`: `<RecordDetailScreen params={{ id: "6" }} />`, `<DayDetailScreen params={{ date: "2026-10-02" }} />`, `<PlaceDetailScreen params={{ key: "스시 마루" }} />`. `<MapScreen kind="cafe" />` switches 맛집 / 카페.
+- `AppScreen` is the bare phone frame (390×844, sample data, safe-area insets). **To design a new screen, build it inside `<AppScreen>`** from `ScreenHead`, `Chip`, `Button`, `PhotoBox`, … — no extra `SafeAreaProvider` needed there.
+- The map tiles and camera view are stand-ins (paper-tone map, dark camera area); markers, sheets, bars and controls are the real components. Nothing navigates or saves.
+
 ## Styling idiom — props, not classes
 
 There are **no CSS utility classes**. Components style themselves; you only add layout glue

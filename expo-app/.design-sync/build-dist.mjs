@@ -12,16 +12,43 @@ const out = path.join(root, "ds-dist");
 rmSync(out, { recursive: true, force: true });
 mkdirSync(out, { recursive: true });
 
-// 브라우저에서 동작할 수 없는 네이티브 모듈은 빈 껍데기로 바꿉니다.
-const stubs = {
-  "expo-router": "export const useRouter = () => ({ push() {}, back() {}, replace() {} }); export const Link = ({ children }) => children;",
-  "expo-haptics": "export const impactAsync = async () => {}; export const selectionAsync = async () => {}; export const ImpactFeedbackStyle = { Light: 'light' };",
+// 브라우저에서 동작할 수 없는 모듈(라우터·Supabase·지도·위치·카메라…)은 대용품으로 바꿉니다.
+//  - 파일 대용품: design-sync-entry/stubs/* (React 컴포넌트가 필요한 것)
+//  - 소스 대용품: .design-sync/native-stubs.mjs (빈 성공을 돌려주는 모듈)
+const stubDir = path.join(root, "design-sync-entry/stubs");
+const fileStubs = {
+  "expo-router": path.join(stubDir, "expo-router.tsx"),
+  "@/lib/supabase": path.join(stubDir, "supabase.ts"),
+  "@mj-studio/react-native-naver-map": path.join(stubDir, "naver-map.tsx"),
+  "@gorhom/bottom-sheet": path.join(stubDir, "gorhom-bottom-sheet.tsx"),
 };
+const { stubs } = await import("./native-stubs.mjs");
 const stubPlugin = {
   name: "native-stubs",
   setup(b) {
-    b.onResolve({ filter: /^(expo-router|expo-haptics)$/ }, (a) => ({ path: a.path, namespace: "stub" }));
-    b.onLoad({ filter: /.*/, namespace: "stub" }, (a) => ({ contents: stubs[a.path], loader: "js" }));
+    b.onResolve({ filter: /.*/ }, (a) => {
+      if (a.namespace === "stub") return;
+      if (fileStubs[a.path]) return { path: fileStubs[a.path] };
+      if (stubs[a.path]) return { path: a.path, namespace: "stub" };
+    });
+    b.onLoad({ filter: /.*/, namespace: "stub" }, (a) => ({ contents: stubs[a.path], loader: "js", resolveDir: root }));
+  },
+};
+
+// 웹 호환용 번들 시점 패치(앱 소스는 그대로) — react-native-web 은 numberOfLines={1} 글자에 max-width:100% 를 걸어서,
+// MobileStars 가 부모 폭에 맞춰 잘리는 대신 "…" 로 줄어듭니다. 네이티브에서처럼 200px 폭을 지키게 줄바꿈만 막습니다.
+const webPatchPlugin = {
+  name: "web-patches",
+  setup(b) {
+    b.onLoad({ filter: /src\/components\/ui\.tsx$/ }, (a) => {
+      const src = readFileSync(a.path, "utf8");
+      const patched = src.replace(
+        'numberOfLines={1} style={[row, { color: C.brick, width: 200 }]}',
+        'style={[row, { color: C.brick, width: 200, whiteSpace: "nowrap" } as any]}',
+      );
+      if (patched === src) console.warn("[web-patches] MobileStars pattern not found — ui.tsx changed; update build-dist.mjs");
+      return { contents: patched, loader: "tsx", resolveDir: path.dirname(a.path) };
+    });
   },
 };
 
@@ -37,9 +64,18 @@ await build({
   alias: { "react-native": path.join(dsNm, "react-native-web") },
   nodePaths: [dsNm, path.join(root, "node_modules")],
   tsconfig: path.join(root, "tsconfig.json"),
-  define: { __DEV__: "false", "process.env.NODE_ENV": '"production"' },
+  // 앱이 읽는 EXPO_PUBLIC_* 값은 브라우저에 없으니 비워 둡니다(키·주소가 번들에 들어가지 않게).
+  define: {
+    __DEV__: "false",
+    "process.env.NODE_ENV": '"production"',
+    "process.env.EXPO_OS": '"web"',
+    "process.env.EXPO_PUBLIC_API_BASE_URL": '"https://preview.invalid"',
+    "process.env.EXPO_PUBLIC_NAVER_MAP_STYLE_ID": "undefined",
+    "process.env.EXPO_PUBLIC_SUPABASE_URL": '""',
+    "process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": '""',
+  },
   loader: { ".png": "dataurl", ".jpg": "dataurl", ".ttf": "dataurl" },
-  plugins: [stubPlugin],
+  plugins: [stubPlugin, webPatchPlugin],
   logLevel: "warning",
 });
 

@@ -24,6 +24,23 @@
   "overrides": {
     "BottomSheetModal": { "cardMode": "single", "viewport": "390x560" },
     "Placeholder": { "cardMode": "column" },
-    "ScreenHead": { "cardMode": "column" }
+    "ScreenHead": { "cardMode": "column" },
+    "AppScreen": { "cardMode": "column", "viewport": "430x900" },
+    "MapScreen": { "cardMode": "column", "viewport": "430x900" },
+    "CalendarScreen": { "cardMode": "column", "viewport": "430x900" },
+    "WishListScreen": { "cardMode": "column", "viewport": "430x900" },
+    "AccountScreen": { "cardMode": "column", "viewport": "430x900" },
+    "RecordDetailScreen": { "cardMode": "column", "viewport": "430x900" },
+    "RecordEditScreen": { "cardMode": "column", "viewport": "430x900" },
+    "WishNewScreen": { "cardMode": "column", "viewport": "430x900" },
+    "WishSpotScreen": { "cardMode": "column", "viewport": "430x900" },
+    "WishDetailScreen": { "cardMode": "column", "viewport": "430x900" },
+    "PlaceDetailScreen": { "cardMode": "column", "viewport": "430x900" },
+    "DayDetailScreen": { "cardMode": "column", "viewport": "430x900" },
+    "DraftsScreen": { "cardMode": "column", "viewport": "430x900" },
+    "LabelBookScreen": { "cardMode": "column", "viewport": "430x900" },
+    "LoginScreen": { "cardMode": "column", "viewport": "430x900" },
+    "WelcomeScreen": { "cardMode": "column", "viewport": "430x900" },
+    "CaptureScreen": { "cardMode": "column", "viewport": "430x900" }
   }
 }
