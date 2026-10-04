@@ -21,7 +21,7 @@ import { findRecord, findWish, norm } from "@/lib/geo";
 import { groupPlaces, type Place } from "@/lib/places";
 import { inRegion, inSearchedRegion, matchRegionName, regionFromSearch, regionNamesFrom } from "@/lib/regions";
 import { matchWish, type Kind, type Restaurant, type Sort } from "@/lib/types";
-import { C, F, SHADOW, TAB_BAR_H } from "@/theme";
+import { C, F, SHADOW } from "@/theme";
 
 const SORTS: { value: Sort; label: string }[] = [
   { value: "recent", label: "최근순" },
@@ -296,8 +296,6 @@ export default function MapTab() {
     </View>
   );
 
-  const bottomInset = TAB_BAR_H + insets.bottom;
-
   return (
     <View style={{ flex: 1, backgroundColor: C.map }}>
       <PaperMap
@@ -388,7 +386,6 @@ export default function MapTab() {
         ref={sheetRef}
         index={1}
         snapPoints={["12%", "46%", "88%"]}
-        bottomInset={bottomInset}
         backgroundStyle={[{ backgroundColor: C.card, borderTopLeftRadius: 26, borderTopRightRadius: 26 }, SHADOW.sheet]}
         handleIndicatorStyle={{ width: 38, height: 4, borderRadius: 2, backgroundColor: "#ded8cb" }}
         handleStyle={{ paddingTop: 10, paddingBottom: 8 }}

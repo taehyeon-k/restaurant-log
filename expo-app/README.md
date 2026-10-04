@@ -7,10 +7,11 @@
 
 ```bash
 cd expo-app
-cp .env.example .env      # Supabase 키, API 주소 채우기
+cp .env.example .env      # Supabase 키, API 주소, NAVER_MAP_CLIENT_ID 채우기
 npm install
 npx expo install expo-dev-client
-eas build --profile development --platform all   # 네이버 지도·백그라운드 위치는 Expo Go 불가
+# 먼저 아래 NAVER Map / EAS 설정을 완료하세요.
+npx eas-cli@latest build --profile development --platform all   # Expo Go 불가
 npm start
 ```
 
@@ -47,3 +48,89 @@ npm start
 - `lib/types.ts` 의 `seoulParts` 는 `Intl.DateTimeFormat({ timeZone: "Asia/Seoul" })` 을 씁니다 — 실기기(Hermes)에서 인증 시각이 맞는지 확인하세요.
 - 지도 마커는 줌 15 미만에서 이름표를 숨깁니다. 목록이 아주 많으면(수백 곳) 클러스터링을 검토하세요.
 - 실기기·시뮬레이터에서 돌려 보지는 못했습니다 — `expo export` 번들과 `tsc`, `expo-doctor` 만 통과를 확인했습니다.
+
+## Android NAVER Map authentication and rebuild
+
+The NAVER logo confirms the native view exists, not that tile authentication succeeded.
+`app.json` declares Android package `app.dinary` and the NAVER Maven repository.
+`app.config.js` passes `NAVER_MAP_CLIENT_ID` to the installed
+`@mj-studio/react-native-naver-map` 2.9.0 plugin's `client_id` option. The plugin
+writes `com.naver.maps.map.NCP_KEY_ID` (current Maps) and
+`com.naver.maps.map.CLIENT_ID` (legacy) into AndroidManifest.xml.
+Missing, empty, or whitespace-only IDs stop Expo config evaluation with an error.
+The ID is a native build credential; Metro reloads and EAS Update cannot replace it.
+
+### Manual NAVER Cloud Platform setup
+
+1. Open **Services > Application Services > Maps > Application** in NAVER Cloud
+   Platform. Create or edit the application whose Client ID you will use.
+2. Enable **Dynamic Map** for that application (older consoles call the mobile
+   SDK service **Mobile Dynamic Map**). Web Dynamic Map alone is insufficient.
+3. Register **Android app package name: `app.dinary`**, exactly, and save.
+   For iOS builds, also register **iOS Bundle ID: `app.dinary`**.
+4. Copy that application's **Client ID / NCP_KEY_ID**, not its Client Secret.
+   Do not put a Client Secret in the app. Check that the application/service is
+   active and its usage limits allow requests.
+5. Leave `EXPO_PUBLIC_NAVER_MAP_STYLE_ID` unset for the first tile check. If using
+   a custom style later, ensure it is valid and available to this Maps application.
+
+### EAS setup (run from `expo-app`)
+
+Each build profile explicitly selects its matching EAS environment. EAS can infer
+these defaults, but explicit selection avoids accidentally building with another
+profile's credentials. Set the ID in every environment you build from. Use
+**sensitive** visibility: EAS CLI needs to read it when resolving dynamic config;
+**secret** visibility is unavailable to local config resolution. The ID is embedded
+in the native binary regardless of EAS visibility.
+
+```bash
+cd expo-app
+npx eas-cli@latest login
+# Read the actual Client ID without putting it in shell history.
+read -r -s -p "NAVER Maps Client ID: " NAVER_MAP_CLIENT_ID
+printf '\n'
+export NAVER_MAP_CLIENT_ID
+# The local export also lets EAS resolve the fail-fast config during initial setup.
+for environment in development preview production; do
+  npx eas-cli@latest env:set --environment "$environment" \
+    --name NAVER_MAP_CLIENT_ID --value "$NAVER_MAP_CLIENT_ID" \
+    --visibility sensitive --scope project
+done
+
+# Standalone, installable Android APK, without Metro:
+npx eas-cli@latest build --platform android --profile preview --clear-cache
+# Install that profile's latest completed build on an emulator/connected device:
+npx eas-cli@latest build:run --platform android --profile preview --latest
+```
+
+On a physical phone you can also open the build's EAS download link and install
+its APK, or download it and run `adb install -r /path/to/dinary.apk`.
+The production profile produces an AAB for Play distribution, not an installable APK.
+
+For a development client instead:
+
+```bash
+npx eas-cli@latest build --platform android --profile development --clear-cache
+npx eas-cli@latest build:run --platform android --profile development --latest
+npx expo start --dev-client
+```
+
+For future local commands, keep the ID in a git-ignored `expo-app/.env.local`, or
+pull the selected EAS environment with
+`npx eas-cli@latest env:pull --environment development --path .env.local`.
+Config evaluation requires the ID even for `expo config` and Metro startup.
+Never commit environment files or generated manifests containing credentials.
+Native `android/` and `ios/` directories are currently untracked, so EAS generates
+native configuration using prebuild. If maintaining native directories later,
+regenerate them with `npx expo prebuild --platform android` before building.
+
+After installation, verify actual roads/tiles appear. If only the logo remains,
+inspect native authentication errors with `adb logcat | rg -i 'naver|ncp|auth'`;
+recheck the Client ID's application, Dynamic Map access, exact package registration,
+custom style, and device network access. Camera-idle callbacks do not prove tile loading.
+
+References: [NAVER Map Expo plugin setup](https://rnnavermap.mjstudio.net/docs/installation/expo),
+[NAVER Maps Android service](https://guide.ncloud-docs.com/docs/en/maps-android-sdk),
+[NAVER application registration](https://guide.ncloud-docs.com/docs/en/maps-app/),
+[EAS environment visibility](https://docs.expo.dev/eas/environment-variables/manage/),
+[EAS CLI commands](https://docs.expo.dev/eas/cli/).
