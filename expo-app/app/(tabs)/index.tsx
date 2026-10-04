@@ -5,6 +5,7 @@ import * as Haptics from "expo-haptics";
 import * as Location from "expo-location";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useDerivedValue, useSharedValue } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BookmarkIcon, BurstIcon, SearchIcon } from "@/components/icons";
 import { PaperMap } from "@/components/PaperMap";
@@ -59,11 +60,10 @@ export default function MapTab() {
   const holdFit = useRef(false);
 
   // 네이버 로고는 콘텐츠 패딩 안쪽 귀퉁이에 놓여서, 그대로 두면 바닥에서 MAP_PAD_BOTTOM 만큼 뜬 「왼쪽 중간」에 보입니다.
-  // 시트 윗변 바로 위(= 보이는 지도의 왼쪽 아래 귀퉁이)를 따라가게 logoMargin 으로 되돌립니다. 로고를 가리면 약관 위반입니다.
-  const [screenH, setScreenH] = useState(0);
-  const [sheetTop, setSheetTop] = useState<number | null>(null);
-  const sheetH = screenH ? screenH - (sheetTop ?? screenH * (1 - parseFloat(SHEET_SNAPS[SHEET_START]) / 100)) : MAP_PAD_BOTTOM;
-  const logoMargin = { bottom: sheetH + 6 - MAP_PAD_BOTTOM };
+  // 시트 윗변 바로 위(= 보이는 지도의 왼쪽 아래 귀퉁이)에 붙여, 시트를 끄는 동안에도 같이 오르내리게 합니다. 로고를 가리면 약관 위반입니다.
+  const screenH = useSharedValue(0);
+  const sheetTop = useSharedValue(0); // 시트 윗변의 y — BottomSheet 가 매 프레임 채웁니다.
+  const logoBottom = useDerivedValue(() => (screenH.value && sheetTop.value ? screenH.value - sheetTop.value + 6 - MAP_PAD_BOTTOM : null));
 
   const [sort, setSort] = useState<Sort>("recent");
   const [q, setQ] = useState("");
@@ -309,13 +309,13 @@ export default function MapTab() {
   );
 
   return (
-    <View style={{ flex: 1, backgroundColor: C.map }} onLayout={(e) => setScreenH(e.nativeEvent.layout.height)}>
+    <View style={{ flex: 1, backgroundColor: C.map }} onLayout={(e) => { screenH.value = e.nativeEvent.layout.height; }}>
       <PaperMap
         ref={mapRef}
         initialCamera={{ latitude: 37.5605, longitude: 126.982, zoom: 12 }}
         mapPadding={{ top: insets.top + 130, bottom: MAP_PAD_BOTTOM, left: 20, right: 20 }}
         logoAlign="BottomLeft"
-        logoMargin={logoMargin}
+        logoBottom={logoBottom}
         onCameraChanged={(e) => { if (e.reason === "Gesture") setMapMoved(true); }}
         onCameraIdle={(e) => {
           regionRef.current = { s: e.region.latitude, w: e.region.longitude, n: e.region.latitude + e.region.latitudeDelta, e: e.region.longitude + e.region.longitudeDelta };
@@ -403,9 +403,8 @@ export default function MapTab() {
         backgroundStyle={[{ backgroundColor: C.card, borderTopLeftRadius: 26, borderTopRightRadius: 26 }, SHADOW.sheet]}
         handleIndicatorStyle={{ width: 38, height: 4, borderRadius: 2, backgroundColor: "#ded8cb" }}
         handleStyle={{ paddingTop: 10, paddingBottom: 8 }}
-        // 올라갈 땐 미리 로고를 올려 시트에 안 가리게, 내려갈 땐 다 내려간 뒤 따라 내려옵니다.
-        onAnimate={(_from, _to, fromPos, toPos) => { if (toPos < fromPos) setSheetTop(toPos); }}
-        onChange={(_i, pos) => { Haptics.selectionAsync(); setSheetTop(pos); }}
+        animatedPosition={sheetTop}
+        onChange={() => Haptics.selectionAsync()}
       >
         <BottomSheetFlatList
           data={filtered}
