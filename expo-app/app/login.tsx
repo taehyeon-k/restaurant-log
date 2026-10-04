@@ -1,9 +1,11 @@
 import * as Linking from "expo-linking";
 import * as WebBrowser from "expo-web-browser";
+import { useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
+import { finishOAuth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { C, F, SHADOW } from "@/theme";
 
@@ -33,18 +35,13 @@ function GoogleIcon() {
   );
 }
 
-/** 돌아온 dinary://auth?…#… 의 쿼리와 해시를 한데 모읍니다 — 토큰은 해시로, 에러는 둘 중 어디로든 옵니다. */
-function readParams(url: string) {
-  const params = new URLSearchParams(url.split("?")[1]?.split("#")[0] ?? "");
-  new URLSearchParams(url.split("#")[1] ?? "").forEach((v, k) => params.set(k, v));
-  return params;
-}
-
 /** 카카오·구글 로그인 — 웹의 auth/callback 라우트 대신 dinary://auth 딥링크로 돌아옵니다(핸드오프 §5). */
 export default function Login() {
   const insets = useSafeAreaInsets();
   const [busy, setBusy] = useState<Provider | null>(null);
-  const [err, setErr] = useState("");
+  // /auth 라우트가 실패하면 ?error= 로 돌려보냅니다.
+  const { error: routeError } = useLocalSearchParams<{ error?: string }>();
+  const [err, setErr] = useState(routeError ?? "");
 
   async function login(provider: Provider) {
     setBusy(provider);
@@ -60,16 +57,8 @@ export default function Login() {
       const res = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
       if (res.type !== "success") return;
 
-      const params = readParams(res.url);
-      const failure = params.get("error_description") ?? params.get("error");
-      if (failure) return setErr(failure.replace(/\+/g, " "));
-
-      const access_token = params.get("access_token");
-      const refresh_token = params.get("refresh_token");
-      if (!access_token || !refresh_token) return setErr("로그인 정보를 받지 못했습니다");
-
-      const { error: e2 } = await supabase.auth.setSession({ access_token, refresh_token });
-      if (e2) setErr(e2.message);
+      const failure = await finishOAuth(res.url);
+      if (failure) setErr(failure);
     } catch (e) {
       setErr(e instanceof Error ? e.message : "로그인하지 못했습니다");
     } finally {

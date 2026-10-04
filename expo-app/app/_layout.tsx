@@ -57,9 +57,10 @@ function Gate({ fontsLoaded }: { fontsLoaded: boolean }) {
   // 로그인 · 닉네임(첫 로그인) 분기 — 웹의 proxy.ts / auth/callback 이 하던 일.
   useEffect(() => {
     if (!ready) return;
-    if (!session) { if (first !== "login") router.replace("/login"); return; }
+    // /auth 는 OAuth 딥링크가 세션을 여는 중이라 그대로 둡니다.
+    if (!session) { if (first !== "login" && first !== "auth") router.replace("/login"); return; }
     if (!account?.nickname) { if (first !== "welcome") router.replace("/welcome"); return; }
-    if (first === "login" || first === "welcome") router.replace("/");
+    if (first === "login" || first === "welcome" || first === "auth") router.replace("/");
   }, [ready, session, account?.nickname, first, router]);
 
   // 오프라인 큐 — 앱 복귀·연결 복구에서 비웁니다.
@@ -85,6 +86,7 @@ function Gate({ fontsLoaded }: { fontsLoaded: boolean }) {
       <Stack.Screen name="wish/new" options={{ presentation: "modal" }} />
       <Stack.Screen name="wish/spot" options={{ presentation: "fullScreenModal" }} />
       <Stack.Screen name="wish/[id]" options={{ presentation: "transparentModal", animation: "fade", contentStyle: { backgroundColor: "transparent" } }} />
+      <Stack.Screen name="auth" />
       <Stack.Screen name="login" />
       <Stack.Screen name="welcome" />
     </Stack>
