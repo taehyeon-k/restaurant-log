@@ -46,10 +46,13 @@ function Gate({ fontsLoaded }: { fontsLoaded: boolean }) {
   const userId = session?.user.id;
   useEffect(() => { if (userId) void qc.invalidateQueries(); }, [userId, qc]);
 
-  const { data: account, isPending: accountPending } = useAccount();
+  const { data: account, isPending: accountPending, isError: accountError } = useAccount();
   const { data: wishes } = useWishes();
 
-  const ready = fontsLoaded && session !== undefined && (!session || !accountPending);
+  // 로그인 직후엔 로그아웃 때 받아 둔 캐시(null)가 남아 있습니다. 그걸로 분기하면 /welcome 으로 갔다가
+  // 다시 읽은 뒤 홈으로 튕기므로, 지금 세션의 계정 정보가 올 때까지 기다립니다.
+  const accountFresh = !accountPending && (account?.userId === session?.user.id || accountError);
+  const ready = fontsLoaded && session !== undefined && (!session || accountFresh);
   const first = segments[0] as string | undefined;
 
   useEffect(() => { if (ready) SplashScreen.hideAsync(); }, [ready]);
