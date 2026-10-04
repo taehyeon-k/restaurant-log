@@ -1,0 +1,24 @@
+/* DINARY — src/theme/index.ts 의 C(색) · F(글꼴) 와 같은 값. 앱은 expo-font 로 글꼴을 불러오고, 여기서는 같은 파일을 @font-face 로 겁니다. */
+@font-face { font-family: "GowunBatang_700Bold"; src: url("./fonts/GowunBatang_700Bold.ttf") format("truetype"); font-weight: 700; font-display: swap; }
+@font-face { font-family: "NotoSansKR_400Regular"; src: url("./fonts/NotoSansKR_400Regular.ttf") format("truetype"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "NotoSansKR_500Medium"; src: url("./fonts/NotoSansKR_500Medium.ttf") format("truetype"); font-weight: 500; font-display: swap; }
+@font-face { font-family: "NotoSansKR_700Bold"; src: url("./fonts/NotoSansKR_700Bold.ttf") format("truetype"); font-weight: 700; font-display: swap; }
+@font-face { font-family: "JetBrainsMono_400Regular"; src: url("./fonts/JetBrainsMono_400Regular.ttf") format("truetype"); font-weight: 400; font-display: swap; }
+
+:root {
+  --dinary-paper: #f6f3ec;
+  --dinary-card: #fbfaf6;
+  --dinary-ink: #1c1a17;
+  --dinary-brick: #b4552d;
+  --dinary-brick-soft: #f7ece5;
+  --dinary-line: #d8d3c8;
+  --dinary-line-soft: #e2ddd2;
+  --dinary-muted: #6b665e;
+  --dinary-faint: #8a8377;
+  --dinary-kakao: #fee500;
+  --dinary-font-serif: "GowunBatang_700Bold", serif;
+  --dinary-font-sans: "NotoSansKR_400Regular", sans-serif;
+  --dinary-font-mono: "JetBrainsMono_400Regular", monospace;
+}
+
+body { margin: 0; color: var(--dinary-ink); font-family: var(--dinary-font-sans); }

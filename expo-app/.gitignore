@@ -1,4 +1,5 @@
 node_modules/
+/node_modules
 .expo/
 dist/
 ios/
@@ -11,3 +12,11 @@ android/
 
 expo-env.d.ts
 # @end expo-cli
+# design-sync (Claude Design) — staged scripts, build output, machine state
+.ds-sync/
+ds-bundle/
+ds-dist/
+.design-sync/.cache/
+.design-sync/learnings/
+.design-sync/node_modules
+.design-sync/tsconfig.dist.json

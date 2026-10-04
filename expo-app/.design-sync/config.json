@@ -1,0 +1,29 @@
+{
+  "projectId": "8fe27e04-e09e-419d-a0c5-699d276551e8",
+  "shape": "package",
+  "pkg": "dinary-expo",
+  "globalName": "Dinary",
+  "buildCmd": "node .design-sync/build-dist.mjs",
+  "cssEntry": "styles.css",
+  "readmeHeader": ".design-sync/conventions.md",
+  "componentSrcMap": { "SafeAreaProvider": null },
+  "provider": {
+    "component": "SafeAreaProvider",
+    "props": {
+      "initialMetrics": {
+        "frame": { "x": 0, "y": 0, "width": 390, "height": 844 },
+        "insets": { "top": 0, "left": 0, "right": 0, "bottom": 0 }
+      }
+    }
+  },
+  "dtsPropsFor": {
+    "Button": "label: string; onPress: () => void; kind?: \"dark\" | \"brick\" | \"line\"; disabled?: boolean; style?: React.CSSProperties",
+    "Row": "children: React.ReactNode; style?: React.CSSProperties",
+    "PhotoBox": "src?: string | null; category?: string | null; size?: number; radius?: number; style?: React.CSSProperties; children?: React.ReactNode"
+  },
+  "overrides": {
+    "BottomSheetModal": { "cardMode": "single", "viewport": "390x560" },
+    "Placeholder": { "cardMode": "column" },
+    "ScreenHead": { "cardMode": "column" }
+  }
+}
