@@ -89,6 +89,15 @@ export const BurstIcon = ({ size = 18, fill = "#b4552d" }: { size?: number; fill
   </Svg>
 );
 
+/** 현재 위치 — 지도 앱에서 흔히 쓰는 조준선(고리 + 네 방향 눈금 + 가운데 점). */
+export const LocateIcon = ({ size = 22, stroke = "#b4552d", strokeWidth = 1.7 }: P) => (
+  <Svg {...base(size, stroke, strokeWidth)}>
+    <Circle cx="12" cy="12" r="6.5" />
+    <Path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3" />
+    <Circle cx="12" cy="12" r="2.4" fill={stroke} stroke="none" />
+  </Svg>
+);
+
 /** 인증 마크 — 버스트 위에 체크. */
 export const VerifiedMark = ({ size = 52 }: { size?: number }) => (
   <Svg width={size} height={size} viewBox="0 0 100 100">
