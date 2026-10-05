@@ -9,7 +9,7 @@ import Animated, { useAnimatedReaction, useAnimatedStyle, useDerivedValue, useSh
 import Svg, { Defs, LinearGradient, Path, Rect, Stop } from "react-native-svg";
 import { scheduleOnRN } from "react-native-worklets";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { BookmarkIcon, BurstIcon, SearchIcon } from "@/components/icons";
+import { BookmarkIcon, BurstIcon, LocateIcon, SearchIcon } from "@/components/icons";
 import { PaperMap } from "@/components/PaperMap";
 import { DraftsBoxIcon } from "@/components/DraftsBoxIcon";
 import { useRows, useWishes } from "@/data/queries";
@@ -422,9 +422,7 @@ export default function MapTab() {
       {/* 현재 위치 — 웹에는 없지만 앱에서는 보관함 위에 남겨 둡니다 */}
       <Animated.View style={[s.floatRight, locateStyle]}>
         <Pressable onPress={locate} accessibilityLabel="현재 위치" style={[s.round, SHADOW.card]}>
-          <View style={{ width: 16, height: 16, borderRadius: 8, borderWidth: 1.6, borderColor: C.brick, alignItems: "center", justifyContent: "center" }}>
-            <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: C.brick }} />
-          </View>
+          <LocateIcon size={22} stroke={C.brick} />
         </Pressable>
       </Animated.View>
 
