@@ -327,8 +327,6 @@ export default function MapTab() {
         </Pressable>
       </View>
 
-      {chipVisible && <View style={{ alignItems: "flex-end", paddingHorizontal: 20, paddingBottom: 8 }}>{boundsChip(false)}</View>}
-
       {chipItems.length > 0 && (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingHorizontal: 20, paddingBottom: 10, alignItems: "center" }}>
           {chipItems.map((c) => (
@@ -346,6 +344,8 @@ export default function MapTab() {
             <Text style={{ fontFamily: sort === o.value ? F.sansMd : F.sans, fontSize: 12.5, color: sort === o.value ? C.ink : "#a8a196" }}>{o.label}</Text>
           </Pressable>
         ))}
+        {/* 「현 지도에 있는 기록만」은 정렬과 같은 줄 오른쪽 끝에 둡니다 */}
+        {chipVisible && <View style={{ marginLeft: "auto" }}>{boundsChip(false)}</View>}
       </View>
     </View>
   );
@@ -581,5 +581,5 @@ const s = StyleSheet.create({
     paddingHorizontal: 12, flexDirection: "row", alignItems: "center", gap: 8,
   },
   boundsChip: { minHeight: 28, borderRadius: 14, borderWidth: 1, borderColor: "#e0c3b1", backgroundColor: "#f9f0e9", paddingHorizontal: 10, flexDirection: "row", alignItems: "center", gap: 5 },
-  sortRow: { flexDirection: "row", gap: 16, paddingHorizontal: 20, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: "#e6e0d3", marginBottom: 12 },
+  sortRow: { flexDirection: "row", alignItems: "center", minHeight: 28, gap: 16, paddingHorizontal: 20, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: "#e6e0d3", marginBottom: 12 },
 });
