@@ -4,8 +4,10 @@ import { useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
 import * as Location from "expo-location";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { useDerivedValue, useSharedValue } from "react-native-reanimated";
+import { Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View, type ViewStyle } from "react-native";
+import Animated, { useAnimatedReaction, useAnimatedStyle, useDerivedValue, useSharedValue } from "react-native-reanimated";
+import Svg, { Defs, LinearGradient, Path, Rect, Stop } from "react-native-svg";
+import { scheduleOnRN } from "react-native-worklets";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BookmarkIcon, BurstIcon, SearchIcon } from "@/components/icons";
 import { PaperMap } from "@/components/PaperMap";
@@ -33,13 +35,23 @@ const SORTS: { value: Sort; label: string }[] = [
 const FILTERS: { id: MarkerFilter; label: string }[] = [
   { id: "all", label: "둘 다" },
   { id: "visited", label: "기록만" },
-  { id: "wish", label: "위시만" },
+  { id: "wish", label: "위시리스트만" },
 ];
 
 /** 지도 콘텐츠 패딩(아래) — 카메라 중심을 시트 위로 올려둡니다. */
 const MAP_PAD_BOTTOM = 320;
-const SHEET_SNAPS = ["12%", "46%", "88%"];
-const SHEET_START = 1;
+/** 웹 MobileShell 과 같은 네 단계 — peek 96 · 35% · 75% · full(화면 − 84). 처음엔 75% 로 엽니다. */
+const SHEET_START = 2;
+/** 시트가 이보다 낮으면 머리를 한 줄(맛집 기록 · 가게 N · 기록 M)로 줄입니다 — 웹 COMPACT_BELOW. */
+const COMPACT_BELOW = 200;
+/** 지도 위 단추들이 시트 윗변에서 띄우는 간격. 마커 필터는 웹(14)보다 24 높게 — 왼쪽 아래 네이버 로고를 가리면 약관 위반입니다. */
+const GAP_FILTER = 38;
+const GAP_DRAFTS = 14;
+const GAP_PLUS = 16;
+const FILTER_H = 38;
+const DRAFTS_H = 56;
+const PLUS_H = 52;
+const LOCATE_H = 44;
 
 type Bounds = { s: number; w: number; n: number; e: number };
 type Pt = [number, number];
@@ -48,6 +60,7 @@ const uniq = (list: (string | null | undefined)[]) => [...new Set(list.filter((v
 /** 지도 탭 — 네이버 지도 + 기록 목록 시트. 웹 MobileShell 의 지도 화면 상태를 그대로 옮겼습니다. */
 export default function MapTab() {
   const insets = useSafeAreaInsets();
+  const { height: windowH } = useWindowDimensions();
   const router = useRouter();
   const { data: allRows = [] } = useRows();
   const { data: wishes = [] } = useWishes();
@@ -64,6 +77,25 @@ export default function MapTab() {
   const screenH = useSharedValue(0);
   const sheetTop = useSharedValue(0); // 시트 윗변의 y — BottomSheet 가 매 프레임 채웁니다.
   const logoBottom = useDerivedValue(() => (screenH.value && sheetTop.value ? screenH.value - sheetTop.value + 6 - MAP_PAD_BOTTOM : null));
+
+  const [layoutH, setLayoutH] = useState(0);
+  const sheetSnaps = useMemo(() => [96, "35%", "75%", Math.max(260, (layoutH || windowH) - 84)], [layoutH, windowH]);
+  const sheetIndex = useRef(SHEET_START);
+
+  // 지도 위 단추들은 시트 윗변을 따라 오르내립니다. 검색줄 위로는 올라가지 않습니다.
+  const minTop = insets.top + 8 + 46 + 12;
+  const filterStyle = useAnimatedStyle(() => ({ top: Math.max(minTop, sheetTop.value - GAP_FILTER - FILTER_H) }));
+  const draftsStyle = useAnimatedStyle(() => ({ top: Math.max(minTop, sheetTop.value - GAP_DRAFTS - DRAFTS_H) }));
+  const locateStyle = useAnimatedStyle(() => ({ top: Math.max(minTop, sheetTop.value - GAP_DRAFTS - DRAFTS_H - 10 - LOCATE_H) }));
+  const plusStyle = useAnimatedStyle(() => ({ top: Math.max(minTop, sheetTop.value - GAP_PLUS - PLUS_H) }));
+  // + 메뉴는 위로 펼칩니다 — 아랫변이 + 단추 아랫변보다 60 위(웹과 같음).
+  const plusMenuStyle = useAnimatedStyle(() => ({ bottom: screenH.value - Math.max(minTop, sheetTop.value - GAP_PLUS - PLUS_H) - PLUS_H + 60 }));
+
+  const [compact, setCompact] = useState(false);
+  useAnimatedReaction(
+    () => screenH.value > 0 && sheetTop.value > 0 && screenH.value - sheetTop.value < COMPACT_BELOW,
+    (v, prev) => { if (v !== prev) scheduleOnRN(setCompact, v); },
+  );
 
   const [sort, setSort] = useState<Sort>("recent");
   const [q, setQ] = useState("");
@@ -166,7 +198,7 @@ export default function MapTab() {
     holdFit.current = true;
     setViewBounds(regionRef.current);
     setMapMoved(false);
-    sheetRef.current?.snapToIndex(1);
+    if (sheetIndex.current === 0) sheetRef.current?.snapToIndex(1);
   };
 
   const clearAll = () => { setCategories([]); setKeywords([]); setRevisitOnly(false); setVerifiedOnly(false); setViewBounds(null); };
@@ -259,33 +291,43 @@ export default function MapTab() {
     ...(verifiedOnly ? [{ key: "verified", label: "인증된 기록", onClear: () => setVerifiedOnly(false) }] : []),
   ];
 
-  const header = (
-    <View style={{ paddingBottom: 6 }}>
+  const boundsChip = (small: boolean) => (
+    <Pressable onPress={applyViewBounds} style={[s.boundsChip, small && { minHeight: 26, borderRadius: 13, paddingHorizontal: 9 }]}>
+      <RefreshIcon size={small ? 10 : 11} />
+      <Text style={{ fontFamily: F.sans, fontSize: small ? 10.5 : 11, color: C.brick }}>현 지도에 있는 기록만</Text>
+    </Pressable>
+  );
+  const chipVisible = mapMoved && !overlayOpen;
+  const title = kind === "cafe" ? "카페 기록" : "맛집 기록";
+
+  // 시트가 낮으면(peek) 한 줄 요약만 — 검색·칩·정렬은 숨깁니다(웹과 같음).
+  const header = compact ? (
+    <View style={s.compactRow}>
+      <Text numberOfLines={1} style={{ flexShrink: 1, fontFamily: F.mono, fontSize: 11.5, color: C.faint }}>{title} · 가게 {filtered.length} · 기록 {visitCount}</Text>
+      {chipVisible && boundsChip(true)}
+    </View>
+  ) : (
+    <View>
       <View style={s.headRow}>
-        <Text style={s.h}>{kind === "cafe" ? "카페 기록" : "맛집 기록"}</Text>
-        <Text style={s.count}>가게 {filtered.length} · 기록 {visitCount}</Text>
-        <View style={{ flex: 1 }} />
+        <View>
+          <Text style={s.h}>{title}</Text>
+          <Text style={s.count}>가게 {filtered.length} · 기록 {visitCount}</Text>
+        </View>
+        <View style={s.searchIn}>
+          <SearchIcon size={14} />
+          <BottomSheetTextInput value={q} onChangeText={setQ} placeholder="내 기록에서 찾기" placeholderTextColor="#a8a196" style={{ flex: 1, padding: 0, fontFamily: F.sans, fontSize: 12.5, color: C.ink }} />
+        </View>
         <Pressable
           onPress={() => setFiltersOpen(true)}
           accessibilityLabel="필터"
           style={[s.filterBtn, activeFilters ? { backgroundColor: C.ink, borderWidth: 0 } : null]}
         >
+          <FilterLinesIcon stroke={activeFilters ? C.card : C.muted} />
           <Text style={{ fontFamily: F.sans, fontSize: 12.5, color: activeFilters ? C.card : C.muted }}>{activeFilters ? activeFilters : "필터"}</Text>
         </Pressable>
       </View>
 
-      <View style={s.searchIn}>
-        <SearchIcon size={14} />
-        <BottomSheetTextInput value={q} onChangeText={setQ} placeholder="내 기록에서 찾기" placeholderTextColor="#a8a196" style={{ flex: 1, padding: 0, fontFamily: F.sans, fontSize: 12.5, color: C.ink }} />
-      </View>
-
-      {mapMoved && !overlayOpen && (
-        <View style={{ alignItems: "flex-end", paddingHorizontal: 20, paddingBottom: 8 }}>
-          <Pressable onPress={applyViewBounds} style={s.boundsChip}>
-            <Text style={{ fontFamily: F.sans, fontSize: 11, color: C.brick }}>↻ 현 지도에 있는 기록만</Text>
-          </Pressable>
-        </View>
-      )}
+      {chipVisible && <View style={{ alignItems: "flex-end", paddingHorizontal: 20, paddingBottom: 8 }}>{boundsChip(false)}</View>}
 
       {chipItems.length > 0 && (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingHorizontal: 20, paddingBottom: 10, alignItems: "center" }}>
@@ -309,7 +351,7 @@ export default function MapTab() {
   );
 
   return (
-    <View style={{ flex: 1, backgroundColor: C.map }} onLayout={(e) => { screenH.value = e.nativeEvent.layout.height; }}>
+    <View style={{ flex: 1, backgroundColor: C.map }} onLayout={(e) => { screenH.value = e.nativeEvent.layout.height; setLayoutH(e.nativeEvent.layout.height); }}>
       <PaperMap
         ref={mapRef}
         initialCamera={{ latitude: 37.5605, longitude: 126.982, zoom: 12 }}
@@ -337,6 +379,17 @@ export default function MapTab() {
         )}
       </PaperMap>
 
+      {/* 위쪽을 눕히는 종이색 그라데이션 — 검색줄 아래에 깝니다 */}
+      <Svg pointerEvents="none" width="100%" height={insets.top + 62} style={s.topFade}>
+        <Defs>
+          <LinearGradient id="topFade" x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0" stopColor={C.paper} stopOpacity={0.96} />
+            <Stop offset="1" stopColor={C.paper} stopOpacity={0} />
+          </LinearGradient>
+        </Defs>
+        <Rect x="0" y="0" width="100%" height="100%" fill="url(#topFade)" />
+      </Svg>
+
       {/* 검색 행 */}
       <View style={[s.searchRow, { top: insets.top + 8 }]}>
         <PlaceSearch value={mapQuery} onChange={setMapQuery} onChoose={choosePlace} hasPicked={!!ghost} onClearPicked={() => setState({ ghost: null })} />
@@ -345,17 +398,8 @@ export default function MapTab() {
         </Pressable>
       </View>
 
-      {/* 마커 필터 칩 */}
-      <View style={[s.chips, { top: insets.top + 8 + 46 + 12 }]}>
-        {FILTERS.map((f) => (
-          <Pressable key={f.id} onPress={() => { Haptics.selectionAsync(); setState({ markerFilter: f.id }); }} style={[s.chip, markerFilter === f.id && { backgroundColor: C.brick }]}>
-            <Text style={{ fontFamily: F.sans, fontSize: 11.5, color: markerFilter === f.id ? C.card : C.muted }}>{f.label}</Text>
-          </Pressable>
-        ))}
-      </View>
-
       {regionView && (
-        <View style={[s.regionBand, { top: insets.top + 8 + 46 + 12 + 40 }]}>
+        <View style={[s.regionBand, { top: minTop }]}>
           <View style={{ flex: 1 }}>
             <Text numberOfLines={1} style={{ fontFamily: F.serif, fontSize: 14, color: C.ink }}>{regionView.name}</Text>
             <Text numberOfLines={1} style={{ marginTop: 2, fontFamily: F.sans, fontSize: 11, color: C.faint }}>이 지역 기록 {regionView.count}곳 · 근처 식당을 보여줍니다</Text>
@@ -366,45 +410,65 @@ export default function MapTab() {
         </View>
       )}
 
-      {/* 오른쪽 버튼 열: 현위치 · 기록/계획 추가 · 보관함 */}
-      <View style={[s.rightCol, { top: insets.top + 8 + 46 + 12 + 40 + (regionView ? 62 : 0) }]}>
+      {/* 마커 필터 — 지도 왼쪽 아래, 시트를 따라 오르내립니다 */}
+      <Animated.View style={[s.chips, filterStyle]}>
+        {FILTERS.map((f) => (
+          <Pressable key={f.id} onPress={() => { Haptics.selectionAsync(); setState({ markerFilter: f.id }); }} style={[s.chip, markerFilter === f.id && { backgroundColor: C.brick }]}>
+            <Text style={{ fontFamily: F.sans, fontSize: 11.5, color: markerFilter === f.id ? C.card : C.muted }}>{f.label}</Text>
+          </Pressable>
+        ))}
+      </Animated.View>
+
+      {/* 현재 위치 — 웹에는 없지만 앱에서는 보관함 위에 남겨 둡니다 */}
+      <Animated.View style={[s.floatRight, locateStyle]}>
         <Pressable onPress={locate} accessibilityLabel="현재 위치" style={[s.round, SHADOW.card]}>
           <View style={{ width: 16, height: 16, borderRadius: 8, borderWidth: 1.6, borderColor: C.brick, alignItems: "center", justifyContent: "center" }}>
             <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: C.brick }} />
           </View>
         </Pressable>
-        <Pressable onPress={() => setPlusOpen((v) => !v)} accessibilityLabel="기록·계획 추가" style={[s.round, SHADOW.card, plusOpen && { backgroundColor: C.brick, borderColor: C.brick }]}>
-          <Text style={{ fontSize: 22, lineHeight: 24, color: plusOpen ? C.card : C.ink, transform: [{ rotate: plusOpen ? "45deg" : "0deg" }] }}>+</Text>
-        </Pressable>
-        {plusOpen && (
-          <View style={{ alignItems: "flex-end", gap: 8 }}>
-            <Pressable onPress={() => { setPlusOpen(false); newRecord({}); }} style={[s.menuBtn, SHADOW.card]}>
-              <View style={{ width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: C.faint }} />
-              <Text style={{ fontFamily: F.sans, fontSize: 13, color: C.ink }}>기록 추가</Text>
-            </Pressable>
-            <Pressable onPress={() => { setPlusOpen(false); router.push("/wish/new"); }} style={[s.menuBtn, SHADOW.card]}>
-              <BookmarkIcon size={20} />
-              <Text style={{ fontFamily: F.sans, fontSize: 13, color: C.ink }}>계획 추가</Text>
-            </Pressable>
-          </View>
-        )}
-        <Pressable onPress={() => router.push("/drafts")} accessibilityLabel="보관함" style={[s.round, SHADOW.card]}>
-          <DraftsBoxIcon size={21} />
+      </Animated.View>
+
+      {/* 보관함 */}
+      <Animated.View style={[s.floatRight, draftsStyle]}>
+        <Pressable onPress={() => router.push("/drafts")} accessibilityLabel="보관함" style={[s.drafts, SHADOW_FAB]}>
+          <DraftsBoxIcon size={23} />
           {pendingRows.length > 0 && (
-            <View style={s.badge}><Text style={{ fontFamily: F.mono, fontSize: 10, color: C.card }}>{pendingRows.length}</Text></View>
+            <View style={s.badge}><Text style={{ fontFamily: F.mono, fontSize: 10.5, color: C.card }}>{pendingRows.length}</Text></View>
           )}
         </Pressable>
-      </View>
+      </Animated.View>
+
+      {/* + 단추 — 두 갈래: 기록 추가 / 계획 추가. 메뉴는 위로 펼치고, 바깥을 누르면 닫힙니다 */}
+      {plusOpen && <Pressable accessibilityLabel="메뉴 닫기" onPress={() => setPlusOpen(false)} style={StyleSheet.absoluteFill} />}
+      {plusOpen && (
+        <Animated.View style={[s.plusMenu, plusMenuStyle]}>
+          <Pressable onPress={() => { setPlusOpen(false); newRecord({}); }} style={[s.menuBtn, SHADOW_FAB]}>
+            <View style={{ width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: C.faint }} />
+            <Text style={{ fontFamily: F.sans, fontSize: 13, color: C.ink }}>기록 추가</Text>
+          </Pressable>
+          <Pressable onPress={() => { setPlusOpen(false); router.push("/wish/new"); }} style={[s.menuBtn, SHADOW_FAB]}>
+            <BookmarkIcon size={20} />
+            <Text style={{ fontFamily: F.sans, fontSize: 13, color: C.ink }}>계획 추가</Text>
+          </Pressable>
+        </Animated.View>
+      )}
+      <Animated.View style={[s.floatPlus, plusStyle]}>
+        <Pressable onPress={() => setPlusOpen((v) => !v)} accessibilityLabel="기록·계획 추가" style={[s.plus, SHADOW_FAB, plusOpen && { backgroundColor: C.brick, borderWidth: 0 }]}>
+          <View style={{ transform: [{ rotate: plusOpen ? "45deg" : "0deg" }] }}>
+            <PlusIcon stroke={plusOpen ? C.card : C.ink} />
+          </View>
+        </Pressable>
+      </Animated.View>
 
       <BottomSheet
         ref={sheetRef}
         index={SHEET_START}
-        snapPoints={SHEET_SNAPS}
-        backgroundStyle={[{ backgroundColor: C.card, borderTopLeftRadius: 26, borderTopRightRadius: 26 }, SHADOW.sheet]}
-        handleIndicatorStyle={{ width: 38, height: 4, borderRadius: 2, backgroundColor: "#ded8cb" }}
-        handleStyle={{ paddingTop: 10, paddingBottom: 8 }}
+        snapPoints={sheetSnaps}
+        backgroundStyle={[{ backgroundColor: C.paper, borderTopLeftRadius: 28, borderTopRightRadius: 28 }, SHADOW_SHEET]}
+        handleIndicatorStyle={{ width: 42, height: 4, borderRadius: 2, backgroundColor: "#cfc8ba" }}
+        handleStyle={{ paddingTop: 11, paddingBottom: 9 }}
         animatedPosition={sheetTop}
-        onChange={() => Haptics.selectionAsync()}
+        onChange={(i) => { sheetIndex.current = i; Haptics.selectionAsync(); }}
       >
         <BottomSheetFlatList
           data={filtered}
@@ -458,7 +522,37 @@ export default function MapTab() {
   );
 }
 
+/** 웹 + 단추 — 획으로 그린 더하기(20, 1.7). */
+const PlusIcon = ({ stroke }: { stroke: string }) => (
+  <Svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth={1.7} strokeLinecap="round">
+    <Path d="M12 5v14M5 12h14" />
+  </Svg>
+);
+
+/** 필터 단추의 세 줄. */
+const FilterLinesIcon = ({ stroke }: { stroke: string }) => (
+  <Svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth={1.9} strokeLinecap="round">
+    <Path d="M4 7h16M7 12h10M10 17h4" />
+  </Svg>
+);
+
+/** 「현 지도에 있는 기록만」 칩의 새로고침 화살표. */
+const RefreshIcon = ({ size }: { size: number }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={C.brick} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M20.5 12a8.5 8.5 0 1 1-2.6-6.1" />
+    <Path d="M20.5 4.5v4.2h-4.2" />
+  </Svg>
+);
+
+const shadow = (opacity: number, radius: number, y: number, elevation: number): ViewStyle =>
+  Platform.select<ViewStyle>({ ios: { shadowColor: C.ink, shadowOpacity: opacity, shadowRadius: radius, shadowOffset: { width: 0, height: y } }, default: { elevation } })!;
+/** 웹 0 6px 18px rgba(28,26,23,.16) — 보관함·+·메뉴. */
+const SHADOW_FAB = shadow(0.15, 17, 6, 6);
+/** 웹 0 -8px 30px rgba(28,26,23,.16) — 시트. */
+const SHADOW_SHEET = shadow(0.16, 30, -8, 12);
+
 const s = StyleSheet.create({
+  topFade: { position: "absolute", top: 0, left: 0, right: 0 },
   searchRow: { position: "absolute", left: 16, right: 16, flexDirection: "row", alignItems: "flex-start", gap: 9, zIndex: 20 },
   round: { width: 44, height: 44, borderRadius: 22, borderWidth: 1, borderColor: C.line, backgroundColor: C.card, alignItems: "center", justifyContent: "center" },
   chips: {
@@ -469,20 +563,25 @@ const s = StyleSheet.create({
     position: "absolute", left: 16, right: 16, flexDirection: "row", alignItems: "center", gap: 11, borderRadius: 18, borderWidth: 1, borderColor: C.line,
     backgroundColor: "rgba(251,250,246,.96)", paddingHorizontal: 13, paddingVertical: 11,
   },
-  rightCol: { position: "absolute", right: 16, alignItems: "flex-end", gap: 10 },
+  floatRight: { position: "absolute", right: 16 },
+  floatPlus: { position: "absolute", right: 84 },
+  drafts: { width: DRAFTS_H, height: DRAFTS_H, borderRadius: DRAFTS_H / 2, borderWidth: 1, borderColor: C.line, backgroundColor: C.card, alignItems: "center", justifyContent: "center" },
+  plus: { width: PLUS_H, height: PLUS_H, borderRadius: PLUS_H / 2, borderWidth: 1, borderColor: C.line, backgroundColor: C.card, alignItems: "center", justifyContent: "center" },
+  plusMenu: { position: "absolute", right: 16, alignItems: "flex-end", gap: 8 },
   menuBtn: { minHeight: 46, flexDirection: "row", alignItems: "center", gap: 8, borderRadius: 16, backgroundColor: C.card, paddingHorizontal: 16 },
   badge: {
     position: "absolute", top: -3, right: -3, minWidth: 21, height: 21, borderRadius: 11, borderWidth: 2, borderColor: C.paper,
     backgroundColor: C.brick, alignItems: "center", justifyContent: "center", paddingHorizontal: 4,
   },
-  headRow: { flexDirection: "row", alignItems: "baseline", gap: 8, paddingHorizontal: 20, paddingTop: 6, paddingBottom: 10 },
-  h: { fontFamily: F.serif, fontSize: 19, color: C.ink },
-  count: { fontFamily: F.mono, fontSize: 11, color: C.faint },
-  filterBtn: { height: 36, borderRadius: 18, borderWidth: 1, borderColor: "#ded8cb", backgroundColor: C.card, paddingHorizontal: 14, justifyContent: "center", alignSelf: "center" },
+  headRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 20, paddingBottom: 10 },
+  compactRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8, paddingHorizontal: 20, paddingBottom: 12 },
+  h: { fontFamily: F.serif, fontSize: 18, color: C.ink },
+  count: { marginTop: 3, fontFamily: F.mono, fontSize: 10.5, color: C.faint },
+  filterBtn: { height: 40, borderRadius: 20, borderWidth: 1, borderColor: "#ded8cb", backgroundColor: C.card, paddingHorizontal: 12, flexDirection: "row", alignItems: "center", gap: 5 },
   searchIn: {
-    marginHorizontal: 20, marginBottom: 10, height: 40, borderRadius: 20, borderWidth: 1, borderColor: "#ded8cb", backgroundColor: C.paper,
+    flex: 1, minWidth: 0, height: 40, borderRadius: 20, borderWidth: 1, borderColor: "#ded8cb", backgroundColor: C.card,
     paddingHorizontal: 12, flexDirection: "row", alignItems: "center", gap: 8,
   },
-  boundsChip: { minHeight: 28, borderRadius: 14, borderWidth: 1, borderColor: "#e0c3b1", backgroundColor: "#f9f0e9", paddingHorizontal: 10, justifyContent: "center" },
+  boundsChip: { minHeight: 28, borderRadius: 14, borderWidth: 1, borderColor: "#e0c3b1", backgroundColor: "#f9f0e9", paddingHorizontal: 10, flexDirection: "row", alignItems: "center", gap: 5 },
   sortRow: { flexDirection: "row", gap: 16, paddingHorizontal: 20, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: "#e6e0d3", marginBottom: 12 },
 });
