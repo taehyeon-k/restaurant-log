@@ -6,19 +6,10 @@ import type { Restaurant } from "@/lib/types";
  * 획득 조건은 아직 확정되지 않았습니다 — 아래 규칙은 시제품의 설명글을
  * 글자 그대로 옮긴 잠정값입니다. 기준이 정해지면 need / count 만 고치면 됩니다.
  */
-export type LabelShape =
-  | "check"
-  | "scallop"
-  | "shield"
-  | "hex"
-  | "diamond"
-  | "oct"
-  | "seal";
-
 export type LabelDef = {
   id: string;
-  glyph?: string;
-  shape: LabelShape;
+  /** 24×24 viewBox, 선만 그리는 SVG path */
+  icon: string;
   color: string;
   name: string;
   desc: string;
@@ -63,7 +54,7 @@ const streak = (rows: Restaurant[]) => {
 export const LABELS: LabelDef[] = [
   {
     id: "verified",
-    shape: "check",
+    icon: "M6.5 12.5l3.5 3.5 7.5-8",
     color: "#b4552d",
     name: "인증 기록자",
     desc: "인증 기록 40개",
@@ -72,7 +63,7 @@ export const LABELS: LabelDef[] = [
   },
   {
     id: "gold",
-    shape: "scallop",
+    icon: "M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.9L12 17l-5.2 2.7 1-5.9-4.3-4.1 5.9-.8Z",
     color: "#b58a2b",
     name: "골드 라벨",
     desc: "5.0을 준 집 열 곳",
@@ -82,7 +73,7 @@ export const LABELS: LabelDef[] = [
   },
   {
     id: "regular",
-    shape: "shield",
+    icon: "M12 19.5s-7-4.3-7-9.6a3.9 3.9 0 0 1 7-2.4 3.9 3.9 0 0 1 7 2.4c0 5.3-7 9.6-7 9.6Z",
     color: "#a8412a",
     name: "레드 라벨",
     desc: "한 가게에 다섯 번",
@@ -92,7 +83,7 @@ export const LABELS: LabelDef[] = [
   },
   {
     id: "hundred",
-    shape: "seal",
+    icon: "M3.5 11.5h17a8.5 8 0 0 1-17 0Z M9 8c0-1.4 1-1.6 1-3 M14 8c0-1.4 1-1.6 1-3",
     color: "#2f3a47",
     name: "백 그릇",
     desc: "방문 100회",
@@ -101,8 +92,8 @@ export const LABELS: LabelDef[] = [
   },
   {
     id: "midnight",
-    shape: "diamond",
-    color: "#2f3a47",
+    icon: "M18.5 14.5A7 7 0 1 1 9.5 5.5a5.6 5.6 0 0 0 9 9Z",
+    color: "#3d4a6b",
     name: "한밤의 기록",
     desc: "자정 이후 10개",
     need: 10,
@@ -114,7 +105,7 @@ export const LABELS: LabelDef[] = [
   },
   {
     id: "first",
-    shape: "oct",
+    icon: "M12 20.5v-8 M12 12.5c0-4 2.8-6.5 7-6.5 0 4-2.8 6.5-7 6.5Z M12 15c0-3-2.5-5-6-5 0 3 2.5 5 6 5Z",
     color: "#6f7350",
     name: "첫 한 끼",
     desc: "첫 기록을 남긴 날",
@@ -123,7 +114,7 @@ export const LABELS: LabelDef[] = [
   },
   {
     id: "regions",
-    shape: "hex",
+    icon: "M12 20.5s-6-6-6-10.8a6 6 0 0 1 12 0c0 4.8-6 10.8-6 10.8Z M12 7.7a2 2 0 1 0 .01 0",
     color: "#7a5c42",
     name: "열 동네",
     desc: "지역 10곳",
@@ -132,40 +123,40 @@ export const LABELS: LabelDef[] = [
   },
   {
     id: "years",
-    shape: "shield",
+    icon: "M5 6.5h14v13H5Z M5 10.5h14 M9 4.5v4 M15 4.5v4",
     color: "#4f7a6a",
     name: "세 해의 기록",
     desc: "3년 연속",
     need: 3,
     count: streak,
   },
-  { id: "revisit", shape: "seal", color: "#b4552d", name: "다시 그 집", desc: "재방문 20곳", need: 20, count: (rows) => distinct(rows.filter((r) => r.revisit).map((r) => r.place_key ?? r.name)).size },
-  { id: "palate", shape: "hex", color: "#6f8455", name: "고루 먹는 입", desc: "분류 8가지", need: 8, count: (rows) => distinct(rows.map((r) => r.category)).size },
+  { id: "revisit", icon: "M18.5 12a6.5 6.5 0 1 1-1.9-4.6 M18.5 4.5v3.5H15", color: "#b4552d", name: "다시 그 집", desc: "재방문 20곳", need: 20, count: (rows) => distinct(rows.filter((r) => r.revisit).map((r) => r.place_key ?? r.name)).size },
+  { id: "palate", icon: "M7.5 4v5.5a2 2 0 0 0 4 0V4 M9.5 4v16 M16.5 20V4c1.8 1 2.8 3.6 2.8 7.5h-2.8", color: "#6f8455", name: "고루 먹는 입", desc: "분류 8가지", need: 8, count: (rows) => distinct(rows.map((r) => r.category)).size },
   {
-    id: "weekend", shape: "diamond", color: "#7a6a9a", name: "주말의 식탁", desc: "토·일 기록 20개", need: 20,
+    id: "weekend", icon: "M8 4h8c0 4.8-1.6 7.5-4 7.5S8 8.8 8 4Z M12 11.5v8 M8.5 19.5h7", color: "#7a6a9a", name: "주말의 식탁", desc: "토·일 기록 20개", need: 20,
     count: (rows) =>
       rows.filter((r) => r.visited_at && [0, 6].includes(new Date(`${r.visited_at}T00:00:00`).getDay())).length,
   },
   {
-    id: "album", shape: "scallop", color: "#5f7a8a", name: "사진첩", desc: "사진 세 장 이상 10개", need: 10,
+    id: "album", icon: "M4.5 6h15v12.5h-15Z M4.5 15.5l4.5-4.5 4 4 2-2 4.5 4.5 M15 8.6a1.3 1.3 0 1 0 .01 0", color: "#5f7a8a", name: "사진첩", desc: "사진 세 장 이상 10개", need: 10,
     count: (rows) =>
       rows.filter((r) => (r.photo_urls?.length ?? (r.photo_url ? 1 : 0)) >= 3).length,
   },
   {
-    id: "longform", shape: "shield", color: "#7a5c42", name: "긴 이야기", desc: "100자 넘는 메모 5개", need: 5,
+    id: "longform", icon: "M5.5 18.5l1-3.8 9.6-9.6 2.8 2.8-9.6 9.6Z M14 7.2l2.8 2.8", color: "#7a5c42", name: "긴 이야기", desc: "100자 넘는 메모 5개", need: 5,
     count: (rows) => rows.filter((r) => (r.review ?? "").length > 100).length,
   },
   {
-    id: "morning", shape: "oct", color: "#c07a2e", name: "아침의 사람", desc: "오전 기록 10개", need: 10,
+    id: "morning", icon: "M12 8a4 4 0 1 0 .01 0 M12 3v2 M12 19v2 M3 12h2 M19 12h2 M5.7 5.7l1.4 1.4 M16.9 16.9l1.4 1.4 M5.7 18.3l1.4-1.4 M16.9 7.1l1.4-1.4", color: "#c07a2e", name: "아침의 사람", desc: "오전 기록 10개", need: 10,
     count: (rows) =>
       rows.filter((r) => r.verified && r.verified_at && new Date(r.verified_at).getHours() < 11).length,
   },
   {
-    id: "thrift", shape: "seal", color: "#6f7350", name: "만원의 행복", desc: "만원 아래 20그릇", need: 20,
+    id: "thrift", icon: "M12 4a8 8 0 1 0 .01 0 M8.6 9l1.6 6 1.8-4.6 1.8 4.6 1.6-6 M8 12h8", color: "#6f7350", name: "만원의 행복", desc: "만원 아래 20그릇", need: 20,
     count: (rows) => rows.filter((r) => r.price_range != null && r.price_range < 10000).length,
   },
   {
-    id: "december", shape: "check", color: "#a8412a", name: "연말의 식탁", desc: "12월 기록 10개", need: 10,
+    id: "december", icon: "M12 3.5v17 M4.6 7.75l14.8 8.5 M4.6 16.25l14.8-8.5", color: "#a8412a", name: "연말의 식탁", desc: "12월 기록 10개", need: 10,
     count: (rows) => rows.filter((r) => (r.visited_at ?? "").slice(5, 7) === "12").length,
   },
 ];

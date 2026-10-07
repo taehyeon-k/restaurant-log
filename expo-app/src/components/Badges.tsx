@@ -1,59 +1,45 @@
 import { Text, View } from "react-native";
-import Svg, { Circle, Path, Polygon } from "react-native-svg";
+import Svg, { Circle, G, Path, Polygon } from "react-native-svg";
 import type { EarnedLabel, RegionTitle } from "@/lib/labels";
 import { REGION_EN } from "@/lib/labels";
 import { C, F } from "@/theme";
 
-/**
- * 웹의 `.label-badge-*` 비대칭 border-radius / clip-path 를 react-native-svg 로 다시 그립니다(핸드오프 §9).
- * border-radius 8값 → 타원 호 path, polygon → 0–100 좌표 그대로.
- */
-function roundedPath(s: number, h: [number, number, number, number], v: [number, number, number, number]) {
-  // h/v: 좌상·우상·우하·좌하 모서리의 가로·세로 반지름(0–1 비율)
-  const [htl, htr, hbr, hbl] = h.map((n) => n * s);
-  const [vtl, vtr, vbr, vbl] = v.map((n) => n * s);
-  return [
-    `M${htl} 0`, `H${s - htr}`, `A${htr} ${vtr} 0 0 1 ${s} ${vtr}`, `V${s - vbr}`, `A${hbr} ${vbr} 0 0 1 ${s - hbr} ${s}`,
-    `H${hbl}`, `A${hbl} ${vbl} 0 0 1 0 ${s - vbl}`, `V${vtl}`, `A${htl} ${vtl} 0 0 1 ${htl} 0`, "Z",
-  ].join(" ");
+/** 라벨 로제트 테두리 — 원 둘레를 n 개의 물결로 나눈 path(0–100 좌표). */
+function scallopPath(n = 16, r = 44, peak = 56) {
+  const p = (a: number, rad: number) => `${(50 + rad * Math.sin(a)).toFixed(2)} ${(50 - rad * Math.cos(a)).toFixed(2)}`;
+  let d = "";
+  for (let i = 0; i < n; i++) {
+    const a0 = (i / n) * 2 * Math.PI, a1 = ((i + 0.5) / n) * 2 * Math.PI, a2 = ((i + 1) / n) * 2 * Math.PI;
+    d += (i === 0 ? `M${p(a0, r)} ` : "") + `Q${p(a1, peak)} ${p(a2, r)} `;
+  }
+  return d + "Z";
 }
-
-const SHAPES: Record<string, { d?: string; points?: string }> = {
-  verified: { d: roundedPath(100, [18, 18, 18, 18], [18, 18, 18, 18]) },
-  gold: { d: roundedPath(100, [42, 58, 45, 55], [52, 44, 56, 48]) },
-  regular: { points: "50,0 100,17 100,62 50,100 0,62 0,17" },
-  hundred: { d: roundedPath(100, [18, 18, 50, 50], [18, 18, 50, 50]) },
-  midnight: { d: roundedPath(100, [50, 50, 50, 8], [50, 50, 50, 8]) },
-  first: { d: roundedPath(100, [50, 50, 50, 50], [50, 50, 50, 50]) },
-  regions: { points: "50,0 93,25 93,75 50,100 7,75 7,25" },
-  years: { d: roundedPath(100, [50, 50, 12, 12], [50, 50, 12, 12]) },
-};
+const SCALLOP = scallopPath();
 
 /** 보안관 배지 — 육각 별. 등급이 달라도 모양은 하나, 색만 바뀝니다. */
 const SHERIFF_STAR = "50,0 68,18.8 93.3,25 86,50 93.3,75 68,81.2 50,100 32,81.2 6.7,75 14,50 6.7,25 32,18.8";
 
-/** 라벨 도장 배지 — 모은 만큼 테두리가 채워지고, 얻었으면 안이 라벨 색으로 찹니다. */
+/** 라벨 로제트 메달 — 얻었으면 라벨 색 테두리에 아이콘, 아니면 회색으로 잠겨 있습니다. 대표 라벨이면 아래에 「대표」 알약이 붙습니다. */
 export function LabelBadge({ label, selected }: { label: EarnedLabel; selected?: boolean }) {
-  const progress = Math.min(1, label.have / label.need);
-  const shape = SHAPES[label.id] ?? SHAPES.verified;
-  const inner = label.earned ? label.color : "#eae5da";
-  const fg = label.earned ? C.card : "#b3aa9a";
-
-  const render = (props: object) =>
-    shape.points ? <Polygon points={shape.points} {...props} /> : <Path d={shape.d} {...props} />;
+  const { earned, color } = label;
 
   return (
-    <View style={{ width: 92, height: 92, alignItems: "center", justifyContent: "center", borderRadius: 46, borderWidth: selected ? 3 : 0, borderColor: C.brick }}>
-      <Svg width={92} height={92} viewBox="-3 -3 106 106" style={{ position: "absolute" }}>
-        {render({ fill: "none", stroke: "#ded8cb", strokeWidth: 5 })}
-        {progress > 0 && render({ fill: "none", stroke: label.color, strokeWidth: 5, pathLength: 100, strokeDasharray: `${progress * 100} 100` })}
+    <View style={{ width: 80, height: 80 }}>
+      <Svg width={80} height={80} viewBox="-4 -4 108 108">
+        <Path d={SCALLOP} fill={earned ? color : "#e6e0d3"} />
+        <Circle cx={50} cy={50} r={36} fill={earned ? C.card : "#f3efe6"} />
+        {earned && <Circle cx={50} cy={50} r={31} fill="none" stroke={color + "55"} strokeWidth={1} strokeDasharray="2 2.5" />}
+        <G transform="translate(29 29) scale(1.75)">
+          <Path d={label.icon} fill="none" stroke={earned ? color : "#bdb4a3"} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+        </G>
       </Svg>
-      <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: inner, borderWidth: 1, borderStyle: "dashed", borderColor: "#cfc7b6", alignItems: "center", justifyContent: "center" }}>
-        <Svg width={32} height={32} viewBox="0 0 32 32" fill="none" stroke={fg} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
-          <Circle cx="16" cy="16" r="9" />
-          {label.id === "verified" ? <Path d="m11 16 3 3 7-7" /> : <Path d="M11 21h10M13 18h6M14 14h4" />}
-        </Svg>
-      </View>
+      {selected && (
+        <View style={{ position: "absolute", left: 0, right: 0, bottom: -6, alignItems: "center" }}>
+          <View style={{ paddingVertical: 2, paddingHorizontal: 8, borderRadius: 8, backgroundColor: C.ink }}>
+            <Text style={{ fontFamily: F.sansBd, fontSize: 9, color: C.card }}>대표</Text>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
