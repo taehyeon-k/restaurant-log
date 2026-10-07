@@ -43,3 +43,6 @@ next-env.d.ts
 # AI agent promtp
 /Restaurant-log website design
 /design_handoff_mobile
+
+# Claude Code worktrees (separate working copies)
+.claude/worktrees/

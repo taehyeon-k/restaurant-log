@@ -1,3 +1,4 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useQueryClient } from "@tanstack/react-query";
 import { CameraView, useCameraPermissions, type CameraType, type FlashMode } from "expo-camera";
 import * as Haptics from "expo-haptics";
@@ -9,10 +10,13 @@ import { useNetInfo } from "@react-native-community/netinfo";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  ActivityIndicator, Alert, FlatList, Image, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
+  ActivityIndicator, Alert, BackHandler, FlatList, Image, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { BellIcon, BookmarkIcon, CameraIcon, FlashIcon, FlipIcon, MapPinIcon, VerifiedMark } from "@/components/icons";
+import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
+import {
+  BellIcon, BookmarkIcon, CameraIcon, DownloadIcon, FlashIcon, FlipIcon, MapPinIcon, RefreshIcon, VerifiedMark,
+} from "@/components/icons";
 import { useRows, useWishes } from "@/data/queries";
 import { useAppState } from "@/data/store";
 import {
@@ -28,8 +32,11 @@ import {
 } from "@/lib/types";
 import { C, F, SHADOW } from "@/theme";
 
-type Step = "permission" | "shoot" | "pick" | "search" | "done";
-type Shot = { uri: string };
+type Step = "permission" | "shoot" | "review" | "pick" | "search" | "done";
+/** uri — 올릴 900px 사본, original — 셔터가 남긴 원본(사진 앱 저장용). */
+type Shot = { uri: string; original: string };
+
+const SAVE_KEY = "capture.saveToGallery";
 
 const FLASH_CYCLE: FlashMode[] = ["off", "on", "auto"];
 const ZOOMS = [
@@ -82,6 +89,20 @@ export default function Capture() {
   const cameraRef = useRef<CameraView>(null);
   const [busy, setBusy] = useState(false);
   const [latestPhoto, setLatestPhoto] = useState<string | null>(null);
+  const [saveToGallery, setSaveToGallery] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+  /** 셔터를 누를 때마다 올라갑니다 — 다시 찍은 뒤 늦게 도착한 이전 위치를 버리는 데 씁니다. */
+  const shotSeq = useRef(0);
+
+  useEffect(() => {
+    AsyncStorage.getItem(SAVE_KEY).then((v) => setSaveToGallery(v === "1")).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 2400);
+    return () => clearTimeout(t);
+  }, [toast]);
 
   // 이미 두 권한이 모두 허용돼 있으면 권한 준비 화면을 건너뜁니다.
   useEffect(() => {
@@ -110,13 +131,15 @@ export default function Capture() {
     if (cam.granted && loc.granted) setStep("shoot");
   }
 
-  async function readGeo() {
+  async function readGeo(seq: number) {
     setGeo(null);
     setGeoErr(null);
     try {
       const p = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+      if (seq !== shotSeq.current) return;
       setGeo({ lat: p.coords.latitude, lng: p.coords.longitude, acc: Math.round(p.coords.accuracy ?? 0) });
     } catch {
+      if (seq !== shotSeq.current) return;
       setGeoErr("위치 권한이 없어 좌표를 읽지 못했습니다.");
     }
   }
@@ -127,21 +150,64 @@ export default function Capture() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
       const at = new Date();
-      void readGeo(); // 동시에 위치 1회 읽기
+      void readGeo(++shotSeq.current); // 동시에 위치 1회 읽기
       const photo = await cameraRef.current.takePictureAsync({ quality: 0.9, skipProcessing: true });
       const out = await ImageManipulator.manipulateAsync(photo.uri, [{ resize: { width: 900 } }], {
         compress: 0.72,
         format: ImageManipulator.SaveFormat.JPEG,
       });
-      setShot({ uri: out.uri });
+      setShot({ uri: out.uri, original: photo.uri });
       setShotAt(at);
-      setStep("pick");
+      setStep("review");
     } catch {
       setError(camMessage(false));
     } finally {
       setBusy(false);
     }
   }
+
+  /** 사진과 그 순간 읽은 위치를 버리고 촬영으로 돌아갑니다 — 가게 찾기도 함께 멈춥니다(geo 가 비면서). */
+  function retake() {
+    shotSeq.current++;
+    setShot(null);
+    setShotAt(null);
+    setGeo(null);
+    setGeoErr(null);
+    setExtra([]);
+    setStep("shoot");
+  }
+
+  function acceptShot() {
+    Haptics.selectionAsync();
+    // 사진 앱 저장은 뒤에서 — 실패해도 인증 흐름은 그대로 갑니다.
+    if (saveToGallery && shot) MediaLibrary.saveToLibraryAsync(shot.original).catch(() => {});
+    setStep("pick");
+  }
+
+  async function toggleSave() {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const next = !saveToGallery;
+    setSaveToGallery(next);
+    if (next) {
+      const perm = await MediaLibrary.requestPermissionsAsync(true).catch(() => null);
+      if (!perm?.granted) {
+        setSaveToGallery(false);
+        setToast("사진 접근을 허용하면 저장할 수 있어요");
+        return;
+      }
+    }
+    AsyncStorage.setItem(SAVE_KEY, next ? "1" : "0").catch(() => {});
+  }
+
+  // 안드로이드 뒤로 가기 — 확인 단계에서는 다시 찍기.
+  useEffect(() => {
+    if (step !== "review") return;
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      retake();
+      return true;
+    });
+    return () => sub.remove();
+  }, [step]);
 
   async function fromGallery() {
     const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.9 });
@@ -164,16 +230,15 @@ export default function Capture() {
     [rows, extra, apiHits, query, geo, pickKind]
   );
 
+  // 셔터 순간의 위치가 들어오면 바로(확인 단계에서) 가까운 가게를 찾아 둡니다 — 다시 찍으면 geo 가 비며 취소됩니다.
   useEffect(() => {
-    if (step !== "pick" || !geo) return;
-    let cancelled = false;
-    nearbyPlaces(geo.lat, geo.lng)
-      .then((found) => !cancelled && setExtra(found.map(nearToCandidate)))
+    if (!geo) return;
+    const ctrl = new AbortController();
+    nearbyPlaces(geo.lat, geo.lng, ctrl.signal)
+      .then((found) => !ctrl.signal.aborted && setExtra(found.map(nearToCandidate)))
       .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [step, geo]);
+    return () => ctrl.abort();
+  }, [geo]);
 
   useEffect(() => {
     if (step !== "search") return;
@@ -365,6 +430,56 @@ export default function Capture() {
     );
   }
 
+  if (step === "review" && shot) {
+    const loc = geo ? `위치 읽음 (정확도 ${geo.acc}m)` : geoErr ? "위치를 읽지 못했어요" : "위치 읽는 중…";
+    return (
+      <View style={s.darkRoot}>
+        <Image source={{ uri: shot.uri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+        <Fade edge="top" height={insets.top + 150} />
+        <Fade edge="bottom" height={insets.bottom + 300} />
+
+        <Pressable style={[s.roundDark, { left: 16, top: insets.top + 8 }]} onPress={close} accessibilityLabel="닫기">
+          <Text style={{ color: C.card, fontSize: 16 }}>✕</Text>
+        </Pressable>
+        <Pressable
+          style={[s.savePill, { top: insets.top + 8 }, saveToGallery && { backgroundColor: C.brick }]}
+          onPress={toggleSave}
+          accessibilityRole="switch"
+          accessibilityState={{ checked: saveToGallery }}
+          accessibilityLabel="사진 앱에 저장"
+        >
+          <DownloadIcon size={15} stroke={saveToGallery ? C.card : "rgba(251,250,246,.85)"} />
+          <Text style={[s.saveText, saveToGallery && { color: C.card }]}>저장</Text>
+        </Pressable>
+
+        <View style={[s.titleBlock, { top: insets.top + 14 }]} pointerEvents="none">
+          <Text style={s.shootTitle}>이 사진으로 할까요?</Text>
+          <View style={s.pill}><Text style={s.reviewChip}>{shotAt ? `${hhmm(shotAt)} · ` : ""}{loc}</Text></View>
+        </View>
+
+        {toast && (
+          <View style={[s.toast, { bottom: insets.bottom + 44 + 190 }]} pointerEvents="none">
+            <Text style={s.toastText}>{toast}</Text>
+          </View>
+        )}
+
+        <View style={[s.reviewBottom, { bottom: insets.bottom + 44 }]}>
+          <Text style={s.reviewNote}>위치는 셔터를 누른 순간 기준입니다. 다시 찍으면 새로 읽습니다.</Text>
+          <Pressable style={({ pressed }) => [s.useBtn, pressed && { opacity: 0.85 }]} onPress={acceptShot}>
+            <Text style={s.darkText}>이 사진 쓰기</Text>
+          </Pressable>
+          <Pressable
+            style={({ pressed }) => [s.retakeBtn, pressed && { backgroundColor: "rgba(251,250,246,.08)" }]}
+            onPress={retake}
+          >
+            <RefreshIcon size={16} stroke={C.card} strokeWidth={1.7} />
+            <Text style={s.darkText}>다시 찍기</Text>
+          </Pressable>
+        </View>
+      </View>
+    );
+  }
+
   if (step === "pick" || step === "search") {
     const searching = step === "search";
     const items: Candidate[] | PickItem[] = searching ? hits : list;
@@ -489,6 +604,26 @@ export default function Capture() {
   );
 }
 
+/** 사진 위 글자를 읽히게 하는 어두운 그라데이션 — 위·아래 가장자리. */
+function Fade({ edge, height }: { edge: "top" | "bottom"; height: number }) {
+  const id = `fade-${edge}`;
+  const top = edge === "top";
+  return (
+    <Svg
+      pointerEvents="none" width="100%" height={height}
+      style={{ position: "absolute", left: 0, right: 0, ...(top ? { top: 0 } : { bottom: 0 }) }}
+    >
+      <Defs>
+        <LinearGradient id={id} x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0" stopColor={C.dark} stopOpacity={top ? 0.72 : 0} />
+          <Stop offset="1" stopColor={C.dark} stopOpacity={top ? 0 : 0.88} />
+        </LinearGradient>
+      </Defs>
+      <Rect width="100%" height="100%" fill={`url(#${id})`} />
+    </Svg>
+  );
+}
+
 function PermCard({ icon, title, body, dashed }: { icon: React.ReactNode; title: string; body: string; dashed?: boolean }) {
   return (
     <View style={[s.perm, dashed ? { borderStyle: "dashed", borderColor: C.line, backgroundColor: "transparent" } : null]}>
@@ -572,6 +707,25 @@ const s = StyleSheet.create({
   shutterOuter: { width: 78, height: 78, borderRadius: 39, borderWidth: 3, borderColor: "rgba(251,250,246,.85)", alignItems: "center", justifyContent: "center" },
   shutterInner: { width: 62, height: 62, borderRadius: 31, backgroundColor: C.card },
   flip: { width: 46, height: 46, borderRadius: 23, backgroundColor: "rgba(251,250,246,.1)", alignItems: "center", justifyContent: "center" },
+  savePill: {
+    position: "absolute", right: 16, height: 44, borderRadius: 22, paddingHorizontal: 15, flexDirection: "row",
+    alignItems: "center", gap: 6, backgroundColor: "rgba(23,22,20,.4)",
+  },
+  saveText: { fontFamily: F.sansMd, fontSize: 12, color: "rgba(251,250,246,.85)" },
+  reviewChip: { fontFamily: F.mono, fontSize: 10.5, color: "rgba(251,250,246,.8)" },
+  // 확인 단계 단추 — 높이는 고정 56(글꼴과 무관), 너비만 화면에 맞춰 늘어납니다.
+  reviewBottom: { position: "absolute", left: 24, right: 24, flexDirection: "column", gap: 10 },
+  reviewNote: { marginBottom: 6, textAlign: "center", fontFamily: F.sans, fontSize: 12, lineHeight: 19, color: "rgba(251,250,246,.6)" },
+  useBtn: { height: 56, borderRadius: 20, backgroundColor: C.brick, alignItems: "center", justifyContent: "center" },
+  retakeBtn: {
+    height: 56, borderRadius: 20, borderWidth: 1, borderColor: "rgba(251,250,246,.3)", backgroundColor: "transparent",
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+  },
+  toast: {
+    position: "absolute", alignSelf: "center", borderRadius: 16, backgroundColor: "rgba(23,22,20,.85)",
+    paddingVertical: 10, paddingHorizontal: 16,
+  },
+  toastText: { fontFamily: F.sans, fontSize: 12.5, color: C.card },
   note: { position: "absolute", left: 0, right: 0, textAlign: "center", fontFamily: F.sans, fontSize: 11.5, color: "rgba(251,250,246,.45)" },
 
   h18: { fontFamily: F.serif, fontSize: 18, color: C.ink },

@@ -79,6 +79,19 @@ export const FlipIcon = ({ size = 20, stroke = "#fbfaf6", strokeWidth = 1.6 }: P
   </Svg>
 );
 
+export const DownloadIcon = ({ size = 16, stroke = "#fbfaf6", strokeWidth = 1.7 }: P) => (
+  <Svg {...base(size, stroke, strokeWidth)}>
+    <Path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19.5h14" />
+  </Svg>
+);
+
+export const RefreshIcon = ({ size = 17, stroke = "#fbfaf6", strokeWidth = 1.7 }: P) => (
+  <Svg {...base(size, stroke, strokeWidth)}>
+    <Path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3L19.5 9" />
+    <Path d="M19.5 4v5h-5" />
+  </Svg>
+);
+
 /** 24각 버스트 — 라벨첩 버튼·인증 뱃지. 좌표는 웹 ui.tsx BURST 와 같은 0–100 좌표계. */
 export const BURST_POINTS =
   "50,0 60.6,10.4 75,6.7 79,21 93.3,25 89.6,39.4 100,50 89.6,60.6 93.3,75 79,79 75,93.3 60.6,89.6 50,100 39.4,89.6 25,93.3 21,79 6.7,75 10.4,60.6 0,50 10.4,39.4 6.7,25 21,21 25,6.7 39.4,10.4";
