@@ -1,7 +1,7 @@
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View,
 } from "react-native";
@@ -10,14 +10,14 @@ import { CameraIcon, VerifiedMark } from "@/components/icons";
 import { Chip, Eyebrow, fieldStyle } from "@/components/ui";
 import { refreshAll } from "@/data/invalidate";
 import { useRows, useWishes } from "@/data/queries";
-import { forwardGeocode } from "@/lib/geocode";
+import { forwardGeocode, searchFoodPlaces, type FoodPlace } from "@/lib/geocode";
 import { FELT_PRICE } from "@/lib/price";
 import { regionFromAddress } from "@/lib/regions";
 import { supabase } from "@/lib/supabase";
 import {
   CATEGORIES, findMatchingWish, KEYWORDS, verifiedDateTime, wishMetInfo, WISH_AUTO_M, type Kind, type MenuItem,
 } from "@/lib/types";
-import { C, F } from "@/theme";
+import { C, F, SHADOW } from "@/theme";
 
 const pad = (n: number) => String(n).padStart(2, "0");
 const isoOf = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -81,6 +81,33 @@ export default function EditRoute() {
   const title = isNew ? (visitedAt && visitedAt !== today() ? "이날 뭐 먹었나요" : "오늘 뭐 먹었나요") : "기록 고치기";
   const preLat = p.lat ? Number(p.lat) : null;
   const preLng = p.lng ? Number(p.lng) : null;
+  const [spot, setSpot] = useState<{ lat: number; lng: number } | null>(
+    preLat != null && preLng != null ? { lat: preLat, lng: preLng } : null
+  );
+
+  // 새 기록은 「가게」 칸에 적는 대로 음식점·카페를 찾아 고르면 자리까지 채웁니다.
+  const [hits, setHits] = useState<FoodPlace[]>([]);
+  const [suggestOpen, setSuggestOpen] = useState(false);
+  const skipSearch = useRef(false);
+  useEffect(() => {
+    if (skipSearch.current) { skipSearch.current = false; return; }
+    if (!isNew || !suggestOpen || name.trim().length < 2) { setHits([]); return; }
+    const ctrl = new AbortController();
+    const t = setTimeout(async () => { try { setHits((await searchFoodPlaces(name, ctrl.signal)).slice(0, 6)); } catch { /* 취소·오프라인 */ } }, 250);
+    return () => { clearTimeout(t); ctrl.abort(); };
+  }, [name, suggestOpen, isNew]);
+
+  function pickPlace(r: FoodPlace) {
+    skipSearch.current = true;
+    setName(r.name);
+    setAddress(r.address);
+    setSpot({ lat: r.lat, lng: r.lng });
+    setHits([]);
+    setSuggestOpen(false);
+    // 다시 가기(revisit)로 들어온 새 기록은 맛집·카페가 정해져 있어 바꾸지 않습니다.
+    const nextKind = p.revisit !== "1" ? r.kind : kind;
+    if (nextKind !== kind) { setNewKind(nextKind); setCategory(""); }
+  }
 
   async function save() {
     if (!canSave || saving) return;
@@ -114,8 +141,8 @@ export default function EditRoute() {
         return;
       }
 
-      let lat = twin?.lat ?? preLat;
-      let lng = twin?.lng ?? preLng;
+      let lat = spot?.lat ?? twin?.lat ?? preLat;
+      let lng = spot?.lng ?? twin?.lng ?? preLng;
       if (lat == null || lng == null) {
         const hit =
           (cleanAddress ? (await forwardGeocode(cleanAddress).catch(() => []))[0] : null) ??
@@ -176,11 +203,33 @@ export default function EditRoute() {
 
         <View style={{ marginTop: 18 }}>
           <Eyebrow>가게</Eyebrow>
-          <TextInput value={name} onChangeText={setName} placeholder="가게 이름" placeholderTextColor="#b3ada1" style={fieldStyle} />
+          <TextInput
+            value={name}
+            onChangeText={(t) => { setName(t); setSuggestOpen(true); }}
+            onFocus={() => setSuggestOpen(true)}
+            onBlur={() => setTimeout(() => setSuggestOpen(false), 150)}
+            placeholder="가게 이름" placeholderTextColor="#b3ada1" style={fieldStyle}
+          />
+          {suggestOpen && hits.length > 0 && (
+            <View style={[s.suggest, SHADOW.card]}>
+              {hits.map((r, i) => (
+                <Pressable key={`${r.lat}-${r.lng}-${i}`} onPress={() => pickPlace(r)} style={[s.suggestRow, i === hits.length - 1 && { borderBottomWidth: 0 }]}>
+                  <Text style={{ fontFamily: F.sansMd, fontSize: 13.5, color: C.ink }}>{r.name}</Text>
+                  <Text numberOfLines={1} style={{ fontFamily: F.sans, fontSize: 11.5, color: C.muted }}>
+                    {[r.category ?? (r.kind === "cafe" ? "카페" : "맛집"), r.address].filter(Boolean).join(" · ")}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          )}
         </View>
         <View style={{ marginTop: 14 }}>
           <Eyebrow>자리</Eyebrow>
-          <TextInput value={address} onChangeText={setAddress} placeholder="주소나 동네" placeholderTextColor="#b3ada1" style={fieldStyle} />
+          <TextInput
+            value={address}
+            onChangeText={(t) => { setAddress(t); if (spot) setSpot(null); }}
+            placeholder="주소나 동네" placeholderTextColor="#b3ada1" style={fieldStyle}
+          />
         </View>
 
         <View style={{ marginTop: 14 }}>
@@ -278,19 +327,19 @@ export default function EditRoute() {
             <Text style={{ fontFamily: F.mono, fontSize: 11, color: C.faint }}>{menuTotalLabel}</Text>
           </View>
           {menus.map((m, i) => (
-            <View key={i} style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-              <TextInput value={m.name} onChangeText={(t) => setMenuAt(i, { name: t })} placeholder="먹은 것" placeholderTextColor="#b3ada1" style={[fieldStyle, { flex: 1, marginTop: 0, minHeight: 46, borderRadius: 14 }]} />
+            <View key={i} style={{ flexDirection: "row", alignItems: "stretch", gap: 6 }}>
+              <TextInput value={m.name} onChangeText={(t) => setMenuAt(i, { name: t })} placeholder="먹은 것" placeholderTextColor="#b3ada1" style={[fieldStyle, s.menuField, { flex: 1 }]} />
               <View style={{ width: 96, justifyContent: "center" }}>
                 <TextInput
                   value={m.price == null ? "" : m.price.toLocaleString("ko-KR")}
                   onChangeText={(t) => { const raw = menuDigits(t); setMenuAt(i, { price: raw ? Number(raw) : null }); }}
                   keyboardType="number-pad" placeholder="0" placeholderTextColor="#b3ada1"
-                  style={[fieldStyle, { marginTop: 0, minHeight: 46, borderRadius: 14, paddingLeft: 11, paddingRight: 26, textAlign: "right", fontFamily: F.mono, fontSize: 13 }]}
+                  style={[fieldStyle, s.menuField, { flex: 1, paddingVertical: 0, paddingLeft: 11, paddingRight: 26, textAlign: "right", fontFamily: F.mono, fontSize: 13 }]}
                 />
                 <Text pointerEvents="none" style={{ position: "absolute", right: 11, fontFamily: F.sans, fontSize: 12, color: "#a29a8c" }}>원</Text>
               </View>
               {menus.length > 1 && (
-                <Pressable onPress={() => setMenus((l) => l.filter((_, n) => n !== i))} accessibilityLabel="이 메뉴 지우기" style={{ width: 34, height: 46, alignItems: "center", justifyContent: "center" }}>
+                <Pressable onPress={() => setMenus((l) => l.filter((_, n) => n !== i))} accessibilityLabel="이 메뉴 지우기" style={{ width: 34, alignItems: "center", justifyContent: "center" }}>
                   <Text style={{ fontSize: 15, color: "#a29a8c" }}>✕</Text>
                 </Pressable>
               )}
@@ -348,6 +397,10 @@ const s = StyleSheet.create({
     marginTop: 7, minHeight: 48, flexDirection: "row", alignItems: "center", gap: 10, borderRadius: 16, borderWidth: 1,
     borderColor: "#e0c3b1", backgroundColor: "#f9efe8", paddingHorizontal: 15,
   },
+  suggest: { marginTop: 6, borderRadius: 14, borderWidth: 1, borderColor: C.line, backgroundColor: C.card, overflow: "hidden" },
+  suggestRow: { paddingHorizontal: 14, paddingVertical: 10, gap: 2, borderBottomWidth: 1, borderBottomColor: C.line },
+  // 메뉴 이름·가격 칸은 글꼴이 달라 제 키가 어긋납니다 — 줄을 stretch 로 두어 가격 칸을 이름 칸 키에 맞춥니다.
+  menuField: { marginTop: 0, minHeight: 46, borderRadius: 14, textAlignVertical: "center" },
   starBase: { fontSize: 27, lineHeight: 34, width: 34, textAlign: "center", color: "#dcd6ca" },
   revisitBox: {
     marginTop: 20, flexDirection: "row", alignItems: "center", gap: 14, borderRadius: 18, borderWidth: 1,
