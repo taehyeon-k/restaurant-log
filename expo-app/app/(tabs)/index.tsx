@@ -15,7 +15,8 @@ import { DraftsBoxIcon } from "@/components/DraftsBoxIcon";
 import { useRows, useWishes } from "@/data/queries";
 import { setState, useAppState, type MarkerFilter } from "@/data/store";
 
-import { GhostMarker, LABEL_ZOOM, RecordMarker, WishMarker } from "@/features/map/Markers";
+import { GhostMarker, RecordMarker, WishMarker } from "@/features/map/Markers";
+import { revealZooms } from "@/features/map/labelZoom";
 import PlaceCard from "@/features/map/PlaceCard";
 import PlaceSearch from "@/features/map/PlaceSearch";
 import { FilterSheet as FilterSheetImpl, FoundSheet, SearchMissSheet } from "@/features/map/Sheets";
@@ -270,7 +271,6 @@ export default function MapTab() {
 
   /* ── 마커 ───────────────────────────────────── */
 
-  const showLabel = zoom >= LABEL_ZOOM;
   const recordMarkers = useMemo(() => {
     const placed = (markerFilter === "wish" ? filtered.filter((p) => matchWish(wishes, p.name)) : filtered).filter((p) => p.lat != null && p.lng != null);
     return placed;
@@ -280,6 +280,12 @@ export default function MapTab() {
     const names = new Set(filtered.map((p) => norm(p.name)));
     return wishes.filter((w) => w.lat != null && w.lng != null && !names.has(norm(w.name)));
   }, [wishes, filtered, markerFilter]);
+  /** 마커마다 이름표가 나타나는 줌 — 이웃 이름표·핀과 안 겹치는 줌부터(labelZoom). */
+  const reveal = useMemo(() => revealZooms([
+    ...recordMarkers.map((p) => ({ id: `r:${p.key}`, lat: p.lat as number, lng: p.lng as number, name: p.name, kind: "record" as const, planned: !!matchWish(wishes, p.name) })),
+    ...wishMarkers.map((w) => ({ id: `w:${w.id}`, lat: w.lat as number, lng: w.lng as number, name: w.name, kind: "wish" as const })),
+  ]), [recordMarkers, wishMarkers, wishes]);
+  const showLabel = (id: string) => zoom >= (reveal.get(id) ?? Infinity);
 
   /* ── 시트 ───────────────────────────────────── */
 
@@ -367,12 +373,12 @@ export default function MapTab() {
         {recordMarkers.map((p) => (
           <RecordMarker
             key={p.key} lat={p.lat as number} lng={p.lng as number} name={p.name} category={p.category} revisit={p.revisit}
-            rating={p.rating} active={false} planned={!!matchWish(wishes, p.name)} showLabel={showLabel}
+            rating={p.rating} active={false} planned={!!matchWish(wishes, p.name)} showLabel={showLabel(`r:${p.key}`)}
             onTap={() => { Haptics.selectionAsync(); openPlace(p); }}
           />
         ))}
         {wishMarkers.map((w) => (
-          <WishMarker key={w.id} lat={w.lat as number} lng={w.lng as number} name={w.name} category={w.category} showLabel={showLabel} onTap={() => { Haptics.selectionAsync(); openWish(w.id); }} />
+          <WishMarker key={w.id} lat={w.lat as number} lng={w.lng as number} name={w.name} category={w.category} showLabel={showLabel(`w:${w.id}`)} onTap={() => { Haptics.selectionAsync(); openWish(w.id); }} />
         ))}
         {ghost && (
           <GhostMarker lat={ghost.lat} lng={ghost.lng} name={ghost.name} onTap={() => newRecord({ name: ghost.name, address: ghost.address, lat: ghost.lat, lng: ghost.lng })} />

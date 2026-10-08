@@ -6,9 +6,6 @@ import { BOOKMARK_PATH } from "@/components/icons";
 import { pinColor } from "@/lib/types";
 import { C, F, SHADOW } from "@/theme";
 
-/** 이 줌 이상에서만 이름표를 보여줍니다(웹 LABEL_ZOOM). */
-export const LABEL_ZOOM = 15;
-
 /**
  * 웹 물방울 핀(MobileMap pinHtml) 그대로 — 지름 size 의 원에 아래로 직각 꼭짓점 하나.
  * 웹은 정사각형을 border-radius 50% 50% 50% 0 + rotate(-45deg) 로 그려서 꼭짓점이 중심에서 size/2·√2 아래에 옵니다.
@@ -24,9 +21,9 @@ const dropH = (size: number) => size / 2 + (size / 2) * Math.SQRT2;
 /* 이름표 줄 높이 — 웹 line-height:1.25. Noto Sans KR 기본 줄 높이는 훨씬 커서 고정하지 않으면 이름표가 넘쳐 윗줄(가게 이름)이 잘립니다. */
 const NAME_LH = 16;
 const SUB_LH = 14;
-const tagHeight = (sub: "none" | "rating" | "cta") => 2 + 7 + 6 + NAME_LH + (sub === "none" ? 0 : SUB_LH) + (sub === "cta" ? 1 : 0);
+export const tagHeight = (sub: "none" | "rating" | "cta") => 2 + 7 + 6 + NAME_LH + (sub === "none" ? 0 : SUB_LH) + (sub === "cta" ? 1 : 0);
 /** 웹 이름표는 마커 기준점에서 bottom:42px(상자 바닥) 위에 놓입니다 — 상자 바닥은 기준점 아래 A px. */
-const LABEL_BOTTOM = 42;
+export const LABEL_BOTTOM = 42;
 
 const textBase = { includeFontPadding: false, textAlignVertical: "center" } as const;
 
@@ -71,7 +68,7 @@ const anchorAt = (h: number, a: number) => ({ x: 0.5, y: (h - a) / h });
  */
 const markerKey = (...deps: unknown[]) => deps.join("/");
 
-const tagWidth = (name: string) => Math.min(220, Math.max(64, name.length * 13 + 26));
+export const tagWidth = (name: string) => Math.min(220, Math.max(64, name.length * 13 + 26));
 
 type Base = { lat: number; lng: number; onTap?: () => void; zIndex?: number };
 
