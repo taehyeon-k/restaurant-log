@@ -71,6 +71,11 @@ export default function MapTab() {
   const regionRef = useRef<Bounds | null>(null);
   const sheetRef = useRef<BottomSheet>(null);
   const lastFit = useRef("");
+  // 검색 결과 목록이 떠 있는 동안과 닫힌 직후엔 마커 탭을 무시합니다 — 목록 항목 아래 겹친 마커(이름표·별점 포함)가
+  // 같은 탭을 받아 기록을 열면 안 됩니다. 탭 이벤트 순서가 어느 쪽이 먼저든 막히도록 닫힌 뒤에도 잠깐 더 막습니다.
+  const markerBlockUntil = useRef(0);
+  const onSearchListOpen = useCallback((open: boolean) => { markerBlockUntil.current = open ? Infinity : Date.now() + 500; }, []);
+  const markerTap = (fn: () => void) => () => { if (Date.now() >= markerBlockUntil.current) fn(); };
   const holdFit = useRef(false);
 
   // 네이버 로고는 콘텐츠 패딩 안쪽 귀퉁이에 놓여서, 그대로 두면 바닥에서 MAP_PAD_BOTTOM 만큼 뜬 「왼쪽 중간」에 보입니다.
@@ -374,14 +379,14 @@ export default function MapTab() {
           <RecordMarker
             key={p.key} lat={p.lat as number} lng={p.lng as number} name={p.name} category={p.category} revisit={p.revisit}
             rating={p.rating} active={false} planned={!!matchWish(wishes, p.name)} showLabel={showLabel(`r:${p.key}`)}
-            onTap={() => { Haptics.selectionAsync(); openPlace(p); }}
+            onTap={markerTap(() => { Haptics.selectionAsync(); openPlace(p); })}
           />
         ))}
         {wishMarkers.map((w) => (
-          <WishMarker key={w.id} lat={w.lat as number} lng={w.lng as number} name={w.name} category={w.category} showLabel={showLabel(`w:${w.id}`)} onTap={() => { Haptics.selectionAsync(); openWish(w.id); }} />
+          <WishMarker key={w.id} lat={w.lat as number} lng={w.lng as number} name={w.name} category={w.category} showLabel={showLabel(`w:${w.id}`)} onTap={markerTap(() => { Haptics.selectionAsync(); openWish(w.id); })} />
         ))}
         {ghost && (
-          <GhostMarker lat={ghost.lat} lng={ghost.lng} name={ghost.name} onTap={() => newRecord({ name: ghost.name, address: ghost.address, lat: ghost.lat, lng: ghost.lng })} />
+          <GhostMarker lat={ghost.lat} lng={ghost.lng} name={ghost.name} onTap={markerTap(() => newRecord({ name: ghost.name, address: ghost.address, lat: ghost.lat, lng: ghost.lng }))} />
         )}
       </PaperMap>
 
@@ -398,7 +403,7 @@ export default function MapTab() {
 
       {/* 검색 행 */}
       <View style={[s.searchRow, { top: insets.top + 8 }]}>
-        <PlaceSearch value={mapQuery} onChange={setMapQuery} onChoose={choosePlace} hasPicked={!!ghost} onClearPicked={() => setState({ ghost: null })} />
+        <PlaceSearch value={mapQuery} onChange={setMapQuery} onChoose={choosePlace} hasPicked={!!ghost} onClearPicked={() => setState({ ghost: null })} onListOpenChange={onSearchListOpen} />
         <Pressable onPress={() => router.push("/labels")} accessibilityLabel="라벨첩" style={[s.round, SHADOW.card]}>
           <BurstIcon />
         </Pressable>

@@ -6,9 +6,12 @@ import { C, F, SHADOW } from "@/theme";
 
 /** 지도 위 메인 검색창 — 어디든 실시간으로 찾아 지도를 옮깁니다. */
 export default function PlaceSearch({
-  value, onChange, onChoose, hasPicked, onClearPicked, placeholder = "음식점이나 지역 찾기",
+  value, onChange, onChoose, hasPicked, onClearPicked, onListOpenChange, placeholder = "음식점이나 지역 찾기",
 }: {
-  value: string; onChange: (v: string) => void; onChoose: (p: Place) => void; hasPicked: boolean; onClearPicked: () => void; placeholder?: string;
+  value: string; onChange: (v: string) => void; onChoose: (p: Place) => void; hasPicked: boolean; onClearPicked: () => void;
+  /** 결과 목록이 보이는지 — 지도 화면이 그동안 마커 탭을 막는 데 씁니다. */
+  onListOpenChange?: (open: boolean) => void;
+  placeholder?: string;
 }) {
   const [results, setResults] = useState<Place[]>([]);
   const [open, setOpen] = useState(false);
@@ -25,6 +28,9 @@ export default function PlaceSearch({
     }, 250);
     return () => { clearTimeout(t); ctrl.abort(); };
   }, [value, open]);
+
+  const listOpen = open && results.length > 0;
+  useEffect(() => { onListOpenChange?.(listOpen); }, [listOpen, onListOpenChange]);
 
   return (
     <View style={{ flex: 1 }}>
@@ -50,7 +56,7 @@ export default function PlaceSearch({
 
       {/* 목록은 absolute 로 띄우지 않고 이 View 안에 쌓습니다. 부모 상자 밖으로 삐져나오면 RN 은 항목 탭을 받지만
           네이티브 지도도 같은 탭을 받아, 그 자리의 기록 마커가 함께 눌려 기록 화면이 열려버립니다. */}
-      {open && results.length > 0 && (
+      {listOpen && (
         <View style={[{ marginTop: 6, borderRadius: 16, borderWidth: 1, borderColor: C.line, backgroundColor: C.card, overflow: "hidden" }, SHADOW.card]}>
           {results.map((p, i) => (
             <Pressable
