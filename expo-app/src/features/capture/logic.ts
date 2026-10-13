@@ -4,6 +4,7 @@
  */
 import { groupPlaces } from "@/lib/places";
 import { findMatchingWish, WISH_NEAR_M, type Kind, type Restaurant, type Wish } from "@/lib/types";
+import { samePlace } from "@/lib/geo";
 import type { FoodPlace, NearbyPlace } from "@/lib/geocode";
 
 export const PICK_MAX_M = 50; // 인증 가능 최대 거리
@@ -89,8 +90,7 @@ export const nearToCandidate = (f: NearbyPlace): Candidate => ({
 
 /** 전체 후보: 최대 8곳. */
 export function buildCandidates(mine: Candidate[], extra: Candidate[], pickKind: Kind): Candidate[] {
-  const taken = new Set(mine.map((c) => c.name));
-  return [...mine, ...extra.filter((c) => !taken.has(c.name))]
+  return [...mine, ...extra.filter((c) => !mine.some((m) => samePlace(m, c)))]
     .filter((c) => c.kind === pickKind)
     .sort((a, b) => (a.distance ?? 1e9) - (b.distance ?? 1e9))
     .slice(0, 8);
@@ -128,20 +128,17 @@ export function searchHits(opts: {
   const mineAll = groupPlaces(rows)
     .filter((p) => p.lat != null && p.lng != null && p.kind === pickKind)
     .map((p) => toCandidate(p, geo));
-  const taken = new Set(mineAll.map((c) => c.name));
-  const pool = [...mineAll, ...extra.filter((c) => !taken.has(c.name) && c.kind === pickKind)].sort(
+  const pool = [...mineAll, ...extra.filter((c) => c.kind === pickKind && !mineAll.some((m) => samePlace(m, c)))].sort(
     (a, b) => (a.distance ?? 1e9) - (b.distance ?? 1e9)
   );
 
   const needle = query.trim().toLowerCase();
   if (!needle) return pool;
 
-  const seen = new Set<string>();
   const hits: Candidate[] = [];
 
   for (const c of pool) {
     if (![c.name, c.category, c.address].some((f) => (f ?? "").toLowerCase().includes(needle))) continue;
-    seen.add(norm(c.name));
     hits.push(c);
   }
 
@@ -149,8 +146,8 @@ export function searchHits(opts: {
     if (p.kind !== pickKind) continue;
     const name = p.name || p.address;
     const key = norm(name);
-    if (seen.has(key)) continue;
-    seen.add(key);
+    // 이미 목록에 있는 그 가게만 거릅니다 — 같은 이름의 다른 지점은 남깁니다.
+    if (hits.some((h) => samePlace(h, { ...p, name }))) continue;
     hits.push({
       id: `api:${key}:${p.lat},${p.lng}`,
       name,

@@ -23,6 +23,7 @@ import {
   buildCandidates, buildMine, formatDistance, hhmm, isoDate, metersBetween, nearToCandidate, noneNear, pickCandidates,
   pickList, searchHits, PICK_MAX_M, type Candidate, type Geo, type PickItem,
 } from "@/features/capture/logic";
+import { samePlace } from "@/lib/geo";
 import { nearbyPlaces, searchFoodPlaces, type FoodPlace } from "@/lib/geocode";
 import { drainQueue } from "@/features/queue/process";
 import { enqueue, persistPhoto } from "@/features/queue/db";
@@ -282,7 +283,8 @@ export default function Capture() {
 
     try {
       const at = shotAt ?? new Date();
-      const twin = rows.find((r) => r.name === picked.name && r.kind === picked.kind);
+      // 같은 건물의 다른 가게·같은 이름의 다른 지점을 재방문으로 잡지 않게 이름과 자리를 함께 봅니다.
+      const twin = rows.find((r) => r.kind === picked.kind && samePlace(r, picked));
       const address = twin?.address ?? picked.address ?? null;
       const matchedWish: Wish | null = picked.wish ?? findMatchingWish(wishes, picked, WISH_AUTO_M);
       const fromWish = matchedWish ? wishMetInfo(matchedWish, isoDate(at)) : null;

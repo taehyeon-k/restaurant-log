@@ -175,9 +175,17 @@ export const WISH_NEAR_M = 50;
 /** §3 — 후보를 묻지 않고 바로 그 가게로 정할 거리 기준(m). */
 export const WISH_AUTO_M = 100;
 
+/** 위시 이름은 손으로 적기도 하니 느슨하게 — 한쪽이 다른 쪽을 품으면 같은 이름으로 봅니다("○○국밥" ↔ "○○국밥 본점"). */
+const looseSameName = (a: string, b: string) => {
+  const x = normName(a);
+  const y = normName(b);
+  return !!x && !!y && (x.includes(y) || y.includes(x));
+};
+
 /**
  * 위시-가게 짝 찾기(HANDOFF-verify.md §4) — 위시에 좌표가 있으면 후보 좌표와의
- * 거리로, 없으면 이름으로 판정합니다. 후보 올리기(§1)·자동 선택(§3)·WISH MET
+ * 거리와 이름을 함께, 없으면 이름으로 판정합니다. 거리만 보면 한 건물에 든 다른
+ * 가게를 기록할 때 그 위시가 거둬집니다. 후보 올리기(§1)·자동 선택(§3)·WISH MET
  * (기록 저장 시 거두기)이 이 함수를 함께 써야 합니다 — 판정이 갈리면 후보에서는
  * "담아둔 식당"이라 해놓고 저장 뒤 위시가 목록에 유령으로 남는 상태가 됩니다.
  */
@@ -189,7 +197,7 @@ export function findMatchingWish(
   const target = normName(place.name);
   for (const w of wishes) {
     if (w.lat != null && w.lng != null && place.lat != null && place.lng != null) {
-      if (metersBetween(w.lat, w.lng, place.lat, place.lng) <= maxMeters) return w;
+      if (metersBetween(w.lat, w.lng, place.lat, place.lng) <= maxMeters && looseSameName(w.name, place.name)) return w;
       continue;
     }
     if (target && normName(w.name) === target) return w;

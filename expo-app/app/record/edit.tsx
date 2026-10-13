@@ -10,6 +10,7 @@ import { CameraIcon, VerifiedMark } from "@/components/icons";
 import { Chip, Eyebrow, fieldStyle } from "@/components/ui";
 import { refreshAll } from "@/data/invalidate";
 import { useRows, useWishes } from "@/data/queries";
+import { samePlace } from "@/lib/geo";
 import { forwardGeocode, searchFoodPlaces, type FoodPlace } from "@/lib/geocode";
 import { FELT_PRICE } from "@/lib/price";
 import { regionFromAddress } from "@/lib/regions";
@@ -71,11 +72,6 @@ export default function EditRoute() {
   const namedMenus = menus.filter((m) => m.name.trim() || m.price);
   const menuTotalLabel = namedMenus.length ? `${namedMenus.length}개 · ${menuTotal.toLocaleString("ko-KR")}원` : "";
 
-  const twin = useMemo(() => {
-    if (!isNew || !name.trim()) return null;
-    return rows.find((r) => r.name === name.trim() && r.kind === kind) ?? null;
-  }, [isNew, name, kind, rows]);
-
   const missing = !name.trim() ? "가게 이름을 적어주세요" : !rating ? "별점을 매겨주세요" : "";
   const canSave = !missing;
   const title = isNew ? (visitedAt && visitedAt !== today() ? "이날 뭐 먹었나요" : "오늘 뭐 먹었나요") : "기록 고치기";
@@ -84,6 +80,13 @@ export default function EditRoute() {
   const [spot, setSpot] = useState<{ lat: number; lng: number } | null>(
     preLat != null && preLng != null ? { lat: preLat, lng: preLng } : null
   );
+
+  const twin = useMemo(() => {
+    if (!isNew || !name.trim()) return null;
+    // 이름만 보면 같은 이름의 다른 지점이 재방문으로 잡히니 자리(주소·좌표)도 함께 봅니다.
+    const here = { name: name.trim(), address: address.trim() || null, lat: spot?.lat, lng: spot?.lng };
+    return rows.find((r) => r.kind === kind && samePlace(r, here)) ?? null;
+  }, [isNew, name, address, spot, kind, rows]);
 
   // 새 기록은 「가게」 칸에 적는 대로 음식점·카페를 찾아 고르면 자리까지 채웁니다.
   const [hits, setHits] = useState<FoodPlace[]>([]);
