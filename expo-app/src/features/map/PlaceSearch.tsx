@@ -48,8 +48,10 @@ export default function PlaceSearch({
         )}
       </View>
 
+      {/* 목록은 absolute 로 띄우지 않고 이 View 안에 쌓습니다. 부모 상자 밖으로 삐져나오면 RN 은 항목 탭을 받지만
+          네이티브 지도도 같은 탭을 받아, 그 자리의 기록 마커가 함께 눌려 기록 화면이 열려버립니다. */}
       {open && results.length > 0 && (
-        <View style={[{ position: "absolute", left: 0, right: 0, top: 52, borderRadius: 16, borderWidth: 1, borderColor: C.line, backgroundColor: C.card, overflow: "hidden", zIndex: 10 }, SHADOW.card]}>
+        <View style={[{ marginTop: 6, borderRadius: 16, borderWidth: 1, borderColor: C.line, backgroundColor: C.card, overflow: "hidden" }, SHADOW.card]}>
           {results.map((p, i) => (
             <Pressable
               key={`${p.lat}-${p.lng}-${i}`}
