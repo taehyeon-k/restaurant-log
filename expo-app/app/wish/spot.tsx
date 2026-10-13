@@ -1,7 +1,7 @@
 import type { NaverMapViewRef } from "@mj-studio/react-native-naver-map";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useRef, useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Keyboard, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BookmarkIcon } from "@/components/icons";
 import { PaperMap } from "@/components/PaperMap";
@@ -23,6 +23,7 @@ export default function SpotPicker() {
   /** 검색으로 옮겨간 자리 정보 — 사람이 손으로 지도를 다시 끌면 지웁니다. */
   const found = useRef<{ name: string; address: string } | null>(null);
   const [q, setQ] = useState("");
+  const [listOpen, setListOpen] = useState(false);
   // 아래 안내 카드가 네이버 로고(왼쪽 아래)를 가리지 않게, 카드 높이만큼 로고를 올립니다.
   const [hintH, setHintH] = useState(70);
 
@@ -49,9 +50,12 @@ export default function SpotPicker() {
           logoMargin={{ bottom: insets.bottom + 24 + hintH + 6 }}
         />
 
-        <View style={{ position: "absolute", left: 16, right: 16, top: 14, zIndex: 10 }}>
+        {/* 검색 결과 목록이 떠 있는 동안 지도를 덮는 투명 가림막 — 목록 항목만 눌리고, 바깥을 누르면 목록이 닫힙니다. */}
+        {listOpen && <Pressable accessibilityLabel="검색 결과 닫기" onPress={() => Keyboard.dismiss()} style={[StyleSheet.absoluteFill, { zIndex: 9, elevation: 9 }]} />}
+
+        <View style={{ position: "absolute", left: 16, right: 16, top: 14, zIndex: 10, elevation: 10 }}>
           <PlaceSearch
-            value={q} onChange={setQ} hasPicked={false} onClearPicked={() => {}} placeholder="가게 이름이나 주소로 찾기"
+            value={q} onChange={setQ} hasPicked={false} onClearPicked={() => {}} placeholder="가게 이름이나 주소로 찾기" onListOpenChange={setListOpen}
             onChoose={(r) => {
               center.current = { lat: r.lat, lng: r.lng };
               found.current = { name: r.name, address: r.address };

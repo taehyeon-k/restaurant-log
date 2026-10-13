@@ -174,7 +174,7 @@ export default function WishForm() {
             )}
           </View>
 
-          <View style={{ zIndex: 5 }}>
+          <View>
             <Eyebrow>자리</Eyebrow>
             <View style={{ marginTop: 7, flexDirection: "row", alignItems: "center", gap: 7 }}>
               <View style={{ flex: 1 }}>
@@ -187,17 +187,6 @@ export default function WishForm() {
                   placeholderTextColor="#b3ada1"
                   style={[fieldStyle, { marginTop: 0, borderRadius: 14, minHeight: 46 }]}
                 />
-                {open && results.length > 0 && (
-                  <View style={[{ position: "absolute", left: 0, right: 0, top: 50, borderRadius: 14, borderWidth: 1, borderColor: C.line, backgroundColor: C.card, overflow: "hidden", zIndex: 10 }, SHADOW.card]}>
-                    {results.map((r, i) => (
-                      <Pressable key={`${r.lat}-${r.lng}-${i}`} onPress={() => { skip.current = true; setWhereText(r.name || r.address); setSpot({ lat: r.lat, lng: r.lng }); setOpen(false); setResults([]); if (!name.trim()) setName(r.name); }}
-                        style={{ paddingHorizontal: 14, paddingVertical: 10, gap: 2, borderBottomWidth: i === results.length - 1 ? 0 : 1, borderBottomColor: C.line }}>
-                        <Text style={{ fontFamily: F.sansMd, fontSize: 13, color: C.ink }}>{r.name || r.address}</Text>
-                        <Text style={{ fontFamily: F.sans, fontSize: 11, color: C.muted }}>{r.address}</Text>
-                      </Pressable>
-                    ))}
-                  </View>
-                )}
               </View>
               <Pressable
                 onPress={() => router.push({ pathname: "/wish/spot", params: spot ? { lat: String(spot.lat), lng: String(spot.lng) } : {} })}
@@ -206,6 +195,19 @@ export default function WishForm() {
                 <Text style={{ fontFamily: F.sans, fontSize: 12, color: spot ? C.brick : C.muted }}>{spot ? "자리 정해짐 · 다시 고르기" : "지도에서 고르기"}</Text>
               </Pressable>
             </View>
+            {/* 목록은 칸 아래로 띄우지 않고 흐름 안에 쌓습니다 — 부모 상자 밖으로 삐져나온 항목은 안드로이드에서 탭을 받지 못해
+                뒤의 「종류」 칩 등이 대신 눌렸습니다. */}
+            {open && results.length > 0 && (
+              <View style={[{ marginTop: 6, borderRadius: 14, borderWidth: 1, borderColor: C.line, backgroundColor: C.card, overflow: "hidden" }, SHADOW.card]}>
+                {results.map((r, i) => (
+                  <Pressable key={`${r.lat}-${r.lng}-${i}`} onPress={() => { skip.current = true; setWhereText(r.name || r.address); setSpot({ lat: r.lat, lng: r.lng }); setOpen(false); setResults([]); if (!name.trim()) setName(r.name); }}
+                    style={{ paddingHorizontal: 14, paddingVertical: 10, gap: 2, borderBottomWidth: i === results.length - 1 ? 0 : 1, borderBottomColor: C.line }}>
+                    <Text style={{ fontFamily: F.sansMd, fontSize: 13, color: C.ink }}>{r.name || r.address}</Text>
+                    <Text style={{ fontFamily: F.sans, fontSize: 11, color: C.muted }}>{r.address}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            )}
             {spot && <Text style={{ marginTop: 6, fontFamily: F.sans, fontSize: 11, color: C.brick }}>검색으로 찾은 자리가 정확히 잡혔습니다.</Text>}
           </View>
 
