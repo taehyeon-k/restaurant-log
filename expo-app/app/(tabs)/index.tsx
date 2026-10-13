@@ -4,7 +4,7 @@ import { useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
 import * as Location from "expo-location";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Keyboard, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View, type ViewStyle } from "react-native";
+import { Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View, type ViewStyle } from "react-native";
 import Animated, { useAnimatedReaction, useAnimatedStyle, useDerivedValue, useSharedValue } from "react-native-reanimated";
 import Svg, { Defs, LinearGradient, Path, Rect, Stop } from "react-native-svg";
 import { scheduleOnRN } from "react-native-worklets";
@@ -71,12 +71,6 @@ export default function MapTab() {
   const regionRef = useRef<Bounds | null>(null);
   const sheetRef = useRef<BottomSheet>(null);
   const lastFit = useRef("");
-  // 검색 결과 목록이 떠 있는 동안과 닫힌 직후엔 마커 탭을 무시합니다 — 목록 항목 아래 겹친 마커(이름표·별점 포함)가
-  // 같은 탭을 받아 기록을 열면 안 됩니다. 탭 이벤트 순서가 어느 쪽이 먼저든 막히도록 닫힌 뒤에도 잠깐 더 막습니다.
-  const markerBlockUntil = useRef(0);
-  const [searchListOpen, setSearchListOpen] = useState(false);
-  const onSearchListOpen = useCallback((open: boolean) => { markerBlockUntil.current = open ? Infinity : Date.now() + 500; setSearchListOpen(open); }, []);
-  const markerTap = (fn: () => void) => () => { if (Date.now() >= markerBlockUntil.current) fn(); };
   const holdFit = useRef(false);
 
   // 네이버 로고는 콘텐츠 패딩 안쪽 귀퉁이에 놓여서, 그대로 두면 바닥에서 MAP_PAD_BOTTOM 만큼 뜬 「왼쪽 중간」에 보입니다.
@@ -380,14 +374,14 @@ export default function MapTab() {
           <RecordMarker
             key={p.key} lat={p.lat as number} lng={p.lng as number} name={p.name} category={p.category} revisit={p.revisit}
             rating={p.rating} active={false} planned={!!matchWish(wishes, p.name)} showLabel={showLabel(`r:${p.key}`)}
-            onTap={markerTap(() => { Haptics.selectionAsync(); openPlace(p); })}
+            onTap={() => { Haptics.selectionAsync(); openPlace(p); }}
           />
         ))}
         {wishMarkers.map((w) => (
-          <WishMarker key={w.id} lat={w.lat as number} lng={w.lng as number} name={w.name} category={w.category} showLabel={showLabel(`w:${w.id}`)} onTap={markerTap(() => { Haptics.selectionAsync(); openWish(w.id); })} />
+          <WishMarker key={w.id} lat={w.lat as number} lng={w.lng as number} name={w.name} category={w.category} showLabel={showLabel(`w:${w.id}`)} onTap={() => { Haptics.selectionAsync(); openWish(w.id); }} />
         ))}
         {ghost && (
-          <GhostMarker lat={ghost.lat} lng={ghost.lng} name={ghost.name} onTap={markerTap(() => newRecord({ name: ghost.name, address: ghost.address, lat: ghost.lat, lng: ghost.lng }))} />
+          <GhostMarker lat={ghost.lat} lng={ghost.lng} name={ghost.name} onTap={() => newRecord({ name: ghost.name, address: ghost.address, lat: ghost.lat, lng: ghost.lng })} />
         )}
       </PaperMap>
 
@@ -402,13 +396,9 @@ export default function MapTab() {
         <Rect x="0" y="0" width="100%" height="100%" fill="url(#topFade)" />
       </Svg>
 
-      {/* 검색 결과 목록이 떠 있는 동안 화면 전체를 덮는 투명 가림막 — 목록 항목 말고는 지도·마커·단추·시트 무엇도 눌리지 않고,
-          바깥을 누르면 키보드와 목록만 닫힙니다. 검색 행(zIndex 20) 바로 아래 층입니다. */}
-      {searchListOpen && <Pressable accessibilityLabel="검색 결과 닫기" onPress={() => Keyboard.dismiss()} style={[StyleSheet.absoluteFill, s.searchShield]} />}
-
       {/* 검색 행 */}
       <View style={[s.searchRow, { top: insets.top + 8 }]}>
-        <PlaceSearch value={mapQuery} onChange={setMapQuery} onChoose={choosePlace} hasPicked={!!ghost} onClearPicked={() => setState({ ghost: null })} onListOpenChange={onSearchListOpen} />
+        <PlaceSearch value={mapQuery} onChange={setMapQuery} onChoose={choosePlace} hasPicked={!!ghost} onClearPicked={() => setState({ ghost: null })} />
         <Pressable onPress={() => router.push("/labels")} accessibilityLabel="라벨첩" style={[s.round, SHADOW.card]}>
           <BurstIcon />
         </Pressable>
@@ -567,8 +557,7 @@ const SHADOW_SHEET = shadow(0.16, 30, -8, 12);
 
 const s = StyleSheet.create({
   topFade: { position: "absolute", top: 0, left: 0, right: 0 },
-  searchRow: { position: "absolute", left: 16, right: 16, flexDirection: "row", alignItems: "flex-start", gap: 9, zIndex: 20, elevation: 20 },
-  searchShield: { zIndex: 19, elevation: 19 },
+  searchRow: { position: "absolute", left: 16, right: 16, flexDirection: "row", alignItems: "flex-start", gap: 9, zIndex: 20 },
   round: { width: 44, height: 44, borderRadius: 22, borderWidth: 1, borderColor: C.line, backgroundColor: C.card, alignItems: "center", justifyContent: "center" },
   chips: {
     position: "absolute", left: 16, flexDirection: "row", padding: 3, borderRadius: 18, borderWidth: 1, borderColor: C.line, backgroundColor: "rgba(251,250,246,.95)",
