@@ -9,7 +9,7 @@ import { refreshAll } from "@/data/invalidate";
 import { useWishes } from "@/data/queries";
 import { setState, useAppState } from "@/data/store";
 import { askWishPermissions } from "@/features/notify/geofence";
-import { forwardGeocode, type Place } from "@/lib/geocode";
+import { forwardGeocode, searchFoodPlaces, type FoodPlace, type Place } from "@/lib/geocode";
 import { supabase } from "@/lib/supabase";
 import { ALL_CATEGORIES, matchWish } from "@/lib/types";
 import { C, F, SHADOW } from "@/theme";
@@ -52,6 +52,28 @@ export default function WishForm() {
     setPlanDate(wish.plan_date ?? ""); setNotify(wish.notify);
     if (wish.lat != null && wish.lng != null) setSpot({ lat: wish.lat, lng: wish.lng });
   }, [wish]);
+
+  // 새 위시는 「가게」 칸에 적는 대로 음식점·카페를 찾아 고르면 자리·종류까지 채웁니다.
+  const [hits, setHits] = useState<FoodPlace[]>([]);
+  const [suggestOpen, setSuggestOpen] = useState(false);
+  const skipSearch = useRef(false);
+  useEffect(() => {
+    if (skipSearch.current) { skipSearch.current = false; return; }
+    if (!isNew || !suggestOpen || name.trim().length < 2) { setHits([]); return; }
+    const ctrl = new AbortController();
+    const t = setTimeout(async () => { try { setHits((await searchFoodPlaces(name, ctrl.signal)).slice(0, 6)); } catch { /* 취소·오프라인 */ } }, 250);
+    return () => { clearTimeout(t); ctrl.abort(); };
+  }, [name, suggestOpen, isNew]);
+
+  function pickPlace(r: FoodPlace) {
+    skipSearch.current = true;
+    setName(r.name);
+    setWhereText(r.address);
+    setSpot({ lat: r.lat, lng: r.lng });
+    setHits([]);
+    setSuggestOpen(false);
+    if (r.category && ALL_CATEGORIES.includes(r.category)) setCategory(r.category);
+  }
 
   // 「자리」 칸에서 바로 가게를 찾아 위치를 잡습니다.
   const [results, setResults] = useState<Place[]>([]);
@@ -130,7 +152,26 @@ export default function WishForm() {
         <View style={{ marginTop: 11, gap: 11 }}>
           <View>
             <Eyebrow>가게</Eyebrow>
-            <TextInput value={name} onChangeText={setName} placeholder="가게 이름" placeholderTextColor="#b3ada1" style={[fieldStyle, { borderRadius: 14, minHeight: 46 }]} />
+            <TextInput
+              value={name}
+              onChangeText={(t) => { setName(t); setSuggestOpen(true); }}
+              onFocus={() => setSuggestOpen(true)}
+              onBlur={() => setTimeout(() => setSuggestOpen(false), 150)}
+              placeholder="가게 이름" placeholderTextColor="#b3ada1" style={[fieldStyle, { borderRadius: 14, minHeight: 46 }]}
+            />
+            {suggestOpen && hits.length > 0 && (
+              <View style={[{ marginTop: 6, borderRadius: 14, borderWidth: 1, borderColor: C.line, backgroundColor: C.card, overflow: "hidden" }, SHADOW.card]}>
+                {hits.map((r, i) => (
+                  <Pressable key={`${r.lat}-${r.lng}-${i}`} onPress={() => pickPlace(r)}
+                    style={{ paddingHorizontal: 14, paddingVertical: 10, gap: 2, borderBottomWidth: i === hits.length - 1 ? 0 : 1, borderBottomColor: C.line }}>
+                    <Text style={{ fontFamily: F.sansMd, fontSize: 13.5, color: C.ink }}>{r.name}</Text>
+                    <Text numberOfLines={1} style={{ fontFamily: F.sans, fontSize: 11.5, color: C.muted }}>
+                      {[r.category ?? (r.kind === "cafe" ? "카페" : "맛집"), r.address].filter(Boolean).join(" · ")}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            )}
           </View>
 
           <View style={{ zIndex: 5 }}>
