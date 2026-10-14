@@ -2,13 +2,11 @@ import { useQuery } from "@tanstack/react-query";
 import * as Haptics from "expo-haptics";
 import * as MediaLibrary from "expo-media-library/legacy";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import * as Sharing from "expo-sharing";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Linking, Pressable, StyleSheet, Text, View, useWindowDimensions, type GestureResponderEvent } from "react-native";
 import Animated, { cancelAnimation, Easing, useAnimatedStyle, useSharedValue, withTiming, type SharedValue } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { captureRef } from "react-native-view-shot";
 import { scheduleOnRN } from "react-native-worklets";
 import { useAccount } from "@/data/profile";
 import { useRows, useWishes } from "@/data/queries";
@@ -26,6 +24,24 @@ import { C, F } from "@/theme";
 const SECONDS = 6;
 /** 이보다 짧게 눌렀다 떼면 탭, 길면 멈춤 */
 const TAP_MS = 250;
+const NEEDS_BUILD = "새 개발 빌드가 필요해요";
+
+/**
+ * 공유 카드에만 쓰는 네이티브 모듈은 누를 때 불러옵니다 — expo-sharing 은 불러오는 순간 네이티브 모듈을 찾아서,
+ * 이 모듈이 없는 예전 빌드에서는 위에서 import 하면 앱이 시작하자마자 멈춥니다. 없으면 null.
+ */
+function shareModules() {
+  try {
+    const { captureRef } = require("react-native-view-shot") as typeof import("react-native-view-shot");
+    const Sharing = require("expo-sharing") as typeof import("expo-sharing");
+    return { captureRef, Sharing };
+  } catch {
+    return null;
+  }
+}
+
+/** view-shot 은 불러올 때가 아니라 부를 때 네이티브 모듈이 없다고 던집니다. */
+const missingNative = (e: unknown) => e instanceof Error && /RNViewShot|native module/i.test(e.message);
 
 type SlideDef = { id: string; dark: boolean; render: () => React.ReactNode };
 
@@ -152,27 +168,29 @@ export default function RecapPlayer() {
 
   /* ── 공유 카드 ─────────────────────────────── */
 
-  const capture = () => captureRef(cardRef, { format: "png", quality: 1, result: "tmpfile" });
-
   async function shareCard() {
+    const mods = shareModules();
+    if (!mods) return setToast(NEEDS_BUILD);
     try {
-      const uri = await capture();
-      if (!(await Sharing.isAvailableAsync())) return setToast("이 기기에서는 공유할 수 없어요");
-      await Sharing.shareAsync(uri, { mimeType: "image/png", UTI: "public.png", dialogTitle: "리캡 공유" });
-    } catch {
-      setToast("이미지를 만들지 못했어요");
+      const uri = await mods.captureRef(cardRef, { format: "png", quality: 1, result: "tmpfile" });
+      if (!(await mods.Sharing.isAvailableAsync())) return setToast("이 기기에서는 공유할 수 없어요");
+      await mods.Sharing.shareAsync(uri, { mimeType: "image/png", UTI: "public.png", dialogTitle: "리캡 공유" });
+    } catch (e) {
+      setToast(missingNative(e) ? NEEDS_BUILD : "이미지를 만들지 못했어요");
     }
   }
 
   async function saveCard() {
+    const mods = shareModules();
+    if (!mods) return setToast(NEEDS_BUILD);
     try {
       const perm = await MediaLibrary.requestPermissionsAsync(true);
       if (!perm.granted) return setToast("사진 접근을 허용하면 저장할 수 있어요");
-      await MediaLibrary.saveToLibraryAsync(await capture());
+      await MediaLibrary.saveToLibraryAsync(await mods.captureRef(cardRef, { format: "png", quality: 1, result: "tmpfile" }));
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setToast("사진 앱에 저장했어요");
-    } catch {
-      setToast("이미지를 저장하지 못했어요");
+    } catch (e) {
+      setToast(missingNative(e) ? NEEDS_BUILD : "이미지를 저장하지 못했어요");
     }
   }
 
