@@ -12,11 +12,11 @@ export default function PlaceCard({ place, onOpen }: { place: Place; onOpen: () 
       onPress={onOpen}
       style={[{ flexDirection: "row", gap: 12, borderRadius: 20, borderWidth: 1, borderColor: place.verified ? "#e0c3b1" : "#ded8cb", backgroundColor: C.card, padding: 12 }, SHADOW.card]}
     >
-      <View>
+      <View style={{ alignSelf: "flex-start" }}>
         <PhotoBox src={place.photo} category={place.category} size={74} radius={15}>
           {!place.photo && <Text style={{ fontFamily: F.mono, fontSize: 9, letterSpacing: 0.7, color: "rgba(251,250,246,.9)" }}>{place.visits.length}장</Text>}
         </PhotoBox>
-        {place.verified && <View style={{ position: "absolute", right: -4, bottom: -4 }}><VerifiedMark size={26} /></View>}
+        {place.verified && <View style={{ position: "absolute", right: 2, bottom: 2 }}><VerifiedMark size={21} /></View>}
       </View>
 
       <View style={{ flex: 1 }}>
