@@ -3,7 +3,11 @@ import { useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Eyebrow } from "@/components/ui";
+import { useAccount } from "@/data/profile";
 import { useRows, useWishes } from "@/data/queries";
+import RecapCard from "@/features/recap/RecapCard";
+import RecapListSheet from "@/features/recap/RecapListSheet";
+import { useRecapState, useRecaps } from "@/features/recap/useRecapState";
 import type { Restaurant, Wish } from "@/lib/types";
 import { C, F } from "@/theme";
 
@@ -48,6 +52,11 @@ export default function CalendarTab() {
   const rows = useMemo(() => allRows.filter((r) => !r.pending), [allRows]);
   const [showWishes, setShowWishes] = useState(true);
   const [cursorState, setCursorState] = useState<{ year: number; month: number } | null>(null);
+  const { data: account } = useAccount();
+  const recaps = useRecaps();
+  const recapState = useRecapState();
+  const [recapList, setRecapList] = useState(false);
+  const openRecap = (quarter: string) => router.push({ pathname: "/recap/[quarter]", params: { quarter } });
 
   const maxVisitedAt = useMemo(() => rows.reduce<string | null>((m, r) => (r.visited_at && (!m || r.visited_at > m) ? r.visited_at : m), null), [rows]);
   const cursor = cursorState ?? monthOfKey(maxVisitedAt ?? keyOf(new Date()));
@@ -75,7 +84,9 @@ export default function CalendarTab() {
       <View style={{ paddingHorizontal: 22 }}>
         <Eyebrow wide>CALENDAR</Eyebrow>
         <View style={s.titleRow}>
-          <Text style={s.title}>{cursor.year}년 {cursor.month + 1}월</Text>
+          <Pressable onPress={() => setRecapList(true)} accessibilityHint="지난 분기 리캡 목록이 열립니다">
+            <Text style={s.title}>{cursor.year}년 {cursor.month + 1}월</Text>
+          </Pressable>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
             <Pressable onPress={() => shift(-1)} accessibilityLabel="이전 달" style={s.round}><Text style={s.arrow}>‹</Text></Pressable>
             <Pressable onPress={() => { const d = new Date(); setCursorState({ year: d.getFullYear(), month: d.getMonth() }); }} style={s.today}>
@@ -95,6 +106,16 @@ export default function CalendarTab() {
           </Pressable>
         </View>
       </View>
+
+      {recaps.latest && (
+        <RecapCard
+          summary={recaps.latest}
+          nick={account?.nickname?.trim() || "나"}
+          unseen={recapState.loaded && !recapState.seen(recaps.latest.quarter)}
+          onOpen={() => openRecap(recaps.latest!.quarter)}
+          onList={() => setRecapList(true)}
+        />
+      )}
 
       <View style={{ marginTop: 14, flexDirection: "row", paddingHorizontal: 12 }}>
         {WEEKDAYS.map((w) => <Text key={w} style={s.weekday}>{w}</Text>)}
@@ -141,6 +162,14 @@ export default function CalendarTab() {
           </View>
         ))}
       </View>
+
+      <RecapListSheet
+        visible={recapList}
+        list={recaps.list}
+        seen={recapState.seen}
+        onClose={() => setRecapList(false)}
+        onPick={(q) => { setRecapList(false); openRecap(q); }}
+      />
     </View>
   );
 }

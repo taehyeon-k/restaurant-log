@@ -21,6 +21,7 @@ import PlaceCard from "@/features/map/PlaceCard";
 import PlacesAtSheet from "@/features/map/PlacesAtSheet";
 import { recordsAt, usePlacesAt, type PlaceAt } from "@/features/map/usePlacesAt";
 import PlaceSearch from "@/features/map/PlaceSearch";
+import RecapInvite from "@/features/recap/RecapInvite";
 import { FilterSheet as FilterSheetImpl, FoundSheet, SearchMissSheet } from "@/features/map/Sheets";
 import type { Place as GeocodePlace } from "@/lib/geocode";
 import { findRecord, findWish, norm } from "@/lib/geo";
@@ -611,6 +612,9 @@ export default function MapTab() {
         onAddRecord={() => { const g = ghost!; setState({ ghost: null }); newRecord({ name: g.name, address: g.address, lat: g.lat, lng: g.lng }); }}
         onAddWish={() => { const g = ghost!; setState({ ghost: null }); openWishPlan({ name: g.name, where_text: g.address, lat: g.lat, lng: g.lng }); }}
       />
+
+      {/* 분기가 바뀐 뒤 처음 한 번 — 지난 분기 리캡 안내 */}
+      <RecapInvite />
     </View>
   );
 }

@@ -3,6 +3,7 @@ import * as Haptics from "expo-haptics";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BookmarkIcon, CalendarIcon, CameraIcon, MapPinIcon, PersonIcon } from "./icons";
+import { useRecapUnseen } from "@/features/recap/useRecapState";
 import { C, F, TAB_BAR_H } from "@/theme";
 
 const LABEL: Record<string, string> = {
@@ -29,10 +30,13 @@ type BottomTabBarProps = Parameters<TabBarFn>[0];
 export default function TabBar({ state, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  // 막 끝난 분기 리캡을 아직 끝까지 보지 않았으면 캘린더 아이콘에 점.
+  const recapUnseen = useRecapUnseen();
 
   const item = (route: (typeof state.routes)[number], index: number) => {
     const active = state.index === index;
     const color = active ? C.brick : "#a29a8c";
+    const dot = route.name === "calendar" && recapUnseen;
     return (
       <Pressable
         key={route.key}
@@ -43,7 +47,10 @@ export default function TabBar({ state, navigation }: BottomTabBarProps) {
           if (!active && !e.defaultPrevented) navigation.navigate(route.name);
         }}
       >
-        {ICON[route.name]?.(color)}
+        <View>
+          {ICON[route.name]?.(color)}
+          {dot && <View style={s.dot} />}
+        </View>
         <Text style={[s.label, { color }]}>{LABEL[route.name] ?? route.name}</Text>
       </Pressable>
     );
@@ -91,6 +98,7 @@ const s = StyleSheet.create({
   tab: { flex: 1, alignItems: "center", gap: 4 },
   gap: { flex: 1 },
   label: { fontFamily: F.mono, fontSize: 9.5, letterSpacing: 0.2 },
+  dot: { position: "absolute", top: -2, right: -4, width: 7, height: 7, borderRadius: 4, backgroundColor: C.brick, borderWidth: 1.5, borderColor: C.card },
   shutter: {
     position: "absolute",
     top: -22,
