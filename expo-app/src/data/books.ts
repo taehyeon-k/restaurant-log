@@ -155,6 +155,10 @@ const ERRORS: Record<string, string> = {
   already_in_couple: "이미 함께 쓰는 연인 기록장이 있어요. 먼저 연결을 끊어 주세요",
   bad_date: "사귄 날을 다시 골라 주세요",
   not_member: "이 기록장에 들어 있지 않아요",
+  not_my_record: "내가 찍은 기록만 남길 수 있어요",
+  pending_record: "보관함 기록은 먼저 저장해 주세요",
+  not_couple_record: "연인 기록에서만 쓸 수 있어요",
+  not_found: "기록을 찾지 못했어요",
 };
 
 const friendly = (message: string) => {
@@ -286,4 +290,14 @@ export async function savePick(qc: QueryClient, bookId: string, milestone: strin
     .upsert({ book_id: bookId, milestone, ...pick, updated_at: new Date().toISOString() });
   if (error) throw friendly(error.message);
   await qc.invalidateQueries({ queryKey: ["anniversary_picks"] });
+}
+
+/* ───────────── 내 기록에도 남기기 ───────────── */
+
+/** 내가 찍은 연인 기록을 개인 기록장에 복사본으로 남깁니다. 이미 있으면 그 복사본 id 를 돌려줍니다. */
+export async function copyToPersonal(qc: QueryClient, recordId: number): Promise<number> {
+  const { data, error } = await supabase.rpc("copy_record_to_personal", { p_record: recordId });
+  if (error) throw friendly(error.message);
+  await qc.invalidateQueries({ queryKey: ["restaurants"] });
+  return data as number;
 }
