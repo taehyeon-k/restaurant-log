@@ -9,7 +9,7 @@ import Animated, { cancelAnimation, Easing, useAnimatedStyle, useSharedValue, wi
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { scheduleOnRN } from "react-native-worklets";
 import { useAccount } from "@/data/profile";
-import { useRows, useWishes } from "@/data/queries";
+import { usePersonalRows, usePersonalWishes } from "@/data/queries";
 import { A, CLOCK_END, ClockProvider } from "@/features/recap/anim";
 import { computeRecap } from "@/features/recap/compute";
 import { currentQuarter, parseQuarter, quarterLabel, seasonOf } from "@/features/recap/seasons";
@@ -54,8 +54,8 @@ export default function RecapPlayer() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { width: W, height: H } = useWindowDimensions();
-  const { data: rows, dataUpdatedAt: rowsAt } = useRows();
-  const { data: wishes, dataUpdatedAt: wishesAt } = useWishes();
+  const { data: rows, dataUpdatedAt: rowsAt } = usePersonalRows();
+  const { data: wishes, dataUpdatedAt: wishesAt } = usePersonalWishes();
   const { data: account } = useAccount();
   const recapState = useRecapState();
 

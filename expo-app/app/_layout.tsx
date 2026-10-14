@@ -89,6 +89,8 @@ function Gate({ fontsLoaded }: { fontsLoaded: boolean }) {
       <Stack.Screen name="wish/new" options={{ presentation: "modal" }} />
       <Stack.Screen name="wish/spot" options={{ presentation: "fullScreenModal" }} />
       <Stack.Screen name="wish/[id]" options={{ presentation: "transparentModal", animation: "fade", contentStyle: { backgroundColor: "transparent" } }} />
+      <Stack.Screen name="couple/new" options={{ presentation: "modal" }} />
+      <Stack.Screen name="couple/join" options={{ presentation: "modal" }} />
       <Stack.Screen name="recap/[quarter]" options={{ presentation: "fullScreenModal", animation: "fade", gestureEnabled: false }} />
       <Stack.Screen name="auth" />
       <Stack.Screen name="login" />

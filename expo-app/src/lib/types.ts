@@ -5,6 +5,10 @@ export type MenuItem = { name: string; price: number | null };
 export type Restaurant = {
   id: number;
   created_at: string;
+  /** 찍은(쓴) 사람 — 연인 기록에서 「태현이 인증」 */
+  user_id: string;
+  /** 속한 기록장(개인 / 연인). 마이그레이션 전 행에는 없습니다. */
+  book_id?: string | null;
   kind: Kind;
   name: string;
   category: string | null;
@@ -40,6 +44,8 @@ export type Restaurant = {
 /** 가고싶다(위시) — 아직 가지 않은 곳. restaurants 와 달리 인증·별점·사진이 없습니다. */
 export type Wish = {
   id: string;
+  user_id?: string;
+  book_id?: string | null;
   name: string;
   where_text: string | null;
   category: string | null;

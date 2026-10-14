@@ -3,11 +3,13 @@ import { useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Eyebrow } from "@/components/ui";
+import { useActiveBook, useAnniversaryPicks } from "@/data/books";
 import { useAccount } from "@/data/profile";
 import { useRows, useWishes } from "@/data/queries";
 import RecapCard from "@/features/recap/RecapCard";
 import RecapListSheet from "@/features/recap/RecapListSheet";
 import { useRecapState, useRecaps } from "@/features/recap/useRecapState";
+import { daysBetween, dayCount, mealFor, milestoneOn, milestonesUntil, nextMilestone, todayIso } from "@/lib/anniversary";
 import type { Restaurant, Wish } from "@/lib/types";
 import { C, F } from "@/theme";
 
@@ -56,6 +58,10 @@ export default function CalendarTab() {
   const recaps = useRecaps();
   const recapState = useRecapState();
   const [recapList, setRecapList] = useState(false);
+  // 연인 기록(HANDOFF-couple §3-10) — 머리 「CALENDAR · 우리」 + D+N, 기념일 띠·칸 강조. 리캡은 개인 기록에만.
+  const { book, isCouple } = useActiveBook();
+  const { data: picks = [] } = useAnniversaryPicks();
+  const startedOn = isCouple ? book?.startedOn ?? null : null;
   const openRecap = (quarter: string) => router.push({ pathname: "/recap/[quarter]", params: { quarter } });
 
   const maxVisitedAt = useMemo(() => rows.reduce<string | null>((m, r) => (r.visited_at && (!m || r.visited_at > m) ? r.visited_at : m), null), [rows]);
@@ -79,10 +85,23 @@ export default function CalendarTab() {
   const countThisMonth = rows.filter((r) => r.visited_at?.startsWith(prefix)).length;
   const todayKey = keyOf(new Date());
 
+  // 이 달의 기념일 띠 — 1차 구현은 기념일 당일 칸만 강조합니다(직접 고른 다른 날 칸은 표시하지 않음).
+  const monthEnd = keyOf(new Date(cursor.year, cursor.month + 1, 0));
+  const monthMilestones = useMemo(
+    () => (startedOn ? milestonesUntil(startedOn, monthEnd).filter((m) => m.date.startsWith(prefix)) : []),
+    [startedOn, monthEnd, prefix]
+  );
+  const band = monthMilestones[0] ?? null;
+  const bandMeal = band ? mealFor(band, picks, rows) : null;
+  const next = startedOn ? nextMilestone(startedOn, todayIso()) : null;
+
   return (
     <View style={{ flex: 1, backgroundColor: C.paper, paddingTop: insets.top + 8 }}>
       <View style={{ paddingHorizontal: 22 }}>
-        <Eyebrow wide>CALENDAR</Eyebrow>
+        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+          <Eyebrow wide>{isCouple ? "CALENDAR · 우리" : "CALENDAR"}</Eyebrow>
+          {startedOn && <Text style={{ fontFamily: F.mono, fontSize: 11.5, color: C.brick }}>D+{dayCount(startedOn)}</Text>}
+        </View>
         <View style={s.titleRow}>
           <Pressable onPress={() => setRecapList(true)} accessibilityHint="지난 분기 리캡 목록이 열립니다">
             <Text style={s.title}>{cursor.year}년 {cursor.month + 1}월</Text>
@@ -107,7 +126,19 @@ export default function CalendarTab() {
         </View>
       </View>
 
-      {recaps.latest && (
+      {band && (
+        <View style={s.band}>
+          <Text numberOfLines={1} style={{ flex: 1, fontFamily: F.sans, fontSize: 11.5, color: "#a34d27" }}>
+            {band.label} · {Number(band.date.slice(5, 7))}월 {Number(band.date.slice(8))}일
+            {bandMeal && (bandMeal.kind === "picked" || bandMeal.kind === "day") ? ` · ${bandMeal.record.name}` : ""}
+          </Text>
+          {next && next.key !== band.key && (
+            <Text style={{ fontFamily: F.mono, fontSize: 10, color: "#a34d27" }}>다음 {next.label} · {daysBetween(todayIso(), next.date)}일 뒤</Text>
+          )}
+        </View>
+      )}
+
+      {!isCouple && recaps.latest && (
         <RecapCard
           summary={recaps.latest}
           nick={account?.nickname?.trim() || "나"}
@@ -133,6 +164,7 @@ export default function CalendarTab() {
               const shownWishes = wishChips.slice(0, Math.max(0, 2 - shownVisits.length));
               const extra = visits.length + wishChips.length - shownVisits.length - shownWishes.length;
               const isToday = key === todayKey;
+              const milestone = inMonth && startedOn ? milestoneOn(startedOn, key) : null;
               return (
                 <Pressable
                   key={key}
@@ -142,13 +174,21 @@ export default function CalendarTab() {
                   style={[
                     s.cell,
                     { borderWidth: isToday ? 1.5 : 1, borderColor: isToday ? C.brick : inMonth ? C.lineSoft : "transparent", backgroundColor: inMonth ? C.card : "transparent" },
+                    milestone && { backgroundColor: C.brick, borderColor: isToday ? C.ink : C.brick },
                   ]}
                 >
-                  <Text style={{ paddingHorizontal: 4, fontFamily: isToday ? F.sansBd : F.mono, fontSize: 10.5, color: !inMonth ? "#d3cdc0" : isToday ? C.brick : C.ink }}>{date.getDate()}</Text>
+                  {milestone ? (
+                    <View style={{ flexDirection: "row", alignItems: "baseline", gap: 2, paddingHorizontal: 4 }}>
+                      <Text style={{ fontFamily: F.sansBd, fontSize: 10.5, color: C.card }}>{date.getDate()}</Text>
+                      <Text numberOfLines={1} style={{ flexShrink: 1, fontFamily: F.mono, fontSize: 8, color: C.card }}>{milestone.label}</Text>
+                    </View>
+                  ) : (
+                    <Text style={{ paddingHorizontal: 4, fontFamily: isToday ? F.sansBd : F.mono, fontSize: 10.5, color: !inMonth ? "#d3cdc0" : isToday ? C.brick : C.ink }}>{date.getDate()}</Text>
+                  )}
                   {inMonth && (
                     <View style={{ marginTop: 4, gap: 2, overflow: "hidden" }}>
                       {shownVisits.map((v) => (
-                        <Text key={v.id} numberOfLines={1} style={[s.chip, { backgroundColor: v.verified ? "#f2e0d5" : "#eae5da", color: v.verified ? "#a34d27" : C.muted }]}>{clipName(v.name, MAX_CHIP_CHARS)}</Text>
+                        <Text key={v.id} numberOfLines={1} style={[s.chip, milestone ? { backgroundColor: C.card, color: "#a34d27" } : { backgroundColor: v.verified ? "#f2e0d5" : "#eae5da", color: v.verified ? "#a34d27" : C.muted }]}>{clipName(v.name, MAX_CHIP_CHARS)}</Text>
                       ))}
                       {shownWishes.map((w) => (
                         <Text key={w.id} numberOfLines={1} style={[s.chip, { backgroundColor: "#eee9de", color: C.faint }]}>○ {clipName(w.name, MAX_CHIP_CHARS)}</Text>
@@ -181,6 +221,7 @@ const s = StyleSheet.create({
   arrow: { fontSize: 15, color: C.ink },
   today: { height: 36, borderRadius: 18, borderWidth: 1, borderColor: C.line, backgroundColor: C.card, paddingHorizontal: 12, justifyContent: "center" },
   toggle: { minHeight: 30, borderRadius: 15, paddingHorizontal: 11, flexDirection: "row", alignItems: "center", gap: 6 },
+  band: { marginTop: 10, marginHorizontal: 22, flexDirection: "row", alignItems: "center", gap: 8, borderRadius: 14, backgroundColor: "#f2e0d5", paddingHorizontal: 13, paddingVertical: 9 },
   weekday: { flex: 1, textAlign: "center", fontFamily: F.mono, fontSize: 10, color: C.faint },
   cell: { flex: 1, minWidth: 0, borderRadius: 12, paddingVertical: 5, paddingHorizontal: 1, overflow: "hidden" },
   chip: { borderRadius: 5, paddingHorizontal: 1, paddingVertical: 2, fontFamily: F.sans, fontSize: 9, lineHeight: 12, overflow: "hidden" },

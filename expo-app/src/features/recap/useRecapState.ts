@@ -1,7 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useEffect, useMemo, useSyncExternalStore } from "react";
 import { useAccount } from "@/data/profile";
-import { useRows } from "@/data/queries";
+import { usePersonalRows } from "@/data/queries";
 import { latestRecap, listRecapQuarters } from "./compute";
 import type { QuarterId } from "./seasons";
 
@@ -70,7 +70,7 @@ export function useRecapState() {
 
 /** 지난 분기 리캡 목록과 막 끝난 분기 리캡(캘린더 카드·초대장 대상). */
 export function useRecaps() {
-  const { data: rows, isSuccess } = useRows();
+  const { data: rows, isSuccess } = usePersonalRows();
   const list = useMemo(() => (rows ? listRecapQuarters(rows) : []), [rows]);
   const latest = useMemo(() => (rows ? latestRecap(rows) : null), [rows]);
   return { ready: isSuccess, list, latest };

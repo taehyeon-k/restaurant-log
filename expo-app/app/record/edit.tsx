@@ -8,6 +8,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CameraIcon, VerifiedMark } from "@/components/icons";
 import { Chip, Eyebrow, fieldStyle } from "@/components/ui";
+import { useActiveBook, useSaveNote } from "@/data/books";
 import { refreshAll } from "@/data/invalidate";
 import { useRows, useWishes } from "@/data/queries";
 import { samePlace } from "@/lib/geo";
@@ -39,6 +40,8 @@ export default function EditRoute() {
   const qc = useQueryClient();
   const { data: rows = [] } = useRows();
   const { data: wishes = [] } = useWishes();
+  const { id: bookId, isCouple } = useActiveBook();
+  const saveNote = useSaveNote();
 
   const record = p.id ? rows.find((r) => r.id === Number(p.id)) ?? null : null;
   const isNew = !p.id;
@@ -139,6 +142,8 @@ export default function EditRoute() {
         const region = regionFromAddress(cleanAddress) || record.region;
         const { error } = await supabase.from("restaurants").update({ ...shared, region, pending: false }).eq("id", record.id);
         if (error) throw new Error(error.message);
+        // 연인 기록이면 별점·메모가 곧 찍은 사람의 한 줄입니다(HANDOFF-couple §3-6).
+        if (isCouple) await saveNote(record.user_id, record.id, shared.rating, shared.review, false);
         await refreshAll(qc);
         router.back();
         return;
@@ -161,15 +166,16 @@ export default function EditRoute() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("로그인이 필요합니다");
 
-      const { error } = await supabase.from("restaurants").insert({
-        user_id: user.id, kind, region: finalRegion,
+      const { data: inserted, error } = await supabase.from("restaurants").insert({
+        user_id: user.id, ...(bookId ? { book_id: bookId } : {}), kind, region: finalRegion,
         place_key: `${cleanName}|${finalAddress ?? ""}`.toLowerCase(),
         lat, lng, verified: false, acc: null,
         ...shared, address: finalAddress,
         revisit: revisit || Boolean(twin),
         from_wish: fromWish,
-      });
+      }).select("id").single();
       if (error) throw new Error(error.message);
+      if (isCouple && (shared.rating != null || shared.review)) await saveNote(user.id, inserted.id as number, shared.rating, shared.review, false);
       if (matchedWish) await supabase.from("wishes").delete().eq("id", matchedWish.id);
 
       await refreshAll(qc);

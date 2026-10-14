@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
-import { useRows } from "@/data/queries";
+import { usePersonalRows } from "@/data/queries";
 import { DEFAULT_CHARACTER, VERIFIED_PER_TICKET, isCharacterId, type CharacterId } from "@/lib/characters";
 import { earnedLabels, regionTitles, REGION_TIERS } from "@/lib/labels";
 import { supabase } from "@/lib/supabase";
@@ -77,7 +77,7 @@ export const useOwnedCharacters = () =>
 
 /** 쓸 수 있는 뽑기권 · 다음 장까지 남은 인증 기록. */
 export function useTickets() {
-  const { data: rows = [], isSuccess } = useRows();
+  const { data: rows = [], isSuccess } = usePersonalRows();
   const labelCount = receivedLabelCount(rows);
   const verified = verifiedCount(rows);
   const q = useQuery({

@@ -27,7 +27,7 @@ export const LABEL_BOTTOM = 42;
 
 const textBase = { includeFontPadding: false, textAlignVertical: "center" } as const;
 
-function Tag({ name, rating, cta }: { name: string; rating?: number | null; cta?: string }) {
+function Tag({ name, rating, cta, badge }: { name: string; rating?: number | null; cta?: string; badge?: string }) {
   return (
     <View
       style={[
@@ -38,7 +38,10 @@ function Tag({ name, rating, cta }: { name: string; rating?: number | null; cta?
         SHADOW.card,
       ]}
     >
-      <Text numberOfLines={1} style={[textBase, { fontFamily: F.sansBd, fontSize: 13, lineHeight: NAME_LH, color: C.ink }]}>{name}</Text>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+        <Text numberOfLines={1} style={[textBase, { flexShrink: 1, fontFamily: F.sansBd, fontSize: 13, lineHeight: NAME_LH, color: C.ink }]}>{name}</Text>
+        {badge && <Text style={[textBase, { fontFamily: F.mono, fontSize: 9.5, lineHeight: NAME_LH, color: C.brick }]}>{badge}</Text>}
+      </View>
       {rating !== undefined && (
         <Text style={[textBase, { fontFamily: F.sans, fontSize: 11, lineHeight: SUB_LH, color: C.muted }]}>★ {rating == null ? "—" : rating.toFixed(1)}</Text>
       )}
@@ -72,7 +75,11 @@ export const tagWidth = (name: string) => Math.min(220, Math.max(64, name.length
 
 type Base = { lat: number; lng: number; onTap?: () => void; zIndex?: number };
 
-type RecordProps = Base & { name: string; category: string | null; revisit: boolean; rating: number | null; active: boolean; planned: boolean; showLabel: boolean };
+type RecordProps = Base & {
+  name: string; category: string | null; revisit: boolean; rating: number | null; active: boolean; planned: boolean; showLabel: boolean;
+  /** 연인 기록의 기념일 식사 — 말풍선 이름 옆 「1주년」 */
+  badge?: string;
+};
 
 /** 기록 핀 — 재방문이면 색이 차고, 한 번만 간 곳은 종이색 바탕에 색 테두리. 크기·위치는 웹 MobileMap 과 같습니다(기준점 = 상자 바닥에서 6px). */
 export const RecordMarker = memo(function RecordMarker(p: RecordProps) {
@@ -83,7 +90,7 @@ export const RecordMarker = memo(function RecordMarker(p: RecordProps) {
   const size = p.active ? 30 : 23;
   const dot = p.active ? 10 : 8;
   const sw = p.active ? 2 : 1.5;
-  const labelW = p.showLabel ? tagWidth(p.name) : 0;
+  const labelW = p.showLabel ? tagWidth(p.name) + (p.badge ? p.badge.length * 8 + 6 : 0) : 0;
   const w = Math.max(size + 22, labelW);
   const h = p.showLabel ? LABEL_BOTTOM + tagHeight("rating") : size + 15 + 2;
   // 웹: 회전 전 정사각형 바닥이 bottom:8 → 원 중심은 8 + size/2, 꼭짓점은 그 아래 size/2·√2.
@@ -91,7 +98,7 @@ export const RecordMarker = memo(function RecordMarker(p: RecordProps) {
 
   return (
     <NaverMapMarkerOverlay latitude={p.lat} longitude={p.lng} width={w} height={h} anchor={anchorAt(h, 6)} onTap={p.onTap} zIndex={p.zIndex ?? (p.active ? 1000 : 0)}>
-      <View key={markerKey(w, h, size, fill, stroke, p.planned, p.showLabel && p.name, p.showLabel && p.rating)} collapsable={false} style={{ width: w, height: h }}>
+      <View key={markerKey(w, h, size, fill, stroke, p.planned, p.showLabel && p.name, p.showLabel && p.rating, p.showLabel && p.badge)} collapsable={false} style={{ width: w, height: h }}>
         <GroundShadow w={p.active ? 12 : 9} h={p.active ? 4 : 3} opacity={0.16} />
         <Svg width={size} height={dropH(size)} style={{ position: "absolute", alignSelf: "center", bottom: center - (size / 2) * Math.SQRT2 }}>
           <Path d={dropPath(size, sw)} fill={fill} stroke={stroke} strokeWidth={sw} />
@@ -102,7 +109,7 @@ export const RecordMarker = memo(function RecordMarker(p: RecordProps) {
             <Svg width={9} height={9} viewBox="0 0 24 24" fill={C.brick}><Path d={BOOKMARK_PATH} /></Svg>
           </View>
         )}
-        {p.showLabel && <LabelAt><Tag name={p.name} rating={p.rating} /></LabelAt>}
+        {p.showLabel && <LabelAt><Tag name={p.name} rating={p.rating} badge={p.badge} /></LabelAt>}
       </View>
     </NaverMapMarkerOverlay>
   );

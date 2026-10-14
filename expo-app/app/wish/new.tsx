@@ -6,6 +6,7 @@ import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Switch, Text, Te
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button, Chip, Eyebrow, fieldStyle } from "@/components/ui";
 import { refreshAll } from "@/data/invalidate";
+import { useActiveBook } from "@/data/books";
 import { useWishes } from "@/data/queries";
 import { setState, useAppState } from "@/data/store";
 import { askWishPermissions } from "@/features/notify/geofence";
@@ -24,6 +25,7 @@ export default function WishForm() {
   const insets = useSafeAreaInsets();
   const qc = useQueryClient();
   const { data: wishes = [] } = useWishes();
+  const { id: bookId } = useActiveBook();
   const { spotPick } = useAppState();
 
   const wish = p.id ? wishes.find((w) => w.id === p.id) ?? null : null;
@@ -121,7 +123,7 @@ export default function WishForm() {
     if (isNew) {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { setSaving(false); return setError("로그인이 필요합니다"); }
-      ({ error: err } = await supabase.from("wishes").insert({ ...payload, user_id: user.id }));
+      ({ error: err } = await supabase.from("wishes").insert({ ...payload, user_id: user.id, ...(bookId ? { book_id: bookId } : {}) }));
     } else {
       ({ error: err } = await supabase.from("wishes").update(payload).eq("id", wish!.id));
     }

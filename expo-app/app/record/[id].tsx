@@ -6,11 +6,15 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BookmarkIcon, ShareIcon, VerifiedMark } from "@/components/icons";
 import { ShareSheet } from "@/components/ShareSheet";
 import { BackButton, Button, Eyebrow, MobileStars, PhotoBox, Pigs } from "@/components/ui";
+import { useActiveBook, useAnniversaryPicks, useRecordNotes } from "@/data/books";
 import { refreshAll } from "@/data/invalidate";
 import { useRows } from "@/data/queries";
+import CoupleNotes from "@/features/couple/CoupleNotes";
+import { dottedWithDay, mealLabels } from "@/lib/anniversary";
+import { iGa } from "@/lib/josa";
 import { photosOf } from "@/lib/record";
 import { supabase } from "@/lib/supabase";
-import { dottedDate, verifiedDateTime } from "@/lib/types";
+import { dottedDate, verifiedDateTime, verifiedTime } from "@/lib/types";
 import { C, F } from "@/theme";
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
@@ -35,6 +39,10 @@ export default function RecordRoute() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [sharing, setSharing] = useState(false);
+  // 연인 기록(HANDOFF-couple §3-6) — 사람별 한 줄, 「태현이 인증」, 기념일 라벨. 기록 자체는 찍은 사람만 고칩니다.
+  const { book, isCouple, readOnly, me, partner } = useActiveBook();
+  const { data: notes = [] } = useRecordNotes();
+  const { data: picks = [] } = useAnniversaryPicks();
 
   if (!record) {
     return (
@@ -43,6 +51,12 @@ export default function RecordRoute() {
       </View>
     );
   }
+
+  const mineRecord = !isCouple || record.user_id === me?.userId;
+  const canEdit = mineRecord && !readOnly;
+  const verifier = isCouple ? [me, partner].find((m) => m?.userId === record.user_id)?.nickname ?? "상대" : null;
+  const anniversary =
+    isCouple && book?.startedOn ? mealLabels(book.startedOn, picks, rows.filter((r) => !r.pending)).get(record.id) ?? null : null;
 
   const idx = shown ?? cover;
   const current = photos[idx] ?? null;
@@ -112,6 +126,11 @@ export default function RecordRoute() {
               <VerifiedMark size={52} />
             </View>
           )}
+          {anniversary && (
+            <Text style={{ position: "absolute", right: 16, top: insets.top + 14, borderRadius: 10, backgroundColor: C.brick, paddingHorizontal: 9, paddingVertical: 4, fontFamily: F.mono, fontSize: 11, color: C.card, overflow: "hidden" }}>
+              {anniversary}
+            </Text>
+          )}
         </PhotoBox>
 
         {photos.length > 1 && (
@@ -123,7 +142,7 @@ export default function RecordRoute() {
                 {i === cover && <Text style={{ position: "absolute", top: 1, right: 3, fontSize: 8, color: C.brick }}>★</Text>}
               </Pressable>
             ))}
-            {idx !== cover && (
+            {idx !== cover && canEdit && (
               <Pressable onPress={makeCover} disabled={busy} style={{ minHeight: 44, borderRadius: 14, borderWidth: 1, borderStyle: "dashed", borderColor: C.line, paddingHorizontal: 13, justifyContent: "center" }}>
                 <Text style={{ fontFamily: F.sans, fontSize: 11.5, color: C.muted }}>대표사진으로</Text>
               </Pressable>
@@ -146,7 +165,13 @@ export default function RecordRoute() {
 
           <View style={{ marginTop: 22, paddingTop: 18, borderTopWidth: 1, borderTopColor: "#ded8cb", gap: 18 }}>
             <Field label="방문">
-              {record.verified && record.verified_at ? (
+              {isCouple && record.verified && record.verified_at && record.visited_at ? (
+                <View style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 6 }}>
+                  <Text style={{ fontFamily: F.mono, fontSize: 13, color: C.ink }}>{dottedWithDay(record.visited_at)} {verifiedTime(record.verified_at)}</Text>
+                  <Text style={{ fontFamily: F.sans, fontSize: 12.5, color: C.muted }}>· {iGa(verifier ?? "상대")} 인증</Text>
+                  <VerifiedMark size={14} />
+                </View>
+              ) : record.verified && record.verified_at ? (
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
                   <Text style={{ fontFamily: F.mono, fontSize: 13.5, color: C.ink }}>{verifiedDateTime(record.verified_at)}</Text>
                   <VerifiedMark size={14} />
@@ -169,9 +194,13 @@ export default function RecordRoute() {
                 <Text style={{ fontFamily: F.sans, fontSize: 13.5, lineHeight: 22, color: C.ink }}>{record.menu || "아직 쓰지 않았습니다"}</Text>
               )}
             </Field>
-            <Field label="메모">
-              <Text style={{ fontFamily: F.serif, fontSize: 16, lineHeight: 31, color: "#2e2a25" }}>{record.review || "메모가 비어 있습니다."}</Text>
-            </Field>
+            {isCouple ? (
+              <CoupleNotes record={record} notes={notes} me={me} partner={partner} readOnly={readOnly} />
+            ) : (
+              <Field label="메모">
+                <Text style={{ fontFamily: F.serif, fontSize: 16, lineHeight: 31, color: "#2e2a25" }}>{record.review || "메모가 비어 있습니다."}</Text>
+              </Field>
+            )}
             <Field label="주소">
               <Text style={{ fontFamily: F.sans, fontSize: 12.5, color: "#4d4842" }}>{record.address ?? record.region ?? "주소 미등록"}</Text>
             </Field>
@@ -207,19 +236,19 @@ export default function RecordRoute() {
 
           {!!error && <Text style={{ marginTop: 16, fontFamily: F.sans, fontSize: 12, color: "#a8412a" }}>{error}</Text>}
 
-          <View style={{ marginTop: 20, gap: 8 }}>
+          {!readOnly && <View style={{ marginTop: 20, gap: 8 }}>
             <Button label="여기 또 왔어요 · 기록 추가" onPress={revisit} />
             <Pressable onPress={addWish} style={{ minHeight: 50, borderRadius: 18, borderWidth: 1, borderColor: "#ded8cb", flexDirection: "row", gap: 8, alignItems: "center", justifyContent: "center" }}>
               <BookmarkIcon size={14} fill={C.brick} stroke={C.brick} />
               <Text style={{ fontFamily: F.sans, fontSize: 13.5, color: C.ink }}>또 갈 예정으로 담기</Text>
             </Pressable>
-            <View style={{ flexDirection: "row", gap: 8 }}>
+            {canEdit && <View style={{ flexDirection: "row", gap: 8 }}>
               <Button style={{ flex: 1, borderColor: "#e4dfd3" }} kind="line" label="기록 수정" onPress={() => router.push({ pathname: "/record/edit", params: { id: String(record.id) } })} />
               <Pressable onPress={remove} disabled={busy} style={{ minHeight: 50, borderRadius: 18, borderWidth: 1, borderColor: "#e4dfd3", paddingHorizontal: 18, justifyContent: "center", opacity: busy ? 0.5 : 1 }}>
                 <Text style={{ fontFamily: F.sans, fontSize: 12.5, color: C.faint }}>지우기</Text>
               </Pressable>
-            </View>
-          </View>
+            </View>}
+          </View>}
         </View>
       </ScrollView>
       <View style={{ position: "absolute", left: 16, top: insets.top + 8, backgroundColor: "rgba(251,250,246,.92)", borderRadius: 22 }}>

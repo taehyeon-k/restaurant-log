@@ -1,6 +1,7 @@
 import BottomSheet, { BottomSheetFlatList, BottomSheetTextInput } from "@gorhom/bottom-sheet";
 import { NaverMapPolygonOverlay, type NaverMapViewRef } from "@mj-studio/react-native-naver-map";
-import { useRouter } from "expo-router";
+import { useQueryClient } from "@tanstack/react-query";
+import { useFocusEffect, useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
 import * as Location from "expo-location";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -12,17 +13,21 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BookmarkIcon, BurstIcon, LocateIcon, SearchIcon } from "@/components/icons";
 import { PaperMap } from "@/components/PaperMap";
 import { DraftsBoxIcon } from "@/components/DraftsBoxIcon";
+import { useActiveBook, useAnniversaryPicks, useRecordNotes, type BookMember } from "@/data/books";
 import { useRows, useWishes } from "@/data/queries";
 import { setState, useAppState, type MarkerFilter } from "@/data/store";
 
 import { BuildingTagMarker, GhostMarker, NumberPin, RecordMarker, TapPointMarker, WishMarker } from "@/features/map/Markers";
 import { revealZooms } from "@/features/map/labelZoom";
-import PlaceCard from "@/features/map/PlaceCard";
+import { Pair } from "@/features/couple/Avatars";
+import BookDrawer, { MenuLines } from "@/features/couple/BookDrawer";
+import PlaceCard, { type CoupleCardInfo } from "@/features/map/PlaceCard";
 import PlacesAtSheet from "@/features/map/PlacesAtSheet";
 import { recordsAt, usePlacesAt, type PlaceAt } from "@/features/map/usePlacesAt";
 import PlaceSearch from "@/features/map/PlaceSearch";
 import RecapInvite from "@/features/recap/RecapInvite";
 import { FilterSheet as FilterSheetImpl, FoundSheet, SearchMissSheet } from "@/features/map/Sheets";
+import { dayCount, mealLabels } from "@/lib/anniversary";
 import type { Place as GeocodePlace } from "@/lib/geocode";
 import { findRecord, findWish, norm } from "@/lib/geo";
 import { groupPlaces, type Place } from "@/lib/places";
@@ -71,6 +76,18 @@ export default function MapTab() {
   const { data: allRows = [] } = useRows();
   const { data: wishes = [] } = useWishes();
   const { kind, markerFilter, ghost } = useAppState();
+  const qc = useQueryClient();
+  // 지금 고른 기록장(HANDOFF-couple §3-1). 연인 기록이면 시트 제목·카드·말풍선이 바뀝니다.
+  const { book, isCouple, me: meMember, partner } = useActiveBook();
+  const { data: notes = [] } = useRecordNotes();
+  const { data: picks = [] } = useAnniversaryPicks();
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  // 상대가 찍은 기록이 바로 보이게 — 연인 기록이면 지도 탭에 돌아올 때마다 다시 읽습니다.
+  useFocusEffect(useCallback(() => {
+    if (!isCouple) return;
+    void qc.invalidateQueries({ queryKey: ["restaurants", book?.id] });
+    void qc.invalidateQueries({ queryKey: ["record_notes"] });
+  }, [isCouple, book?.id, qc]));
 
   const mapRef = useRef<NaverMapViewRef>(null);
   const regionRef = useRef<Bounds | null>(null);
@@ -158,6 +175,25 @@ export default function MapTab() {
   }, [allPlaces, q, categories, keywords, revisitOnly, verifiedOnly, viewBounds, sort]);
 
   const visitCount = useMemo(() => filtered.reduce((n, p) => n + p.visits.length, 0), [filtered]);
+
+  /* ── 연인 기록 ─────────────────────────────── */
+
+  const startedOn = isCouple ? book?.startedOn ?? null : null;
+  /** 기념일 식사로 정해진 기록 id → 「1주년」 */
+  const anniversaryTags = useMemo(
+    () => (startedOn ? mealLabels(startedOn, picks, visibleRows) : new Map<number, string>()),
+    [startedOn, picks, visibleRows]
+  );
+  const placeTag = useCallback((p: Place) => p.visits.map((v) => anniversaryTags.get(v.id)).find(Boolean), [anniversaryTags]);
+  /** 최근 기록 기준으로 누가 한 줄을 썼는지 — 찍은 사람의 별점·메모도 그 사람의 한 줄로 봅니다. */
+  const coupleInfo = useCallback((p: Place): CoupleCardInfo | undefined => {
+    if (!isCouple) return undefined;
+    const r = p.latest;
+    const wrote = (m: BookMember | null) =>
+      !!m && (notes.some((n) => n.record_id === r.id && n.user_id === m.userId && (n.rating != null || !!n.note)) ||
+        (r.user_id === m.userId && (r.rating != null || !!r.review)));
+    return { me: meMember, partner, meWrote: wrote(meMember), partnerWrote: wrote(partner), tag: placeTag(p) };
+  }, [isCouple, notes, meMember, partner, placeTag]);
   const activeFilters = categories.length + keywords.length + (revisitOnly ? 1 : 0) + (verifiedOnly ? 1 : 0);
   const overlayOpen = filtersOpen || foundHit !== null || ghost !== null || regionView !== null || placesAt.state.status !== "idle";
 
@@ -372,7 +408,8 @@ export default function MapTab() {
     </Pressable>
   );
   const chipVisible = mapMoved && !overlayOpen;
-  const title = kind === "cafe" ? "카페 기록" : "맛집 기록";
+  const title = isCouple ? "우리 기록" : kind === "cafe" ? "카페 기록" : "맛집 기록";
+  const dPlus = startedOn ? `D+${dayCount(startedOn)}` : null;
 
   // 시트가 낮으면(peek) 한 줄 요약만 — 검색·칩·정렬은 숨깁니다(웹과 같음).
   const header = compact ? (
@@ -384,7 +421,10 @@ export default function MapTab() {
     <View>
       <View style={s.headRow}>
         <View>
-          <Text style={s.h}>{title}</Text>
+          <View style={{ flexDirection: "row", alignItems: "baseline", gap: 6 }}>
+            <Text style={s.h}>{title}</Text>
+            {dPlus && <Text style={{ fontFamily: F.mono, fontSize: 11.5, color: C.brick }}>{dPlus}</Text>}
+          </View>
           <Text style={s.count}>가게 {filtered.length} · 기록 {visitCount}</Text>
         </View>
         <View style={s.searchIn}>
@@ -442,7 +482,7 @@ export default function MapTab() {
         {recordMarkers.map((p) => (
           <RecordMarker
             key={p.key} lat={p.lat as number} lng={p.lng as number} name={p.name} category={p.category} revisit={p.revisit}
-            rating={p.rating} active={false} planned={!!matchWish(wishes, p.name)} showLabel={showLabel(`r:${p.key}`)}
+            rating={p.rating} active={false} planned={!!matchWish(wishes, p.name)} showLabel={showLabel(`r:${p.key}`)} badge={placeTag(p)}
             onTap={() => { Haptics.selectionAsync(); openPlace(p); }}
           />
         ))}
@@ -477,6 +517,17 @@ export default function MapTab() {
 
       {/* 검색 행 */}
       <View style={[s.searchRow, { top: insets.top + 8 }]}>
+        {/* 기록장 메뉴 — 개인 기록이면 ≡, 연인 기록이면 두 아바타 + 작은 ≡ (§3-1) */}
+        <Pressable onPress={() => { Haptics.selectionAsync(); setDrawerOpen(true); }} accessibilityLabel="기록장 메뉴" style={[s.bookBtn, SHADOW.card]}>
+          {isCouple ? (
+            <>
+              <Pair me={meMember} partner={partner} size={30} overlap={9} />
+              <View style={s.bookBtnLines}><MenuLines size={10} stroke={C.ink} /></View>
+            </>
+          ) : (
+            <MenuLines />
+          )}
+        </Pressable>
         <PlaceSearch value={mapQuery} onChange={setMapQuery} onChoose={choosePlace} hasPicked={!!ghost} onClearPicked={() => setState({ ghost: null })} />
         <Pressable onPress={() => router.push("/labels")} accessibilityLabel="라벨첩" style={[s.round, SHADOW.card]}>
           <BurstIcon />
@@ -559,7 +610,7 @@ export default function MapTab() {
           ListHeaderComponent={header}
           ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
           contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24 }}
-          renderItem={({ item }: { item: Place }) => <PlaceCard place={item} onOpen={() => openPlace(item)} />}
+          renderItem={({ item }: { item: Place }) => <PlaceCard place={item} onOpen={() => openPlace(item)} couple={coupleInfo(item)} />}
           ListEmptyComponent={
             <Text style={{ paddingHorizontal: 20, paddingVertical: 44, textAlign: "center", fontFamily: F.sans, fontSize: 12.5, lineHeight: 22, color: C.faint }}>
               {"조건에 맞는 기록이 없습니다.\n필터를 지우거나 다른 낱말로 찾아보세요."}
@@ -613,8 +664,10 @@ export default function MapTab() {
         onAddWish={() => { const g = ghost!; setState({ ghost: null }); openWishPlan({ name: g.name, where_text: g.address, lat: g.lat, lng: g.lng }); }}
       />
 
-      {/* 분기가 바뀐 뒤 처음 한 번 — 지난 분기 리캡 안내 */}
-      <RecapInvite />
+      {/* 분기가 바뀐 뒤 처음 한 번 — 지난 분기 리캡 안내(개인 기록만) */}
+      {!isCouple && <RecapInvite />}
+
+      <BookDrawer visible={drawerOpen} onClose={() => setDrawerOpen(false)} />
     </View>
   );
 }
@@ -651,6 +704,8 @@ const SHADOW_SHEET = shadow(0.16, 30, -8, 12);
 const s = StyleSheet.create({
   topFade: { position: "absolute", top: 0, left: 0, right: 0 },
   searchRow: { position: "absolute", left: 16, right: 16, flexDirection: "row", alignItems: "flex-start", gap: 9, zIndex: 20 },
+  bookBtn: { width: 46, height: 46, borderRadius: 23, borderWidth: 1, borderColor: C.line, backgroundColor: C.card, alignItems: "center", justifyContent: "center" },
+  bookBtnLines: { position: "absolute", right: -2, bottom: -2, width: 18, height: 18, borderRadius: 9, borderWidth: 1, borderColor: C.line, backgroundColor: C.card, alignItems: "center", justifyContent: "center" },
   round: { width: 44, height: 44, borderRadius: 22, borderWidth: 1, borderColor: C.line, backgroundColor: C.card, alignItems: "center", justifyContent: "center" },
   chips: {
     position: "absolute", left: 16, flexDirection: "row", padding: 3, borderRadius: 18, borderWidth: 1, borderColor: C.line, backgroundColor: "rgba(251,250,246,.95)",

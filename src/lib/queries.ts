@@ -16,9 +16,21 @@ export type SearchFilters = {
   sort?: Sort;
 };
 
+/**
+ * 내 개인 기록장 id(HANDOFF-couple.md). 연인 기록장이 생기면 RLS 가 상대와 함께 쓰는 기록도 읽어 주므로,
+ * 웹은 개인 기록장으로 좁혀 읽습니다(연인 기록은 앱에서만). 마이그레이션 전이면 null — 좁히지 않습니다.
+ */
+async function personalBookId(client: SupabaseClient): Promise<string | null> {
+  const { data, error } = await client.from("books").select("id").eq("kind", "personal").limit(1);
+  if (error) return null;
+  return (data?.[0]?.id as string | undefined) ?? null;
+}
+
 /** Free-text search over name/region/category/menu/review, plus chip filters. */
 export async function searchRestaurants(client: SupabaseClient, f: SearchFilters) {
+  const bookId = await personalBookId(client);
   let query = client.from("restaurants").select("*").eq("kind", f.kind);
+  if (bookId) query = query.eq("book_id", bookId);
 
   if (f.q) {
     const like = `%${f.q}%`;
@@ -63,10 +75,12 @@ export async function searchRestaurants(client: SupabaseClient, f: SearchFilters
 
 /** Distinct chip options for one kind — drives the CATEGORY / REGION / KEYWORD rows. */
 export async function getFacets(client: SupabaseClient, kind: Kind, bbox?: Bbox | null) {
+  const bookId = await personalBookId(client);
   let query = client
     .from("restaurants")
     .select("category, region, keywords")
     .eq("kind", kind);
+  if (bookId) query = query.eq("book_id", bookId);
 
   if (bbox) {
     query = query
@@ -113,10 +127,10 @@ export async function getRestaurant(client: SupabaseClient, id: number) {
  * (바텀시트가 서버를 오가지 않고 바로 반응합니다) 조건 없이 한 번만 읽습니다.
  */
 export async function getAllRestaurants(client: SupabaseClient) {
-  const { data, error } = await client
-    .from("restaurants")
-    .select("*")
-    .order("visited_at", { ascending: false, nullsFirst: false });
+  const bookId = await personalBookId(client);
+  let query = client.from("restaurants").select("*");
+  if (bookId) query = query.eq("book_id", bookId);
+  const { data, error } = await query.order("visited_at", { ascending: false, nullsFirst: false });
 
   if (error) throw new Error(error.message);
   return (data ?? []) as Restaurant[];
@@ -128,9 +142,10 @@ export async function getAllRestaurants(client: SupabaseClient) {
  * 전이거나 일시적 오류) 기록 화면은 그대로 열려야 합니다 — 던지지 않고 빈 배열.
  */
 export async function getAllWishes(client: SupabaseClient) {
-  const { data, error } = await client
-    .from("wishes")
-    .select("*")
+  const bookId = await personalBookId(client);
+  let query = client.from("wishes").select("*");
+  if (bookId) query = query.eq("book_id", bookId);
+  const { data, error } = await query
     .order("plan_date", { ascending: true, nullsFirst: false })
     .order("saved_at", { ascending: false });
 

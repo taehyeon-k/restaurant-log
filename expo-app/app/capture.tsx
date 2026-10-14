@@ -17,6 +17,7 @@ import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
 import {
   BellIcon, BookmarkIcon, CameraIcon, DownloadIcon, FlashIcon, FlipIcon, MapPinIcon, RefreshIcon, VerifiedMark,
 } from "@/components/icons";
+import { useActiveBook } from "@/data/books";
 import { useRows, useWishes } from "@/data/queries";
 import { useAppState } from "@/data/store";
 import {
@@ -57,6 +58,8 @@ export default function Capture() {
   const params = useLocalSearchParams<{ verifyWishId?: string; kind?: Kind }>();
   const { data: rows = [] } = useRows();
   const { data: wishes = [] } = useWishes();
+  // 저장 위치 = 지금 고른 기록장(HANDOFF-couple §3-6). 연인 기록이면 찍은 사람이 인증합니다.
+  const { id: bookId } = useActiveBook();
 
   const verifyWish = useMemo(
     () => (params.verifyWishId ? (wishes.find((w) => w.id === params.verifyWishId) ?? null) : null),
@@ -295,6 +298,7 @@ export default function Capture() {
 
       const payload = {
         user_id: session.user.id,
+        ...(bookId ? { book_id: bookId } : {}),
         kind: picked.kind,
         name: picked.name,
         category: twin?.category ?? picked.category,

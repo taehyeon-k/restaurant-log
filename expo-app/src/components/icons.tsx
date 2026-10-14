@@ -37,6 +37,14 @@ export const BookmarkIcon = ({ size = 20, stroke = "#1c1a17", strokeWidth = 1.6,
   </Svg>
 );
 
+/** 기념일 — 겹친 원 두 개(HANDOFF-couple §3-7). */
+export const RingsIcon = ({ size = 21, stroke = "#000", strokeWidth = 1.6 }: P) => (
+  <Svg {...base(size, stroke, strokeWidth)}>
+    <Circle cx="9" cy="12.5" r="5.6" />
+    <Circle cx="15" cy="12.5" r="5.6" />
+  </Svg>
+);
+
 export const PersonIcon = ({ size = 21, stroke = "#000", strokeWidth = 1.6 }: P) => (
   <Svg {...base(size, stroke, strokeWidth)}>
     <Circle cx="12" cy="8.6" r="3.8" />

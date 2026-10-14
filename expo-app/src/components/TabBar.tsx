@@ -1,8 +1,9 @@
 import { useRouter, type Tabs } from "expo-router";
 import * as Haptics from "expo-haptics";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { BookmarkIcon, CalendarIcon, CameraIcon, MapPinIcon, PersonIcon } from "./icons";
+import { BookmarkIcon, CalendarIcon, CameraIcon, MapPinIcon, PersonIcon, RingsIcon } from "./icons";
+import { useActiveBook } from "@/data/books";
 import { useRecapUnseen } from "@/features/recap/useRecapState";
 import { C, F, TAB_BAR_H } from "@/theme";
 
@@ -10,6 +11,7 @@ const LABEL: Record<string, string> = {
   calendar: "캘린더",
   index: "지도",
   wish: "위시리스트",
+  anniversary: "기념일",
   account: "내계정",
 };
 
@@ -17,6 +19,7 @@ const ICON: Record<string, (color: string) => React.ReactNode> = {
   calendar: (c) => <CalendarIcon stroke={c} />,
   index: (c) => <MapPinIcon stroke={c} />,
   wish: (c) => <BookmarkIcon size={19} stroke={c} />,
+  anniversary: (c) => <RingsIcon stroke={c} />,
   account: (c) => <PersonIcon stroke={c} />,
 };
 
@@ -32,8 +35,13 @@ export default function TabBar({ state, navigation }: BottomTabBarProps) {
   const router = useRouter();
   // 막 끝난 분기 리캡을 아직 끝까지 보지 않았으면 캘린더 아이콘에 점.
   const recapUnseen = useRecapUnseen();
+  // 연인 기록이면 위시리스트 칸이 「기념일」이 됩니다. 연인 기록의 위시리스트는 지도 필터로 봅니다(§3-7).
+  const { isCouple, readOnly } = useActiveBook();
 
-  const item = (route: (typeof state.routes)[number], index: number) => {
+  const item = (name: string) => {
+    const index = state.routes.findIndex((r) => r.name === name);
+    const route = state.routes[index];
+    if (!route) return <View style={s.tab} />;
     const active = state.index === index;
     const color = active ? C.brick : "#a29a8c";
     const dot = route.name === "calendar" && recapUnseen;
@@ -56,21 +64,21 @@ export default function TabBar({ state, navigation }: BottomTabBarProps) {
     );
   };
 
-  const [l1, l2, r1, r2] = state.routes;
 
   return (
     <View style={[s.bar, { height: TAB_BAR_H + insets.bottom, paddingBottom: insets.bottom }]}>
-      {item(l1, 0)}
-      {item(l2, 1)}
+      {item("calendar")}
+      {item("index")}
       <View style={s.gap} />
-      {item(r1, 2)}
-      {item(r2, 3)}
+      {item(isCouple ? "anniversary" : "wish")}
+      {item("account")}
 
       <Pressable
         accessibilityLabel="사진으로 방문 인증"
         style={s.shutter}
         onPress={() => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          if (readOnly) return Alert.alert("연결이 끊긴 기록장이에요", "읽기만 할 수 있어요. 지도 ≡ 메뉴에서 다른 기록장을 골라 주세요.");
           router.push("/capture");
         }}
       >

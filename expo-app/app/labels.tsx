@@ -6,7 +6,7 @@ import Svg, { Path } from "react-native-svg";
 import { DistrictBadge, LabelBadge } from "@/components/Badges";
 import { BackButton, Eyebrow } from "@/components/ui";
 import { refreshAll } from "@/data/invalidate";
-import { useRows } from "@/data/queries";
+import { usePersonalRows } from "@/data/queries";
 import { useAccount } from "@/data/profile";
 import { earnedLabels, regionTitles, type EarnedLabel } from "@/lib/labels";
 import { supabase } from "@/lib/supabase";
@@ -23,7 +23,7 @@ const SEGMENT_SHADOW = Platform.select({
 export default function Labels() {
   const insets = useSafeAreaInsets();
   const qc = useQueryClient();
-  const { data: rows = [] } = useRows();
+  const { data: rows = [] } = usePersonalRows();
   const { data: account } = useAccount();
   const [tab, setTab] = useState<Tab>("labels");
   const [busy, setBusy] = useState(false);
