@@ -41,6 +41,34 @@ npm start
 - Android 백그라운드 위치는 Play 콘솔에 사용 목적 영상 제출이 필요합니다. 심사 부담이 크면 `app.json` 의 `ACCESS_BACKGROUND_LOCATION` 과
   `isAndroidBackgroundLocationEnabled` 를 빼고 1차 출시에서는 앱 실행 중에만 쓰세요.
 
+## 지도 길게 누르기 — 그 건물 식당 (places-at)
+
+지도 빈 곳을 길게 누르면 Supabase Edge Function `places-at`(서울 리전으로 호출)이 그 자리의 건물을 찾아
+건물 안 식당·카페를 층별로 돌려줍니다. 건물을 못 찾으면 반경 50m 목록입니다.
+
+- DB: `supabase/migrations/20261013000000_places_at.sql`, `…000100_places_at_only_near.sql`
+  (`public_stores` · `buildings` · `place_links`, RPC `stores_in_building` · `stores_near` · `places_at_lookup`)
+- 함수: `supabase/functions/places-at/index.ts` — 카카오 coord2address → juso 건물관리번호 → DB 한 번 → VWorld 건물 경계
+- 함수 비밀값(Supabase 대시보드 → Edge Functions → Secrets): `KAKAO_REST_API_KEY`, `JUSO_API_KEY`, `VWORLD_API_KEY`.
+  앱 번들에는 외부 API 키를 넣지 않습니다. VWorld 는 국외 IP 를 막으므로 앱은 `x-region: ap-northeast-2` 로 부릅니다.
+
+### 상가 데이터 적재 — 분기마다
+
+소상공인시장진흥공단 「상가(상권)정보」는 분기마다 갱신됩니다(공공데이터포털 15083033). 새 파일이 나오면:
+
+1. https://www.data.go.kr/data/15083033/fileData.do 에서 전체 zip 을 내려받아 **저장소 밖** 폴더에 풉니다(시도별 CSV, 약 1.5GB).
+2. `expo-app/.env` 에 `SUPABASE_SERVICE_ROLE_KEY` 가 있는지 확인합니다(커밋하지 마세요).
+3. 먼저 미리 보기, 그다음 적재:
+   ```bash
+   cd expo-app
+   node --experimental-strip-types --env-file=.env scripts/import-stores.ts "<폴더>/소상공인시장진흥공단_상가(상권)정보_서울_YYYYMM.csv" --sido 11 --dry-run
+   node --experimental-strip-types --env-file=.env scripts/import-stores.ts "<폴더>/소상공인시장진흥공단_상가(상권)정보_서울_YYYYMM.csv" --sido 11
+   ```
+   - 음식 업종만, `--sido` 의 시도코드(서울 11 · 경기 41 · 부산 26 …)만 넣습니다. 폴더를 주면 그 안 CSV 를 모두 읽고 시도코드로 거릅니다.
+   - `store_id`(상가업소번호) 기준 upsert. 새 파일에 없는 같은 시도 가게는 `closed_at` 이 찍히고 지워지지 않습니다.
+   - 유흥 주점·구내식당은 뺍니다. 층정보는 `B1`·`1F` 꼴로 고쳐 넣습니다(모르면 빈 값 → 앱에서 「기타」).
+4. 서울 한 번에 약 14만 곳, 2~3분 걸립니다.
+
 ## 알려진 차이·TODO
 
 - NativeWind v4 는 설치하지 않았습니다. 화면은 `src/theme` 토큰 + StyleSheet 로 썼습니다.

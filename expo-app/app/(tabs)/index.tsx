@@ -1,5 +1,5 @@
 import BottomSheet, { BottomSheetFlatList, BottomSheetTextInput } from "@gorhom/bottom-sheet";
-import type { NaverMapViewRef } from "@mj-studio/react-native-naver-map";
+import { NaverMapPolygonOverlay, type NaverMapViewRef } from "@mj-studio/react-native-naver-map";
 import { useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
 import * as Location from "expo-location";
@@ -15,9 +15,11 @@ import { DraftsBoxIcon } from "@/components/DraftsBoxIcon";
 import { useRows, useWishes } from "@/data/queries";
 import { setState, useAppState, type MarkerFilter } from "@/data/store";
 
-import { GhostMarker, RecordMarker, WishMarker } from "@/features/map/Markers";
+import { BuildingTagMarker, GhostMarker, NumberPin, RecordMarker, TapPointMarker, WishMarker } from "@/features/map/Markers";
 import { revealZooms } from "@/features/map/labelZoom";
 import PlaceCard from "@/features/map/PlaceCard";
+import PlacesAtSheet from "@/features/map/PlacesAtSheet";
+import { recordsAt, usePlacesAt, type PlaceAt } from "@/features/map/usePlacesAt";
 import PlaceSearch from "@/features/map/PlaceSearch";
 import { FilterSheet as FilterSheetImpl, FoundSheet, SearchMissSheet } from "@/features/map/Sheets";
 import type { Place as GeocodePlace } from "@/lib/geocode";
@@ -53,6 +55,8 @@ const FILTER_H = 38;
 const DRAFTS_H = 56;
 const PLUS_H = 52;
 const LOCATE_H = 44;
+/** 지도 탭 시트의 최대 높이(화면 비율) — 위쪽에 누른 자리가 보이게 남깁니다. */
+const PLACES_SHEET_RATIO = 0.56;
 
 type Bounds = { s: number; w: number; n: number; e: number };
 type Pt = [number, number];
@@ -113,6 +117,7 @@ export default function MapTab() {
   const [foundHit, setFoundHit] = useState<{ restaurant: Restaurant; place: Place } | null>(null);
   const [plusOpen, setPlusOpen] = useState(false);
   const [me, setMe] = useState<{ lat: number; lng: number } | null>(null);
+  const placesAt = usePlacesAt();
 
   /* ── 데이터 ─────────────────────────────────── */
 
@@ -153,7 +158,7 @@ export default function MapTab() {
 
   const visitCount = useMemo(() => filtered.reduce((n, p) => n + p.visits.length, 0), [filtered]);
   const activeFilters = categories.length + keywords.length + (revisitOnly ? 1 : 0) + (verifiedOnly ? 1 : 0);
-  const overlayOpen = filtersOpen || foundHit !== null || ghost !== null || regionView !== null;
+  const overlayOpen = filtersOpen || foundHit !== null || ghost !== null || regionView !== null || placesAt.state.status !== "idle";
 
   /* ── 지도 이동 ──────────────────────────────── */
 
@@ -216,16 +221,78 @@ export default function MapTab() {
 
   const openWish = (id: string) => router.push({ pathname: "/wish/[id]", params: { id } });
 
-  const newRecord = (p: { name?: string; address?: string; lat?: number; lng?: number; category?: string; revisit?: boolean }) =>
+  const newRecord = (p: { name?: string; address?: string; lat?: number; lng?: number; category?: string; revisit?: boolean; kind?: Kind }) =>
     router.push({
       pathname: "/record/edit",
-      params: { kind, name: p.name ?? "", address: p.address ?? "", lat: p.lat != null ? String(p.lat) : "", lng: p.lng != null ? String(p.lng) : "", category: p.category ?? "", revisit: p.revisit ? "1" : "" },
+      params: { kind: p.kind ?? kind, name: p.name ?? "", address: p.address ?? "", lat: p.lat != null ? String(p.lat) : "", lng: p.lng != null ? String(p.lng) : "", category: p.category ?? "", revisit: p.revisit ? "1" : "" },
     });
 
   const openWishPlan = (p: { name: string; where_text?: string; category?: string; lat?: number; lng?: number }) => {
     const dup = matchWish(wishes, p.name);
     if (dup) return openWish(dup.id);
     router.push({ pathname: "/wish/new", params: { name: p.name, where_text: p.where_text ?? "", category: p.category ?? "", lat: p.lat != null ? String(p.lat) : "", lng: p.lng != null ? String(p.lng) : "" } });
+  };
+
+  /* ── 지도 탭 → 그 건물 식당 ───────────────── */
+
+  const placesSheetH = Math.round((layoutH || windowH) * PLACES_SHEET_RATIO);
+
+  /** 누른 자리를 검색줄 아래 ~ 시트 위의 빈 곳 가운데에 둡니다. 카메라 중심(mapPadding 기준)에서 그만큼 남쪽을 봅니다. */
+  const showAboveSheet = useCallback((lat: number, lng: number, z: number) => {
+    const h = layoutH || windowH;
+    const centerY = (insets.top + 130 + h - MAP_PAD_BOTTOM) / 2;
+    const wantY = (insets.top + 62 + h - placesSheetH) / 2;
+    const metersPerDp = (156543.03392 * Math.cos((lat * Math.PI) / 180)) / 2 ** z;
+    const dLat = ((centerY - wantY) * metersPerDp) / 111320;
+    lastFit.current = `places:${lat},${lng}`;
+    mapRef.current?.animateCameraTo({ latitude: lat - dLat, longitude: lng, zoom: z, duration: 450 });
+  }, [layoutH, windowH, insets.top, placesSheetH]);
+
+  /**
+   * 지도 빈 곳을 누르면 — 네이버 지도의 onTapMap(네이티브가 좌표까지 줍니다). 핀을 누른 건 핀의 onTap 이 받으므로 여기로 오지 않습니다.
+   * (길게 누르기는 네이티브 지도가 손가락을 가져가 JS 로 오지 않아서 짧은 탭으로 바꿨습니다.)
+   */
+  const openPlacesAt = placesAt.open;
+  const onMapTap = useCallback((lat: number, lng: number) => {
+    if (__DEV__) console.log("[map-tap]", { lat, lng });
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setPlusOpen(false);
+    openPlacesAt(lat, lng);
+    showAboveSheet(lat, lng, Math.max(zoom, 17));
+  }, [openPlacesAt, showAboveSheet, zoom]);
+
+  const placesData = placesAt.state.status === "done" ? placesAt.state.data : null;
+  const placesPoint = placesAt.state.status === "idle" ? null : placesAt.state.point;
+  // 반경 100m 는 한 단계 멀리서 봅니다.
+  useEffect(() => {
+    if (placesData?.mode === "radius" && placesPoint) showAboveSheet(placesPoint.lat, placesPoint.lng, placesData.radius >= 100 ? 16.3 : 17);
+  }, [placesData]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /** 건물 경계 — 닫는 점(첫 점과 같은 끝점)은 빼고 넘깁니다. */
+  const footprint = useMemo(() => {
+    const fp = placesData?.mode === "building" ? placesData.building.footprint : null;
+    if (!fp || fp.length < 4) return null;
+    const ring = fp[0][0] === fp[fp.length - 1][0] && fp[0][1] === fp[fp.length - 1][1] ? fp.slice(0, -1) : fp;
+    const top = Math.max(...ring.map((p) => p[0]));
+    const midLng = (Math.min(...ring.map((p) => p[1])) + Math.max(...ring.map((p) => p[1]))) / 2;
+    return { coords: ring.map(([latitude, longitude]) => ({ latitude, longitude })), label: { lat: top, lng: midLng } };
+  }, [placesData]);
+
+  const recordedAt = useCallback((p: PlaceAt) => (visibleRows.length ? recordsAt(p, visibleRows).length > 0 : p.myRecordCount > 0), [visibleRows]);
+
+  /** 가게 줄 — 기록 1건이면 그 기록, 2건 이상이면 가게 화면, 없으면 기록 추가(그 화면의 50m 인증 규칙 그대로). */
+  const pickPlaceAt = (p: PlaceAt, recs: Restaurant[]) => {
+    placesAt.close();
+    if (recs.length === 1) {
+      setState({ kind: recs[0].kind });
+      return router.push({ pathname: "/record/[id]", params: { id: String(recs[0].id) } });
+    }
+    if (recs.length > 1) {
+      const top = groupPlaces(recs).sort((a, b) => b.visits.length - a.visits.length)[0];
+      setState({ kind: top.kind });
+      return router.push({ pathname: "/place/[key]", params: { key: top.key } });
+    }
+    newRecord({ name: p.name, address: p.addr ?? undefined, lat: p.lat, lng: p.lng, category: p.appCategory ?? undefined, kind: p.kind });
   };
 
   /* ── 검색 ───────────────────────────────────── */
@@ -365,6 +432,7 @@ export default function MapTab() {
         logoAlign="BottomLeft"
         logoBottom={logoBottom}
         onCameraChanged={(e) => { if (e.reason === "Gesture") setMapMoved(true); }}
+        onTapMap={(e) => onMapTap(e.latitude, e.longitude)}
         onCameraIdle={(e) => {
           regionRef.current = { s: e.region.latitude, w: e.region.longitude, n: e.region.latitude + e.region.latitudeDelta, e: e.region.longitude + e.region.longitudeDelta };
           if (e.zoom != null) setZoom(e.zoom);
@@ -383,6 +451,16 @@ export default function MapTab() {
         {ghost && (
           <GhostMarker lat={ghost.lat} lng={ghost.lng} name={ghost.name} onTap={() => newRecord({ name: ghost.name, address: ghost.address, lat: ghost.lat, lng: ghost.lng })} />
         )}
+        {/* 지도 탭 — 건물 경계·이름, 둘레 번호 핀, 누른 자리. 시트를 닫으면 함께 사라집니다. */}
+        {footprint && placesData?.mode === "building" && (
+          <NaverMapPolygonOverlay coords={footprint.coords} color="rgba(180,85,45,0.16)" outlineColor={C.brick} outlineWidth={2} zIndex={1200} />
+        )}
+        {footprint && placesData?.mode === "building" && (
+          <BuildingTagMarker lat={footprint.label.lat} lng={footprint.label.lng} name={placesData.building.name} />
+        )}
+        {placesData?.mode === "radius" &&
+          placesData.places.map((p, i) => <NumberPin key={p.id} n={i + 1} lat={p.lat} lng={p.lng} filled={recordedAt(p)} />)}
+        {placesPoint && <TapPointMarker lat={placesPoint.lat} lng={placesPoint.lng} />}
       </PaperMap>
 
       {/* 위쪽을 눕히는 종이색 그라데이션 — 검색줄 아래에 깝니다 */}
@@ -514,6 +592,17 @@ export default function MapTab() {
         onRevisit={() => { const r = foundHit!.restaurant; setFoundHit(null); newRecord({ name: r.name, address: r.address ?? undefined, lat: r.lat ?? undefined, lng: r.lng ?? undefined, category: r.category ?? undefined, revisit: true }); }}
         onWish={() => { const r = foundHit!.restaurant; setFoundHit(null); openWishPlan({ name: r.name, where_text: r.address ?? r.region ?? undefined, category: r.category ?? undefined, lat: r.lat ?? undefined, lng: r.lng ?? undefined }); }}
         onOpen={() => { const h = foundHit!; setFoundHit(null); openPlace(h.place); }}
+      />
+
+      <PlacesAtSheet
+        state={placesAt.state}
+        rows={visibleRows}
+        wishes={wishes}
+        maxHeight={placesSheetH}
+        onClose={placesAt.close}
+        onRadius={placesAt.setRadius}
+        onRetry={placesAt.retry}
+        onPick={pickPlaceAt}
       />
 
       <SearchMissSheet

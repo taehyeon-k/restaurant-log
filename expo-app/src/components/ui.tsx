@@ -128,14 +128,14 @@ export function PhotoBox({
   );
 }
 
-/** 아래에서 올라오는 시트 — FilterSheet·SearchMissSheet·WishSheet 가 함께 씁니다. */
+/** 아래에서 올라오는 시트 — FilterSheet·SearchMissSheet·WishSheet 가 함께 씁니다. dim 은 뒤 화면을 덮는 어둡기(기본 .34). */
 export function BottomSheetModal({
-  visible, onClose, children,
-}: { visible: boolean; onClose: () => void; children: React.ReactNode }) {
+  visible, onClose, children, dim = 0.34,
+}: { visible: boolean; onClose: () => void; children: React.ReactNode; dim?: number }) {
   const insets = useSafeAreaInsets();
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
-      <View style={{ flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(28,26,23,.34)" }}>
+      <View style={{ flex: 1, justifyContent: "flex-end", backgroundColor: `rgba(28,26,23,${dim})` }}>
         <Pressable style={{ flex: 1 }} onPress={onClose} accessibilityLabel="닫기" />
         <View
           style={[

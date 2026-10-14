@@ -128,6 +128,53 @@ export const WishMarker = memo(function WishMarker(p: WishProps) {
   );
 });
 
+/** 길게 누른 자리 — brick 점 14px + 흰 테두리 3px. 기준점 = 가운데. */
+export const TapPointMarker = memo(function TapPointMarker(p: Base) {
+  const d = 14 + 3 * 2;
+  const box = d + 12; // 그림자 여유
+  return (
+    <NaverMapMarkerOverlay latitude={p.lat} longitude={p.lng} width={box} height={box} anchor={{ x: 0.5, y: 0.5 }} zIndex={1500}>
+      <View key="tap" collapsable={false} style={{ width: box, height: box, alignItems: "center", justifyContent: "center" }}>
+        <View style={[{ width: d, height: d, borderRadius: d / 2, borderWidth: 3, borderColor: "#ffffff", backgroundColor: C.brick }, SHADOW.card]} />
+      </View>
+    </NaverMapMarkerOverlay>
+  );
+});
+
+/** 둘레 목록의 번호 핀 — 목록 번호와 같습니다. 내 기록이 있는 곳은 brick 으로 채웁니다. */
+export const NumberPin = memo(function NumberPin(p: Base & { n: number; filled: boolean }) {
+  const d = 24;
+  const box = d + 6;
+  return (
+    <NaverMapMarkerOverlay latitude={p.lat} longitude={p.lng} width={box} height={box} anchor={{ x: 0.5, y: 0.5 }} onTap={p.onTap} zIndex={1400 - p.n}>
+      <View key={markerKey(p.n, p.filled)} collapsable={false} style={{ width: box, height: box, alignItems: "center", justifyContent: "center" }}>
+        <View
+          style={{
+            width: d, height: d, borderRadius: d / 2, borderWidth: 1.5, borderColor: p.filled ? C.card : C.brick,
+            backgroundColor: p.filled ? C.brick : C.card, alignItems: "center", justifyContent: "center",
+          }}
+        >
+          <Text style={[textBase, { fontFamily: F.mono, fontSize: 11, lineHeight: 13, color: p.filled ? C.card : C.brick }]}>{p.n}</Text>
+        </View>
+      </View>
+    </NaverMapMarkerOverlay>
+  );
+});
+
+/** 건물 이름 말풍선 — 건물 경계 가운데 위에 띄웁니다. 기준점 = 꼬리 끝. */
+export const BuildingTagMarker = memo(function BuildingTagMarker(p: Base & { name: string }) {
+  const w = tagWidth(p.name) + 8;
+  const h = tagHeight("none") + 10;
+  return (
+    <NaverMapMarkerOverlay latitude={p.lat} longitude={p.lng} width={w} height={h} anchor={{ x: 0.5, y: 1 }} zIndex={1300}>
+      <View key={markerKey(w, h, p.name)} collapsable={false} style={{ width: w, height: h, alignItems: "center" }}>
+        <Tag name={p.name} />
+        <View style={{ width: 2, height: 8, backgroundColor: C.brick, borderRadius: 1 }} />
+      </View>
+    </NaverMapMarkerOverlay>
+  );
+});
+
 /** 검색으로 고른, 아직 기록에 없는 자리 — 점선 흐린 핀 + 「+ 여기에 기록 추가」. 웹 ghostIcon(24px, 기준점 = 바닥에서 8px). */
 export const GhostMarker = memo(function GhostMarker(p: Base & { name: string }) {
   const w = tagWidth(p.name) + 30;
