@@ -13,6 +13,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { useAccount } from "@/data/profile";
 import { useWishes } from "@/data/queries";
+import CommunityTransition from "@/features/community/Transition";
 import { startQueueTriggers } from "@/features/queue/process";
 // 이 import 가 백그라운드 지오펜스 태스크를 정의합니다 — 반드시 앱 진입점에서 불러야 합니다.
 import { syncWishGeofences } from "@/features/notify/geofence";
@@ -82,8 +83,11 @@ function Gate({ fontsLoaded }: { fontsLoaded: boolean }) {
   if (!ready) return null;
 
   return (
+    <>
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: C.paper } }}>
       <Stack.Screen name="(tabs)" />
+      {/* 커뮤니티 — 들어갈 때는 전환 판이 덮고, 나갈 때(‹ 내 기록 · 밀기)는 판 없이 아래로 내려갑니다. */}
+      <Stack.Screen name="community" options={{ animation: "slide_from_bottom", gestureEnabled: true }} />
       <Stack.Screen name="capture" options={{ presentation: "fullScreenModal", animation: "slide_from_bottom", gestureEnabled: false }} />
       <Stack.Screen name="record/edit" options={{ presentation: "modal" }} />
       <Stack.Screen name="wish/new" options={{ presentation: "modal" }} />
@@ -96,6 +100,9 @@ function Gate({ fontsLoaded }: { fontsLoaded: boolean }) {
       <Stack.Screen name="login" />
       <Stack.Screen name="welcome" />
     </Stack>
+    {/* 커뮤니티 들어가기 전환 판 — 상태 표시줄까지 모든 화면 위 */}
+    <CommunityTransition />
+    </>
   );
 }
 

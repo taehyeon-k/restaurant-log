@@ -136,6 +136,8 @@ export default function EditRoute() {
         ...(isVerified ? {} : { visited_at: visitedAt || null }),
         keywords,
         updated_at: new Date().toISOString(),
+        // TODO(커뮤니티 §5): 공개 범위(restaurants.visibility: private · friends · public) 선택 UI 는 아직 설계 중입니다.
+        // 정해지면 여기서 함께 저장하세요. 그 전까지는 기본값 private 이고, 시험할 때는 DB 에서 직접 바꿉니다.
       };
 
       if (record) {

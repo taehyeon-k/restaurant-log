@@ -79,7 +79,7 @@ export default function WishSheetRoute() {
         <View style={{ marginTop: 12, flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 4 }}>
           <Pressable onPress={() => router.replace({ pathname: "/wish/new", params: { id: wish.id } })} style={{ padding: 6 }}><Text style={{ fontFamily: F.sans, fontSize: 12, color: C.faint }}>수정</Text></Pressable>
           <Text style={{ color: "#d8d3c8" }}>·</Text>
-          <Pressable onPress={() => { router.dismissTo("/(tabs)/wish"); }} style={{ padding: 6 }}><Text style={{ fontFamily: F.sans, fontSize: 12, color: C.faint }}>위시리스트에서 보기</Text></Pressable>
+          <Pressable onPress={() => { setState({ mapSegment: "wish" }); router.dismissTo({ pathname: "/", params: { segment: "wish" } }); }} style={{ padding: 6 }}><Text style={{ fontFamily: F.sans, fontSize: 12, color: C.faint }}>위시리스트에서 보기</Text></Pressable>
           <Text style={{ color: "#d8d3c8" }}>·</Text>
           <Pressable onPress={remove} disabled={busy} style={{ padding: 6 }}><Text style={{ fontFamily: F.sans, fontSize: 12, color: C.faint }}>삭제</Text></Pressable>
         </View>

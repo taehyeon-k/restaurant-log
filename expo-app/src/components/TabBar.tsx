@@ -2,15 +2,16 @@ import { useRouter, type Tabs } from "expo-router";
 import * as Haptics from "expo-haptics";
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { BookmarkIcon, CalendarIcon, CameraIcon, MapPinIcon, PersonIcon, RingsIcon } from "./icons";
+import { CalendarIcon, CameraIcon, MapPinIcon, PeopleIcon, PersonIcon, RingsIcon } from "./icons";
 import { useActiveBook } from "@/data/books";
+import { useCommunityUnseen } from "@/features/community/api";
+import { playCommunityTransition } from "@/features/community/Transition";
 import { useRecapUnseen } from "@/features/recap/useRecapState";
 import { C, F, TAB_BAR_H } from "@/theme";
 
 const LABEL: Record<string, string> = {
   calendar: "캘린더",
   index: "지도",
-  wish: "위시리스트",
   anniversary: "기념일",
   account: "내계정",
 };
@@ -18,14 +19,14 @@ const LABEL: Record<string, string> = {
 const ICON: Record<string, (color: string) => React.ReactNode> = {
   calendar: (c) => <CalendarIcon stroke={c} />,
   index: (c) => <MapPinIcon stroke={c} />,
-  wish: (c) => <BookmarkIcon size={19} stroke={c} />,
   anniversary: (c) => <RingsIcon stroke={c} />,
   account: (c) => <PersonIcon stroke={c} />,
 };
 
 /**
- * 탭 4개 + 절대 위치 카메라 버튼(핸드오프 §2). 5칸 그리드를 흉내내지 않고,
+ * 탭 3개 + 「커뮤니티」 단추 + 절대 위치 카메라 버튼(핸드오프 §2). 5칸 그리드를 흉내내지 않고,
  * 가운데 버튼은 탭이 아니라 router.push('/capture') — 탭 상태를 건드리지 않습니다.
+ * 「커뮤니티」도 같은 방식입니다: 전환 판을 띄우고 /community 를 엽니다. 탭이 아니라서 벽돌색(선택됨)이 되지 않습니다.
  */
 type TabBarFn = NonNullable<React.ComponentProps<typeof Tabs>["tabBar"]>;
 type BottomTabBarProps = Parameters<TabBarFn>[0];
@@ -35,15 +36,17 @@ export default function TabBar({ state, navigation }: BottomTabBarProps) {
   const router = useRouter();
   // 막 끝난 분기 리캡을 아직 끝까지 보지 않았으면 캘린더 아이콘에 점.
   const recapUnseen = useRecapUnseen();
-  // 연인 기록이면 위시리스트 칸이 「기념일」이 됩니다. 연인 기록의 위시리스트는 지도 필터로 봅니다(§3-7).
+  // 연인 기록이면 커뮤니티 칸이 「기념일」이 됩니다. 연인 기록의 위시리스트는 지도에서 봅니다(§3-7).
   const { isCouple, readOnly } = useActiveBook();
+  // 마지막으로 커뮤니티를 본 뒤 친구가 공유한 기록이 있으면 커뮤니티 아이콘에 점.
+  const { data: communityUnseen = 0 } = useCommunityUnseen();
 
   const item = (name: string) => {
     const index = state.routes.findIndex((r) => r.name === name);
     const route = state.routes[index];
     if (!route) return <View style={s.tab} />;
     const active = state.index === index;
-    const color = active ? C.brick : "#a29a8c";
+    const color = active ? C.brick : OFF;
     const dot = route.name === "calendar" && recapUnseen;
     return (
       <Pressable
@@ -64,13 +67,30 @@ export default function TabBar({ state, navigation }: BottomTabBarProps) {
     );
   };
 
-
   return (
     <View style={[s.bar, { height: TAB_BAR_H + insets.bottom, paddingBottom: insets.bottom }]}>
       {item("calendar")}
       {item("index")}
       <View style={s.gap} />
-      {item(isCouple ? "anniversary" : "wish")}
+      {isCouple ? (
+        item("anniversary")
+      ) : (
+        <Pressable
+          style={s.tab}
+          accessibilityRole="button"
+          accessibilityLabel={communityUnseen > 0 ? "커뮤니티, 새 소식 있음" : "커뮤니티"}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            playCommunityTransition();
+          }}
+        >
+          <View>
+            <PeopleIcon stroke={OFF} />
+            {communityUnseen > 0 && <View style={s.dot} />}
+          </View>
+          <Text style={[s.label, { color: OFF }]}>커뮤니티</Text>
+        </Pressable>
+      )}
       {item("account")}
 
       <Pressable
@@ -87,6 +107,8 @@ export default function TabBar({ state, navigation }: BottomTabBarProps) {
     </View>
   );
 }
+
+const OFF = "#a29a8c";
 
 const s = StyleSheet.create({
   bar: {

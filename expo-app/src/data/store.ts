@@ -7,12 +7,24 @@ import type { Kind } from "@/lib/types";
  */
 export type Ghost = { name: string; address: string; lat: number; lng: number } | null;
 export type MarkerFilter = "all" | "visited" | "wish";
+/** 지도 시트 머리의 전환 — 맛집 기록 / 위시리스트(커뮤니티 핸드오프 §2). */
+export type MapSegment = "records" | "wish";
+/** 커뮤니티 탭 — 마지막에 본 곳을 기억합니다(§4). */
+export type CommunityTab = "friends" | "recs" | "ranking" | "board";
 
 /** 위시 자리 고르기 화면(wish/spot)이 돌려주는 값 — 폼이 읽고 비웁니다. */
 export type SpotPick = { lat: number; lng: number; found?: { name: string; address: string } } | null;
 
-type State = { kind: Kind; markerFilter: MarkerFilter; ghost: Ghost; spotPick: SpotPick };
-let state: State = { kind: "restaurant", markerFilter: "all", ghost: null, spotPick: null };
+type State = {
+  kind: Kind; markerFilter: MarkerFilter; ghost: Ghost; spotPick: SpotPick;
+  mapSegment: MapSegment; communityTab: CommunityTab;
+  /** 이번에 커뮤니티에 들어오기 직전의 last_seen_community_at — 친구 줄의 「새 기록」 테두리 기준. */
+  communitySeenSince: string | null;
+};
+let state: State = {
+  kind: "restaurant", markerFilter: "all", ghost: null, spotPick: null,
+  mapSegment: "records", communityTab: "friends", communitySeenSince: null,
+};
 const subs = new Set<() => void>();
 
 export const getState = () => state;

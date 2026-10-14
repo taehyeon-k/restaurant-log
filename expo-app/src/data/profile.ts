@@ -15,6 +15,8 @@ export type AccountInfo = {
   titleLabelId: string | null;
   /** 닉네임 옆 대표 캐릭터 */
   characterId: CharacterId;
+  /** 랭킹 참여(기본 구경만) — 커뮤니티 §7 */
+  leaderboardOptIn: boolean;
 };
 
 export const useAccount = () =>
@@ -41,6 +43,7 @@ export const useAccount = () =>
         providers: (user.identities ?? []).map((i) => i.provider),
         titleLabelId: profile?.title_label_id ?? null,
         characterId: isCharacterId(profile?.character_id) ? profile.character_id : DEFAULT_CHARACTER,
+        leaderboardOptIn: profile?.leaderboard_opt_in === true,
       };
     },
   });
@@ -132,4 +135,16 @@ async function setCharacter(qc: QueryClient, userId: string, id: CharacterId) {
     await qc.invalidateQueries({ queryKey: ["account"] });
     throw new Error(error.message.includes("character_not_owned") ? "아직 없는 캐릭터입니다" : error.message);
   }
+}
+
+/** 랭킹 참여 켜고 끄기 — 끄면 다음 집계부터 빠지고 지난 순위는 남지 않습니다(계산을 그때그때 하므로). */
+export function useSetLeaderboardOptIn() {
+  const qc = useQueryClient();
+  return async (userId: string, on: boolean) => {
+    qc.setQueryData<AccountInfo | null>(["account"], (a) => (a ? { ...a, leaderboardOptIn: on } : a));
+    const { error } = await supabase.from("profiles").update({ leaderboard_opt_in: on }).eq("id", userId);
+    await qc.invalidateQueries({ queryKey: ["account"] });
+    await qc.invalidateQueries({ queryKey: ["community", "leaderboard"] });
+    if (error) throw new Error(error.message);
+  };
 }

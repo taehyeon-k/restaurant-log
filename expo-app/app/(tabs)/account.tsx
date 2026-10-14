@@ -6,8 +6,8 @@ import { useState } from "react";
 import { Alert, Image, Pressable, ScrollView, Share, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Character } from "@/components/Character";
-import { Eyebrow } from "@/components/ui";
-import { useAccount, useOwnedCharacters, useSetCharacter, useTickets } from "@/data/profile";
+import { Eyebrow, Toggle } from "@/components/ui";
+import { useAccount, useOwnedCharacters, useSetCharacter, useSetLeaderboardOptIn, useTickets } from "@/data/profile";
 import { refreshAll } from "@/data/invalidate";
 import { usePersonalRows, usePersonalWishes } from "@/data/queries";
 import { apiFetch } from "@/lib/api";
@@ -53,6 +53,7 @@ export default function AccountTab() {
   const { data: owned = [] } = useOwnedCharacters();
   const { tickets, untilNext } = useTickets();
   const setCharacter = useSetCharacter();
+  const setLeaderboardOptIn = useSetLeaderboardOptIn();
   const [error, setError] = useState("");
 
   if (!account) return <View style={{ flex: 1, backgroundColor: C.paper }} />;
@@ -242,6 +243,11 @@ export default function AccountTab() {
 
       <View style={{ marginTop: 22, borderRadius: 18, borderWidth: 1, borderColor: C.lineSoft, backgroundColor: C.card, overflow: "hidden" }}>
         <Row label="계정 연결" border={false} right={<Text style={{ fontFamily: F.mono, fontSize: 11, color: C.faint }}>{connectedLine}</Text>} />
+        {/* 커뮤니티 랭킹 참여 — 끄면 다음 집계부터 빠지고 지난 순위는 남지 않습니다 */}
+        <Row
+          label="랭킹 참여"
+          right={<Toggle label="랭킹 참여" value={account.leaderboardOptIn} onChange={(v) => setLeaderboardOptIn(account.userId, v).catch((e) => setError(e instanceof Error ? e.message : "바꾸지 못했습니다"))} />}
+        />
         <Row label="라벨첩" onPress={() => router.push("/labels")} right={<Text style={{ fontSize: 13, color: C.faint }}>›</Text>} />
         <Row label="기록 내려받기" onPress={exportRecords} right={<Text style={{ fontSize: 13, color: C.faint }}>›</Text>} />
         <Row label="개인정보 처리방침" onPress={() => WebBrowser.openBrowserAsync(`${BASE}/privacy`)} right={<Text style={{ fontSize: 13, color: C.faint }}>›</Text>} />

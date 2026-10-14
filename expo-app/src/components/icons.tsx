@@ -134,3 +134,65 @@ export const VerifiedMark = ({ size = 52 }: { size?: number }) => (
     <Path d="M30 52l14 14 27-30" stroke="#fbfaf6" strokeWidth={9} strokeLinecap="round" strokeLinejoin="round" fill="none" />
   </Svg>
 );
+
+/* ── 커뮤니티 (design_handoff_community · 21px · 1.6) ── */
+
+/** 두 사람 — 메인 탭바 「커뮤니티」 · 커뮤니티 탭바 「친구」. */
+export const PeopleIcon = ({ size = 21, stroke = "#000", strokeWidth = 1.6 }: P) => (
+  <Svg {...base(size, stroke, strokeWidth)}>
+    <Circle cx="9" cy="8.5" r="3.3" />
+    <Path d="M3 19.5c.6-3.2 3-5 6-5s5.4 1.8 6 5" />
+    <Circle cx="16.8" cy="9.6" r="2.6" />
+    <Path d="M16.4 14.6c2.4.1 4.1 1.7 4.6 4.4" />
+  </Svg>
+);
+
+/** 나침반 — 「추천」. */
+export const CompassIcon = ({ size = 21, stroke = "#000", strokeWidth = 1.6 }: P) => (
+  <Svg {...base(size, stroke, strokeWidth)}>
+    <Circle cx="12" cy="12" r="8.5" />
+    <Path d="M15.4 8.6l-1.9 4.9-4.9 1.9 1.9-4.9z" />
+  </Svg>
+);
+
+/** 바닥선 위 막대 셋 — 「랭킹」. */
+export const RankBarsIcon = ({ size = 21, stroke = "#000", strokeWidth = 1.6 }: P) => (
+  <Svg {...base(size, stroke, strokeWidth)}>
+    <Path d="M4 20.5h16" />
+    <Rect x="5" y="12" width="4" height="8.5" />
+    <Rect x="10" y="6.5" width="4" height="14" />
+    <Rect x="15" y="14.5" width="4" height="6" />
+  </Svg>
+);
+
+/** 세 줄 적힌 종이 — 「게시판」. */
+export const BoardIcon = ({ size = 21, stroke = "#000", strokeWidth = 1.6 }: P) => (
+  <Svg {...base(size, stroke, strokeWidth)}>
+    <Rect x="4.5" y="3.5" width="15" height="17" rx="2.5" />
+    <Path d="M8.5 8.5h7M8.5 12h7M8.5 15.5h4" />
+  </Svg>
+);
+
+/** 사람 + 더하기 — 친구 추가. */
+export const AddPersonIcon = ({ size = 17, stroke = "#4d4842", strokeWidth = 1.7 }: P) => (
+  <Svg {...base(size, stroke, strokeWidth)}>
+    <Circle cx="10" cy="8.5" r="3.4" />
+    <Path d="M3.8 19.5c.7-3.3 3.1-5.1 6.2-5.1 1.5 0 2.8.4 3.9 1.2M18 13v6M15 16h6" />
+  </Svg>
+);
+
+/** 종 — 커뮤니티 알림. */
+export const BellLineIcon = ({ size = 17, stroke = "#4d4842", strokeWidth = 1.7 }: P) => (
+  <Svg {...base(size, stroke, strokeWidth)}>
+    <Path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15z" />
+    <Path d="M10 20.5a2 2 0 0 0 4 0" />
+  </Svg>
+);
+
+/** 돋보기(24 좌표) — 커뮤니티 머리 단추. */
+export const SearchLineIcon = ({ size = 16, stroke = "#4d4842", strokeWidth = 1.8 }: P) => (
+  <Svg {...base(size, stroke, strokeWidth)}>
+    <Circle cx="11" cy="11" r="6.5" />
+    <Path d="M20 20l-4.2-4.2" />
+  </Svg>
+);

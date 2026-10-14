@@ -1,7 +1,7 @@
 import BottomSheet, { BottomSheetFlatList, BottomSheetTextInput } from "@gorhom/bottom-sheet";
 import { NaverMapPolygonOverlay, type NaverMapViewRef } from "@mj-studio/react-native-naver-map";
 import { useQueryClient } from "@tanstack/react-query";
-import { useFocusEffect, useRouter } from "expo-router";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
 import * as Location from "expo-location";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -25,6 +25,7 @@ import PlaceCard, { type CoupleCardInfo } from "@/features/map/PlaceCard";
 import PlacesAtSheet from "@/features/map/PlacesAtSheet";
 import { recordsAt, usePlacesAt, type PlaceAt } from "@/features/map/usePlacesAt";
 import PlaceSearch from "@/features/map/PlaceSearch";
+import { SegmentSwitch, useWishItems, WishRow, type WishItem } from "@/features/map/WishSegment";
 import RecapInvite from "@/features/recap/RecapInvite";
 import { FilterSheet as FilterSheetImpl, FoundSheet, SearchMissSheet } from "@/features/map/Sheets";
 import { dayCount, mealLabels } from "@/lib/anniversary";
@@ -75,7 +76,16 @@ export default function MapTab() {
   const router = useRouter();
   const { data: allRows = [] } = useRows();
   const { data: wishes = [] } = useWishes();
-  const { kind, markerFilter, ghost } = useAppState();
+  const { kind, markerFilter: pickedFilter, ghost, mapSegment } = useAppState();
+  // 위시리스트를 보는 동안 핀은 「위시리스트만」과 같게 — 기록으로 돌리면 고른 필터로 돌아옵니다.
+  const markerFilter: MarkerFilter = mapSegment === "wish" ? "wish" : pickedFilter;
+  const wishItems = useWishItems(wishes);
+
+  // 다른 화면의 「위시에 담기」 등이 지도를 segment=wish 로 열 수 있습니다.
+  const { segment } = useLocalSearchParams<{ segment?: string }>();
+  useEffect(() => {
+    if (segment === "wish" || segment === "records") setState({ mapSegment: segment });
+  }, [segment]);
   const qc = useQueryClient();
   // 지금 고른 기록장(HANDOFF-couple §3-1). 연인 기록이면 시트 제목·카드·말풍선이 바뀝니다.
   const { book, isCouple, me: meMember, partner } = useActiveBook();
@@ -215,6 +225,11 @@ export default function MapTab() {
       latitude: s - padLat, longitude: w - padLng, latitudeDelta: n - s + padLat * 2, longitudeDelta: e - w + padLng * 2, duration: 500,
     });
   }, [flyTo]);
+
+  // 다른 화면(커뮤니티 추천의 「지도에서 보기」)이 찍어 둔 자리로 갑니다. 검색으로 고른 때는 이미 그 자리라 그대로입니다.
+  useEffect(() => {
+    if (ghost && lastFit.current !== `fly:${ghost.lat},${ghost.lng}`) flyTo(ghost.lat, ghost.lng, 16);
+  }, [ghost, flyTo]);
 
   // 목록(검색·필터) 결과가 바뀌면 지도를 그 범위에 맞춥니다 — 시트·지역 보기가 떠 있는 동안은 건너뜁니다.
   useEffect(() => {
@@ -412,13 +427,28 @@ export default function MapTab() {
   const dPlus = startedOn ? `D+${dayCount(startedOn)}` : null;
 
   // 시트가 낮으면(peek) 한 줄 요약만 — 검색·칩·정렬은 숨깁니다(웹과 같음).
+  const segmentSwitch = (
+    <SegmentSwitch
+      value={mapSegment}
+      recordLabel={title}
+      recordCount={filtered.length}
+      wishCount={wishes.length}
+      onChange={(v) => setState({ mapSegment: v })}
+    />
+  );
+
   const header = compact ? (
     <View style={s.compactRow}>
-      <Text numberOfLines={1} style={{ flexShrink: 1, fontFamily: F.mono, fontSize: 11.5, color: C.faint }}>{title} · 가게 {filtered.length} · 기록 {visitCount}</Text>
-      {chipVisible && boundsChip(true)}
+      <Text numberOfLines={1} style={{ flexShrink: 1, fontFamily: F.mono, fontSize: 11.5, color: C.faint }}>
+        {mapSegment === "wish" ? `위시리스트 · ${wishes.length}곳` : `${title} · 가게 ${filtered.length} · 기록 ${visitCount}`}
+      </Text>
+      {chipVisible && mapSegment === "records" && boundsChip(true)}
     </View>
+  ) : mapSegment === "wish" ? (
+    segmentSwitch
   ) : (
     <View>
+      {segmentSwitch}
       <View style={s.headRow}>
         <View>
           <View style={{ flexDirection: "row", alignItems: "baseline", gap: 6 }}>
@@ -549,7 +579,7 @@ export default function MapTab() {
       {/* 마커 필터 — 지도 왼쪽 아래, 시트를 따라 오르내립니다 */}
       <Animated.View style={[s.chips, filterStyle]}>
         {FILTERS.map((f) => (
-          <Pressable key={f.id} onPress={() => { Haptics.selectionAsync(); setState({ markerFilter: f.id }); }} style={[s.chip, markerFilter === f.id && { backgroundColor: C.brick }]}>
+          <Pressable key={f.id} onPress={() => { Haptics.selectionAsync(); setState({ markerFilter: f.id, ...(mapSegment === "wish" && f.id !== "wish" ? { mapSegment: "records" as const } : {}) }); }} style={[s.chip, markerFilter === f.id && { backgroundColor: C.brick }]}>
             <Text style={{ fontFamily: F.sans, fontSize: 11.5, color: markerFilter === f.id ? C.card : C.muted }}>{f.label}</Text>
           </Pressable>
         ))}
@@ -604,6 +634,16 @@ export default function MapTab() {
         animatedPosition={sheetTop}
         onChange={(i) => { sheetIndex.current = i; Haptics.selectionAsync(); }}
       >
+        {mapSegment === "wish" ? (
+          <BottomSheetFlatList
+            data={wishItems}
+            keyExtractor={(w: WishItem) => w.key}
+            ListHeaderComponent={header}
+            ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
+            contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24 }}
+            renderItem={({ item }: { item: WishItem }) => <WishRow item={item} />}
+          />
+        ) : (
         <BottomSheetFlatList
           data={filtered}
           keyExtractor={(p: Place) => p.key}
@@ -617,6 +657,7 @@ export default function MapTab() {
             </Text>
           }
         />
+        )}
       </BottomSheet>
 
       <FilterSheetImpl
