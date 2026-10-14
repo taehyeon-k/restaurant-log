@@ -13,13 +13,13 @@ export type CharacterDef = { id: CharacterId; name: string; rarity: Rarity };
 
 export const CHARACTERS: CharacterDef[] = [
   { id: "plate", name: "빈 접시", rarity: "common" },
-  { id: "onigiri", name: "주먹밥", rarity: "common" },
-  { id: "tteok", name: "떡볶이 떡", rarity: "common" },
-  { id: "ramen", name: "라면", rarity: "common" },
+  { id: "onigiri", name: "오니기리", rarity: "common" },
+  { id: "tteok", name: "쏘야", rarity: "common" },
+  { id: "ramen", name: "라멘", rarity: "common" },
   { id: "pizza", name: "피자 조각", rarity: "rare" },
   { id: "burger", name: "햄버거", rarity: "rare" },
   { id: "sushi", name: "연어 초밥", rarity: "rare" },
-  { id: "fish", name: "생선구이 탈", rarity: "legend" },
+  { id: "fish", name: "생구는 1티어", rarity: "legend" },
 ];
 
 /** 가입하면 받는 캐릭터. */
