@@ -7,6 +7,8 @@ import { earnedLabels } from "@/lib/labels";
 import { uploadPhoto } from "@/lib/photos";
 import type { Restaurant, Wish } from "@/lib/types";
 import { Eyebrow, photoFill } from "./ui";
+import { Character } from "../Character";
+import type { CharacterId } from "@/lib/characters";
 
 export type AccountInfo = {
   nickname: string;
@@ -17,6 +19,8 @@ export type AccountInfo = {
   providers: string[];
   /** 닉네임 옆에 내건 대표 라벨(src/lib/labels.ts LABELS 의 id). 없으면 null. */
   titleLabelId: string | null;
+  /** 닉네임 옆 대표 캐릭터(src/lib/characters.ts). 뽑기·도감은 앱에만 있습니다. */
+  characterId: CharacterId;
 };
 
 const PROVIDER_LABEL: Record<string, string> = { kakao: "카카오", google: "구글" };
@@ -227,6 +231,7 @@ export default function AccountScreen({
             <span className="truncate font-serif text-[21px] font-bold">
               {account.nickname || "이름 없음"}
             </span>
+            <Character id={account.characterId} size={26} />
             {titleLabel && (
               <span
                 className="inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-[3px] text-[10.5px] font-bold"

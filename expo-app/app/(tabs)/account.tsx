@@ -5,11 +5,13 @@ import * as WebBrowser from "expo-web-browser";
 import { useState } from "react";
 import { Alert, Image, Pressable, ScrollView, Share, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Character } from "@/components/Character";
 import { Eyebrow } from "@/components/ui";
-import { useAccount } from "@/data/profile";
+import { useAccount, useOwnedCharacters, useSetCharacter, useTickets } from "@/data/profile";
 import { refreshAll } from "@/data/invalidate";
 import { useRows, useWishes } from "@/data/queries";
 import { apiFetch } from "@/lib/api";
+import { CHARACTERS } from "@/lib/characters";
 import { earnedLabels } from "@/lib/labels";
 import { uploadPhoto } from "@/lib/photos";
 import { supabase } from "@/lib/supabase";
@@ -48,6 +50,9 @@ export default function AccountTab() {
   const { data: wishes = [] } = useWishes();
   const [avatarBusy, setAvatarBusy] = useState(false);
   const [labelBusy, setLabelBusy] = useState(false);
+  const { data: owned = [] } = useOwnedCharacters();
+  const { tickets, untilNext } = useTickets();
+  const setCharacter = useSetCharacter();
   const [error, setError] = useState("");
 
   if (!account) return <View style={{ flex: 1, backgroundColor: C.paper }} />;
@@ -60,6 +65,20 @@ export default function AccountTab() {
   const titleLabelId = account.titleLabelId;
   const titleLabel = titleLabelId ? got.find((l) => l.id === titleLabelId) ?? null : null;
   const connectedLine = account.providers.length ? account.providers.map((p) => PROVIDER_LABEL[p] ?? p).join(" · ") + " 연결됨" : "연결된 계정 없음";
+
+  // 대표가 맨 앞, 나머지는 도감 순서.
+  const ownedSorted = [...owned].sort((a, b) =>
+    a.id === account.characterId ? -1 : b.id === account.characterId ? 1 : CHARACTERS.findIndex((c) => c.id === a.id) - CHARACTERS.findIndex((c) => c.id === b.id));
+
+  async function pickCharacter(id: (typeof owned)[number]["id"]) {
+    if (id === account!.characterId) return;
+    setError("");
+    try {
+      await setCharacter(account!.userId, id);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "대표 캐릭터를 바꾸지 못했습니다");
+    }
+  }
 
   async function saveAvatar(url: string | null) {
     setAvatarBusy(true);
@@ -136,6 +155,7 @@ export default function AccountTab() {
         <View style={{ flex: 1 }}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
             <Text numberOfLines={1} style={{ flexShrink: 1, fontFamily: F.serif, fontSize: 21, color: C.ink }}>{account.nickname || "이름 없음"}</Text>
+            <Character id={account.characterId} size={26} />
             {titleLabel && (
               <Text style={{ borderRadius: 12, borderWidth: 1, borderColor: `${titleLabel.color}4d`, backgroundColor: `${titleLabel.color}1a`, paddingHorizontal: 8, paddingVertical: 3, fontFamily: F.sansBd, fontSize: 10.5, color: titleLabel.color, overflow: "hidden" }}>{titleLabel.name}</Text>
             )}
@@ -158,6 +178,41 @@ export default function AccountTab() {
         <Stat value={records} label="기록" />
         <Stat value={verified} label="인증" brick border />
         <Stat value={places} label="식당" border />
+      </View>
+
+      <View style={{ marginTop: 20, flexDirection: "row", justifyContent: "space-between", alignItems: "baseline" }}>
+        <Text style={{ fontFamily: F.serif, fontSize: 15, color: C.ink }}>내 캐릭터</Text>
+        <Pressable onPress={() => router.push("/characters")} hitSlop={8}><Text style={{ fontFamily: F.mono, fontSize: 10.5, color: C.faint }}>{owned.length} / {CHARACTERS.length} ›</Text></Pressable>
+      </View>
+      <Text style={{ marginTop: 4, fontFamily: F.sans, fontSize: 10.5, color: C.faint }}>탭하면 닉네임 옆과 랭킹에 이 캐릭터가 나옵니다</Text>
+      <View style={{ marginTop: 10, flexDirection: "row", gap: 8 }}>
+        {ownedSorted.slice(0, 3).map((o) => {
+          const on = o.id === account.characterId;
+          return (
+            <Pressable
+              key={o.id}
+              onPress={() => pickCharacter(o.id)}
+              accessibilityLabel={`${CHARACTERS.find((c) => c.id === o.id)?.name} 대표로`}
+              style={{ width: 62, height: 62, borderRadius: 16, borderWidth: on ? 1.5 : 1, borderColor: on ? C.brick : "#e2ddd2", backgroundColor: on ? C.brickSoft : C.card, alignItems: "center", justifyContent: "center" }}
+            >
+              <Character id={o.id} size={48} />
+            </Pressable>
+          );
+        })}
+        {owned.length > 3 && (
+          <Pressable onPress={() => router.push("/characters")} style={{ width: 62, height: 62, borderRadius: 16, borderWidth: 1, borderStyle: "dashed", borderColor: C.line, alignItems: "center", justifyContent: "center" }}>
+            <Text style={{ fontFamily: F.mono, fontSize: 12, color: C.faint }}>+{owned.length - 3}</Text>
+          </Pressable>
+        )}
+      </View>
+      <View style={{ marginTop: 12, flexDirection: "row", alignItems: "center", gap: 10, borderRadius: 18, borderWidth: 1, borderColor: "#e0c3b1", backgroundColor: "#f9f0e9", paddingVertical: 12, paddingHorizontal: 14 }}>
+        <View style={{ flex: 1 }}>
+          <Text style={{ fontFamily: F.serif, fontSize: 15, color: C.ink }}>뽑기권 {tickets}장</Text>
+          <Text style={{ marginTop: 3, fontFamily: F.mono, fontSize: 10, color: C.faint }}>다음 장까지 인증 기록 {untilNext}건</Text>
+        </View>
+        <Pressable onPress={() => router.push("/draw")} disabled={tickets < 1} style={{ minHeight: 40, borderRadius: 14, backgroundColor: C.ink, paddingHorizontal: 14, justifyContent: "center", opacity: tickets < 1 ? 0.4 : 1 }}>
+          <Text style={{ fontFamily: F.sansMd, fontSize: 12.5, color: C.card }}>밥솥 열러 가기</Text>
+        </Pressable>
       </View>
 
       {got.length > 0 && (

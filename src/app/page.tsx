@@ -11,6 +11,7 @@ import { createClient } from "@/lib/supabase/server";
 import { CATEGORY_COLORS, parseBbox, type Kind, type Sort } from "@/lib/types";
 import { groupPlaces } from "@/lib/places";
 import type { AccountInfo } from "./_components/mobile/AccountScreen";
+import { DEFAULT_CHARACTER, isCharacterId } from "@/lib/characters";
 import KindTabs from "./_components/KindTabs";
 import SearchBar from "./_components/SearchBar";
 import PlaceSearch from "./_components/PlaceSearch";
@@ -38,7 +39,8 @@ export default async function Home({
 
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
-    .select("nickname, avatar_url, created_at, title_label_id")
+    // 컬럼을 나열하지 않고 * 로 읽습니다 — 새 컬럼(character_id) 마이그레이션이 밀려도 닉네임까지 비지 않게.
+    .select("*")
     .eq("id", user.id)
     .single();
 
@@ -56,6 +58,7 @@ export default async function Home({
     since: profile?.created_at ?? user.created_at,
     providers: (user.identities ?? []).map((i) => i.provider),
     titleLabelId: profile?.title_label_id ?? null,
+    characterId: isCharacterId(profile?.character_id) ? profile.character_id : DEFAULT_CHARACTER,
   };
 
   const kind: Kind = sp.kind === "cafe" ? "cafe" : "restaurant";
