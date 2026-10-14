@@ -1,4 +1,5 @@
 import DateTimePicker from "@react-native-community/datetimepicker";
+import { requireOptionalNativeModule } from "expo";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
@@ -16,6 +17,8 @@ const isoOf = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.
 
 /** 「복사」 — expo-clipboard 는 누를 때 불러옵니다(예전 개발 빌드엔 네이티브 모듈이 없어 불러오는 순간 멈춥니다). */
 async function copyText(text: string) {
+  // 이 개발 빌드에 네이티브 모듈이 없으면 부르지 않고 공유 시트로 넘깁니다(빨간 오류 없이).
+  if (!requireOptionalNativeModule("ExpoClipboard")) return false;
   try {
     const Clipboard = require("expo-clipboard") as typeof import("expo-clipboard");
     await Clipboard.setStringAsync(text);
