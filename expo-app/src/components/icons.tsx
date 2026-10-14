@@ -92,6 +92,14 @@ export const RefreshIcon = ({ size = 17, stroke = "#fbfaf6", strokeWidth = 1.7 }
   </Svg>
 );
 
+export const ShareIcon = ({ size = 18, stroke = "#1c1a17", strokeWidth = 1.7 }: P) => (
+  <Svg {...base(size, stroke, strokeWidth)}>
+    <Path d="M12 3.5v11" />
+    <Path d="M8 7.5l4-4 4 4" />
+    <Path d="M6 11.5H5a1.5 1.5 0 0 0-1.5 1.5v6A1.5 1.5 0 0 0 5 20.5h14a1.5 1.5 0 0 0 1.5-1.5v-6a1.5 1.5 0 0 0-1.5-1.5h-1" />
+  </Svg>
+);
+
 /** 24각 버스트 — 라벨첩 버튼·인증 뱃지. 좌표는 웹 ui.tsx BURST 와 같은 0–100 좌표계. */
 export const BURST_POINTS =
   "50,0 60.6,10.4 75,6.7 79,21 93.3,25 89.6,39.4 100,50 89.6,60.6 93.3,75 79,79 75,93.3 60.6,89.6 50,100 39.4,89.6 25,93.3 21,79 6.7,75 10.4,60.6 0,50 10.4,39.4 6.7,25 21,21 25,6.7 39.4,10.4";

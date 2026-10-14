@@ -1,9 +1,10 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
-import { Alert, Dimensions, Image, Pressable, ScrollView, Text, View } from "react-native";
+import { Alert, Dimensions, Image, Platform, Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { BookmarkIcon, VerifiedMark } from "@/components/icons";
+import { BookmarkIcon, ShareIcon, VerifiedMark } from "@/components/icons";
+import { ShareSheet } from "@/components/ShareSheet";
 import { BackButton, Button, Eyebrow, MobileStars, PhotoBox, Pigs } from "@/components/ui";
 import { refreshAll } from "@/data/invalidate";
 import { useRows } from "@/data/queries";
@@ -33,6 +34,7 @@ export default function RecordRoute() {
   const [shown, setShown] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [sharing, setSharing] = useState(false);
 
   if (!record) {
     return (
@@ -223,6 +225,21 @@ export default function RecordRoute() {
       <View style={{ position: "absolute", left: 16, top: insets.top + 8, backgroundColor: "rgba(251,250,246,.92)", borderRadius: 22 }}>
         <BackButton />
       </View>
+      {!record.pending && (
+        <>
+          <Pressable
+            onPress={() => setSharing(true)}
+            accessibilityLabel="기록 공유"
+            style={[
+              { position: "absolute", right: 16, top: insets.top + 8, width: 44, height: 44, borderRadius: 22, backgroundColor: "rgba(251,250,246,.92)", alignItems: "center", justifyContent: "center" },
+              Platform.select({ ios: { shadowColor: C.ink, shadowOpacity: 0.14, shadowRadius: 4, shadowOffset: { width: 0, height: 2 } }, default: { elevation: 3 } }),
+            ]}
+          >
+            <ShareIcon size={18} stroke={C.ink} />
+          </Pressable>
+          <ShareSheet record={record} visible={sharing} onClose={() => setSharing(false)} />
+        </>
+      )}
     </View>
   );
 }

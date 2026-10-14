@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { Modal, Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BookmarkIcon, VerifiedMark } from "@/components/icons";
+import { ShareButton, ShareSheet } from "@/components/ShareSheet";
 import { BackButton, MobileStars, PhotoBox } from "@/components/ui";
 import { useRows, useWishes } from "@/data/queries";
 import { coverPhoto, dottedDate, verifiedTime, type Restaurant, type Wish } from "@/lib/types";
@@ -24,6 +25,7 @@ export default function DayRoute() {
   const { data: allRows = [] } = useRows();
   const { data: wishes = [] } = useWishes();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [sharing, setSharing] = useState<Restaurant | null>(null);
 
   const byName = (a: { name: string }, b: { name: string }) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
   const visits = useMemo(() => allRows.filter((r) => !r.pending && r.visited_at === dateKey).sort(byName), [allRows, dateKey]);
@@ -91,7 +93,7 @@ export default function DayRoute() {
           </View>
         ) : (
           <>
-            {visits.map((v) => <VisitCard key={v.id} record={v} onOpen={() => router.push({ pathname: "/record/[id]", params: { id: String(v.id) } })} />)}
+            {visits.map((v) => <VisitCard key={v.id} record={v} onOpen={() => router.push({ pathname: "/record/[id]", params: { id: String(v.id) } })} onShare={() => setSharing(v)} />)}
             {dayWishes.length > 0 && (
               <View style={{ marginTop: visits.length ? 8 : 0, gap: 10 }}>
                 {visits.length > 0 && <Text style={{ paddingHorizontal: 4, fontFamily: F.mono, fontSize: 10, letterSpacing: 1.6, color: C.faint }}>예정</Text>}
@@ -101,11 +103,12 @@ export default function DayRoute() {
           </>
         )}
       </ScrollView>
+      {sharing && <ShareSheet record={sharing} visible onClose={() => setSharing(null)} />}
     </View>
   );
 }
 
-function VisitCard({ record, onOpen }: { record: Restaurant; onOpen: () => void }) {
+function VisitCard({ record, onOpen, onShare }: { record: Restaurant; onOpen: () => void; onShare: () => void }) {
   const photo = coverPhoto(record);
   return (
     <Pressable onPress={onOpen} style={{ flexDirection: "row", alignItems: "flex-start", gap: 12, borderRadius: 22, borderWidth: 1, borderColor: record.verified ? "#e0c3b1" : "#e4dfd3", backgroundColor: C.card, padding: 12 }}>
@@ -128,6 +131,7 @@ function VisitCard({ record, onOpen }: { record: Restaurant; onOpen: () => void 
         </View>
         <Text numberOfLines={2} style={{ marginTop: 6, fontFamily: F.sans, fontSize: 11.5, lineHeight: 18, color: "#4d4842" }}>{record.review || record.menu || "메모가 비어 있습니다"}</Text>
       </View>
+      {!record.pending && <View style={{ alignSelf: "flex-end" }}><ShareButton onPress={onShare} /></View>}
     </Pressable>
   );
 }

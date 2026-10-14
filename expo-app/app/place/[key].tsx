@@ -1,13 +1,15 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BookmarkIcon } from "@/components/icons";
+import { ShareButton, ShareSheet } from "@/components/ShareSheet";
 import { BackButton, Button, Eyebrow, MobileStars, PhotoBox, Pigs } from "@/components/ui";
 import { useRows } from "@/data/queries";
 import { photoCount } from "@/lib/record";
 import { feltLabel, feltLevel } from "@/lib/price";
 import { groupPlaces } from "@/lib/places";
-import { dottedDate, verifiedDateTime } from "@/lib/types";
+import { dottedDate, verifiedDateTime, type Restaurant } from "@/lib/types";
 import { C, F } from "@/theme";
 
 /** 가게 화면 — 같은 가게의 방문 기록들을 묶어 보여줍니다. */
@@ -16,6 +18,7 @@ export default function PlaceRoute() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { data: rows = [] } = useRows();
+  const [sharing, setSharing] = useState<Restaurant | null>(null);
   const place = groupPlaces(rows.filter((r) => !r.pending)).find((p) => p.key === key);
 
   if (!place) {
@@ -113,9 +116,12 @@ export default function PlaceRoute() {
                   </View>
                   <Text style={{ marginTop: 7, fontFamily: F.sans, fontSize: 11.5, color: C.muted }}>{v.menu || "메뉴를 쓰지 않았습니다"}</Text>
                   <Text numberOfLines={2} style={{ marginTop: 5, fontFamily: F.sans, fontSize: 11.5, lineHeight: 18, color: "#4d4842" }}>{v.review || "메모가 비어 있습니다"}</Text>
-                  <Text style={{ marginTop: 9, fontFamily: F.mono, fontSize: 9.5, color: "#a29a8c" }}>
-                    {shots ? `${shots}장 · PHOTO ${Math.min(v.cover_index ?? 0, shots - 1) + 1}` : "사진 없음"}
-                  </Text>
+                  <View style={{ marginTop: 9, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                    <Text style={{ fontFamily: F.mono, fontSize: 9.5, color: "#a29a8c" }}>
+                      {shots ? `${shots}장 · PHOTO ${Math.min(v.cover_index ?? 0, shots - 1) + 1}` : "사진 없음"}
+                    </Text>
+                    {!v.pending && <ShareButton onPress={() => setSharing(v)} />}
+                  </View>
                 </Pressable>
               );
             })}
@@ -125,6 +131,7 @@ export default function PlaceRoute() {
       <View style={{ position: "absolute", left: 16, top: insets.top + 8, backgroundColor: "rgba(251,250,246,.92)", borderRadius: 22 }}>
         <BackButton />
       </View>
+      {sharing && <ShareSheet record={sharing} visible onClose={() => setSharing(null)} />}
     </View>
   );
 }

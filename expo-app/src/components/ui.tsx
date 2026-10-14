@@ -150,6 +150,23 @@ export function BottomSheetModal({
   );
 }
 
+/** 켜고 끄는 스위치 — 50×28, 켜짐 벽돌색. */
+export const Toggle = ({
+  value, onChange, disabled, label,
+}: { value: boolean; onChange: (v: boolean) => void; disabled?: boolean; label?: string }) => (
+  <Pressable
+    onPress={() => onChange(!value)}
+    disabled={disabled}
+    hitSlop={8}
+    accessibilityRole="switch"
+    accessibilityLabel={label}
+    accessibilityState={{ checked: value, disabled }}
+    style={{ width: 50, height: 28, borderRadius: 14, backgroundColor: value ? C.brick : "#d8d3c8" }}
+  >
+    <View style={{ position: "absolute", top: 2, left: value ? 24 : 2, width: 24, height: 24, borderRadius: 12, backgroundColor: C.card }} />
+  </Pressable>
+);
+
 export const Row = ({ children, style }: { children: React.ReactNode; style?: ViewStyle }) => (
   <View style={[{ flexDirection: "row", alignItems: "center" }, style]}>{children}</View>
 );
