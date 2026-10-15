@@ -1,6 +1,6 @@
 import { useRouter } from "expo-router";
-import { useMemo, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useMemo, useRef, useState } from "react";
+import { Modal, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Eyebrow } from "@/components/ui";
 import { useActiveBook, useAnniversaryPicks } from "@/data/books";
@@ -19,6 +19,10 @@ const keyOf = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.
 /** 칸 안 이름 칩 최대 글자 수 — 390px 폭·7열 격자에서 들어가는 값(웹 HANDOFF-calendar 실측). */
 const MAX_CHIP_CHARS = 3;
 const clipName = (name: string, max: number) => (name.length > max ? `${name.slice(0, max)}…` : name);
+/** 연도 다이얼 범위(HANDOFF-calendar-nav §3) */
+const YEARS = Array.from({ length: 16 }, (_, i) => 2020 + i);
+const MONTHS = Array.from({ length: 12 }, (_, i) => i);
+const ROW = 40;
 const monthOfKey = (k: string) => {
   const [y, m] = k.split("-").map(Number);
   return { year: y, month: m - 1 };
@@ -43,6 +47,36 @@ function groupBy<T extends { name: string }>(list: T[], key: (t: T) => string | 
   }
   for (const l of map.values()) l.sort((a, b) => (a.name < b.name ? -1 : 1));
   return map;
+}
+
+/**
+ * 연·월 다이얼 — 굴리는 동안은 가운데 강조만 바뀌고, 항목을 눌러야 onPick 으로 적용됩니다.
+ * 처음부터 contentOffset 으로 현재 값을 가운데에 둡니다.
+ */
+function Dial({ labels, index, onPick }: { labels: string[]; index: number; onPick: (i: number) => void }) {
+  const [center, setCenter] = useState(index);
+  return (
+    <View style={{ height: ROW * 5, borderRadius: 15, overflow: "hidden" }}>
+      <View pointerEvents="none" style={{ position: "absolute", top: ROW * 2, height: ROW, left: 6, right: 6, borderRadius: 10, backgroundColor: C.brickSoft }} />
+      <ScrollView
+        contentOffset={{ x: 0, y: index * ROW }}
+        contentContainerStyle={{ paddingVertical: ROW * 2 }}
+        snapToInterval={ROW}
+        decelerationRate="fast"
+        showsVerticalScrollIndicator={false}
+        scrollEventThrottle={16}
+        onScroll={(e) => setCenter(Math.max(0, Math.min(labels.length - 1, Math.round(e.nativeEvent.contentOffset.y / ROW))))}
+      >
+        {labels.map((label, i) => (
+          <Pressable key={label} onPress={() => onPick(i)} style={{ height: ROW, alignItems: "center", justifyContent: "center" }}>
+            <Text style={i === center
+              ? { fontFamily: F.serif, fontSize: 18, fontWeight: "700", color: C.brick }
+              : { fontFamily: F.serif, fontSize: 15, color: C.faint }}>{label}</Text>
+          </Pressable>
+        ))}
+      </ScrollView>
+    </View>
+  );
 }
 
 /** 월력 — 기록의 visited_at 을 날짜별로 모아 칸 안에 가게 이름 미리보기로 보여줍니다. */
@@ -71,6 +105,27 @@ export default function CalendarTab() {
     const d = new Date(cursor.year, cursor.month + delta, 1);
     setCursorState({ year: d.getFullYear(), month: d.getMonth() });
   };
+
+  // 격자를 좌우로 밀면 달 이동(HANDOFF-calendar-nav §2) — 애니메이션 없이 바로. 스와이프로 잡힌 터치는 칸 onPress 가 나지 않습니다.
+  const shiftRef = useRef(shift);
+  shiftRef.current = shift;
+  const pan = useMemo(() => {
+    const horizontal = (g: { dx: number; dy: number }) => Math.abs(g.dx) > 12 && Math.abs(g.dx) > Math.abs(g.dy);
+    return PanResponder.create({
+      onMoveShouldSetPanResponder: (_, g) => horizontal(g),
+      onMoveShouldSetPanResponderCapture: (_, g) => horizontal(g),
+      onPanResponderRelease: (_, g) => {
+        if (Math.abs(g.dx) > 40 && Math.abs(g.dx) > Math.abs(g.dy)) shiftRef.current(g.dx < 0 ? 1 : -1);
+      },
+    });
+  }, []);
+
+  // 연·월 다이얼(§3) — 누른 글자 바로 아래에 펼칩니다. 위치는 글자를 창 기준으로 재서 맞춥니다.
+  const yearRef = useRef<View>(null);
+  const monthRef = useRef<View>(null);
+  const [picker, setPicker] = useState<null | { kind: "year" | "month"; x: number; y: number }>(null);
+  const openPicker = (kind: "year" | "month") =>
+    (kind === "year" ? yearRef : monthRef).current?.measureInWindow((x, y, _w, h) => setPicker({ kind, x, y: y + h + 2 }));
 
   const byDate = useMemo(() => groupBy<Restaurant>(rows, (r) => r.visited_at), [rows]);
   const byDateWish = useMemo(() => groupBy<Wish>(wishes, (w) => w.plan_date), [wishes]);
@@ -103,16 +158,12 @@ export default function CalendarTab() {
           {startedOn && <Text style={{ fontFamily: F.mono, fontSize: 11.5, color: C.brick }}>D+{dayCount(startedOn)}</Text>}
         </View>
         <View style={s.titleRow}>
-          <Pressable onPress={() => setRecapList(true)} accessibilityHint="지난 분기 리캡 목록이 열립니다">
-            <Text style={s.title}>{cursor.year}년 {cursor.month + 1}월</Text>
+          <Pressable ref={yearRef} onPress={() => openPicker("year")} hitSlop={8} accessibilityHint="연도를 고르는 다이얼이 열립니다">
+            <Text style={s.title}>{cursor.year}년</Text>
           </Pressable>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-            <Pressable onPress={() => shift(-1)} accessibilityLabel="이전 달" style={s.round}><Text style={s.arrow}>‹</Text></Pressable>
-            <Pressable onPress={() => { const d = new Date(); setCursorState({ year: d.getFullYear(), month: d.getMonth() }); }} style={s.today}>
-              <Text style={{ fontFamily: F.sans, fontSize: 11, color: C.muted }}>오늘</Text>
-            </Pressable>
-            <Pressable onPress={() => shift(1)} accessibilityLabel="다음 달" style={s.round}><Text style={s.arrow}>›</Text></Pressable>
-          </View>
+          <Pressable ref={monthRef} onPress={() => openPicker("month")} hitSlop={8} accessibilityHint="월을 고르는 다이얼이 열립니다">
+            <Text style={s.title}>{cursor.month + 1}월</Text>
+          </Pressable>
         </View>
         <View style={{ marginTop: 6, flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
           <Text style={{ fontFamily: F.sans, fontSize: 12, color: C.faint }}>이 달 기록 {countThisMonth}건</Text>
@@ -152,7 +203,7 @@ export default function CalendarTab() {
         {WEEKDAYS.map((w) => <Text key={w} style={s.weekday}>{w}</Text>)}
       </View>
 
-      <View style={{ flex: 1, paddingHorizontal: 12, paddingTop: 6, paddingBottom: 74 + insets.bottom + 12, gap: 4 }}>
+      <View {...pan.panHandlers} style={{ flex: 1, paddingHorizontal: 12, paddingTop: 6, paddingBottom: 74 + insets.bottom + 12, gap: 4 }}>
         {weeks.map((week, i) => (
           <View key={i} style={{ flex: 1, flexDirection: "row", gap: 4 }}>
             {week.map((date) => {
@@ -203,6 +254,28 @@ export default function CalendarTab() {
         ))}
       </View>
 
+      <Modal visible={!!picker} transparent animationType="none" onRequestClose={() => setPicker(null)} statusBarTranslucent>
+        <Pressable onPress={() => setPicker(null)} style={{ flex: 1 }}>
+          {picker && (
+            <Pressable onPress={() => {}} style={[s.popover, { left: picker.x, top: picker.y, width: picker.kind === "year" ? 104 : 84 }]}>
+              {picker.kind === "year" ? (
+                <Dial
+                  labels={YEARS.map((y) => `${y}년`)}
+                  index={Math.max(0, YEARS.indexOf(cursor.year))}
+                  onPick={(i) => { setCursorState({ year: YEARS[i], month: cursor.month }); setPicker(null); }}
+                />
+              ) : (
+                <Dial
+                  labels={MONTHS.map((m) => `${m + 1}월`)}
+                  index={cursor.month}
+                  onPick={(i) => { setCursorState({ year: cursor.year, month: i }); setPicker(null); }}
+                />
+              )}
+            </Pressable>
+          )}
+        </Pressable>
+      </Modal>
+
       <RecapListSheet
         visible={recapList}
         list={recaps.list}
@@ -215,11 +288,12 @@ export default function CalendarTab() {
 }
 
 const s = StyleSheet.create({
-  titleRow: { marginTop: 8, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  titleRow: { marginTop: 8, flexDirection: "row", alignItems: "baseline", gap: 6 },
   title: { fontFamily: F.serif, fontSize: 22, color: C.ink },
-  round: { width: 36, height: 36, borderRadius: 18, borderWidth: 1, borderColor: C.line, backgroundColor: C.card, alignItems: "center", justifyContent: "center" },
-  arrow: { fontSize: 15, color: C.ink },
-  today: { height: 36, borderRadius: 18, borderWidth: 1, borderColor: C.line, backgroundColor: C.card, paddingHorizontal: 12, justifyContent: "center" },
+  popover: {
+    position: "absolute", borderRadius: 16, backgroundColor: C.card, borderWidth: 1, borderColor: C.line,
+    ...Platform.select({ ios: { shadowColor: C.ink, shadowOpacity: 0.16, shadowRadius: 16, shadowOffset: { width: 0, height: 12 } }, default: { elevation: 8 } }),
+  },
   toggle: { minHeight: 30, borderRadius: 15, paddingHorizontal: 11, flexDirection: "row", alignItems: "center", gap: 6 },
   band: { marginTop: 10, marginHorizontal: 22, flexDirection: "row", alignItems: "center", gap: 8, borderRadius: 14, backgroundColor: "#f2e0d5", paddingHorizontal: 13, paddingVertical: 9 },
   weekday: { flex: 1, textAlign: "center", fontFamily: F.mono, fontSize: 10, color: C.faint },
