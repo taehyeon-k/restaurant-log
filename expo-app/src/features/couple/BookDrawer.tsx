@@ -3,12 +3,14 @@ import { useQueryClient } from "@tanstack/react-query";
 import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import { Alert, Modal, Platform, Pressable, ScrollView, Text, View } from "react-native";
+import { Alert, Image, Modal, Platform, Pressable, ScrollView, Text, View } from "react-native";
 import Animated, { SlideInLeft } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
+import { Character } from "@/components/Character";
 import { Eyebrow } from "@/components/ui";
 import { closeBook, setActiveBook, updateStartedOn, useActiveBook, type Book } from "@/data/books";
+import { useAccount } from "@/data/profile";
 import { useBookRows } from "@/data/queries";
 import { dayCount, todayIso } from "@/lib/anniversary";
 import { dottedDate, type Restaurant } from "@/lib/types";
@@ -34,6 +36,33 @@ const Check = () => (
     </Svg>
   </View>
 );
+
+/**
+ * 내 계정 사진(HANDOFF-recommend §2, 시안 2a·2b) — 40px 원, 안쪽 테두리 2 종이색 + 바깥 링 1.5 벽돌색.
+ * 사진 → 대표 캐릭터 → 닉네임 첫 글자 순.
+ */
+function AccountPhoto() {
+  const { data: account } = useAccount();
+  const initial = Array.from(account?.nickname?.trim() || "나")[0];
+  return (
+    <View style={{ width: 43, height: 43, borderRadius: 21.5, borderWidth: 1.5, borderColor: C.brick, alignItems: "center", justifyContent: "center" }}>
+      <View
+        style={{
+          width: 40, height: 40, borderRadius: 20, borderWidth: 2, borderColor: C.card, overflow: "hidden", alignItems: "center", justifyContent: "center",
+          backgroundColor: account?.avatarUrl ? "#ded8cb" : account?.characterId ? C.brickSoft : C.brick,
+        }}
+      >
+        {account?.avatarUrl ? (
+          <Image source={{ uri: account.avatarUrl }} style={{ width: 36, height: 36 }} />
+        ) : account?.characterId ? (
+          <View style={{ marginTop: 6 }}><Character id={account.characterId} size={34} /></View>
+        ) : (
+          <Text style={{ fontFamily: F.sansBd, fontSize: 16, color: C.card }}>{initial}</Text>
+        )}
+      </View>
+    </View>
+  );
+}
 
 /**
  * 기록장 메뉴(HANDOFF-couple §3-2, 시안 1b·2b) — 왼쪽에서 열리는 308px 서랍.
@@ -211,6 +240,15 @@ export default function BookDrawer({ visible, onClose }: { visible: boolean; onC
                 두 기록장은 따로 저장됩니다. 개인 기록은 상대에게 보이지 않습니다.
               </Text>
             </ScrollView>
+            {/* 머리 오른쪽 위 내 계정 사진 — 서랍을 닫고 내계정을 엽니다. 연인 기록 중에도 내 계정. */}
+            <Pressable
+              onPress={() => { onClose(); router.navigate("/me"); }}
+              accessibilityRole="button"
+              accessibilityLabel="내 계정"
+              style={{ position: "absolute", right: 16, top: insets.top + 20, width: 44, height: 44, alignItems: "center", justifyContent: "center" }}
+            >
+              <AccountPhoto />
+            </Pressable>
           </Animated.View>
         )}
         <Pressable style={{ flex: 1 }} onPress={onClose} accessibilityLabel="기록장 메뉴 닫기" />

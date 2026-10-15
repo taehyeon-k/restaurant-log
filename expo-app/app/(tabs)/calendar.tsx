@@ -6,10 +6,11 @@ import { Eyebrow } from "@/components/ui";
 import { useActiveBook, useAnniversaryPicks } from "@/data/books";
 import { useAccount } from "@/data/profile";
 import { useRows, useWishes } from "@/data/queries";
+import AnniversaryBanner from "@/features/couple/AnniversaryBanner";
 import RecapCard from "@/features/recap/RecapCard";
 import RecapListSheet from "@/features/recap/RecapListSheet";
 import { useRecapState, useRecaps } from "@/features/recap/useRecapState";
-import { daysBetween, dayCount, mealFor, milestoneOn, milestonesUntil, nextMilestone, todayIso } from "@/lib/anniversary";
+import { dayCount, milestoneOn } from "@/lib/anniversary";
 import type { Restaurant, Wish } from "@/lib/types";
 import { C, F } from "@/theme";
 
@@ -90,7 +91,7 @@ export default function CalendarTab() {
   const recaps = useRecaps();
   const recapState = useRecapState();
   const [recapList, setRecapList] = useState(false);
-  // 연인 기록(HANDOFF-couple §3-10) — 머리 「CALENDAR · 우리」 + D+N, 기념일 띠·칸 강조. 리캡은 개인 기록에만.
+  // 연인 기록(HANDOFF-couple §3-10) — 머리 「CALENDAR · 우리」 + D+N, 기념일 배너·칸 강조. 리캡은 개인 기록에만.
   const { book, isCouple } = useActiveBook();
   const { data: picks = [] } = useAnniversaryPicks();
   const startedOn = isCouple ? book?.startedOn ?? null : null;
@@ -157,16 +158,6 @@ export default function CalendarTab() {
   const countThisMonth = rows.filter((r) => r.visited_at?.startsWith(prefix)).length;
   const todayKey = keyOf(new Date());
 
-  // 이 달의 기념일 띠 — 1차 구현은 기념일 당일 칸만 강조합니다(직접 고른 다른 날 칸은 표시하지 않음).
-  const monthEnd = keyOf(new Date(cursor.year, cursor.month + 1, 0));
-  const monthMilestones = useMemo(
-    () => (startedOn ? milestonesUntil(startedOn, monthEnd).filter((m) => m.date.startsWith(prefix)) : []),
-    [startedOn, monthEnd, prefix]
-  );
-  const band = monthMilestones[0] ?? null;
-  const bandMeal = band ? mealFor(band, picks, rows) : null;
-  const next = startedOn ? nextMilestone(startedOn, todayIso()) : null;
-
   return (
     <View style={{ flex: 1, backgroundColor: C.paper, paddingTop: insets.top + 8 }}>
       <View style={{ paddingHorizontal: 22 }}>
@@ -194,17 +185,8 @@ export default function CalendarTab() {
         </View>
       </View>
 
-      {band && (
-        <View style={s.band}>
-          <Text numberOfLines={1} style={{ flex: 1, fontFamily: F.sans, fontSize: 11.5, color: "#a34d27" }}>
-            {band.label} · {Number(band.date.slice(5, 7))}월 {Number(band.date.slice(8))}일
-            {bandMeal && (bandMeal.kind === "picked" || bandMeal.kind === "day") ? ` · ${bandMeal.record.name}` : ""}
-          </Text>
-          {next && next.key !== band.key && (
-            <Text style={{ fontFamily: F.mono, fontSize: 10, color: "#a34d27" }}>다음 {next.label} · {daysBetween(todayIso(), next.date)}일 뒤</Text>
-          )}
-        </View>
-      )}
+      {/* 연인 기록이면 리캡 자리에 기념일 배너(HANDOFF-recommend §3-2). */}
+      {startedOn && <AnniversaryBanner startedOn={startedOn} picks={picks} rows={rows} />}
 
       {!isCouple && recaps.latest && (
         <RecapCard
@@ -312,7 +294,6 @@ const s = StyleSheet.create({
     ...Platform.select({ ios: { shadowColor: C.ink, shadowOpacity: 0.16, shadowRadius: 16, shadowOffset: { width: 0, height: 12 } }, default: { elevation: 8 } }),
   },
   toggle: { minHeight: 30, borderRadius: 15, paddingHorizontal: 11, flexDirection: "row", alignItems: "center", gap: 6 },
-  band: { marginTop: 10, marginHorizontal: 22, flexDirection: "row", alignItems: "center", gap: 8, borderRadius: 14, backgroundColor: "#f2e0d5", paddingHorizontal: 13, paddingVertical: 9 },
   weekday: { flex: 1, textAlign: "center", fontFamily: F.mono, fontSize: 10, color: C.faint },
   cell: { flex: 1, minWidth: 0, borderRadius: 12, paddingVertical: 5, paddingHorizontal: 1, overflow: "hidden" },
   chip: { borderRadius: 5, paddingHorizontal: 1, paddingVertical: 2, fontFamily: F.sans, fontSize: 9, lineHeight: 12, overflow: "hidden" },

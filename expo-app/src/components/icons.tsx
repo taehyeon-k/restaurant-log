@@ -147,7 +147,7 @@ export const PeopleIcon = ({ size = 21, stroke = "#000", strokeWidth = 1.6 }: P)
   </Svg>
 );
 
-/** 나침반 — 「추천」. */
+/** 나침반 — 하단 「추천」 탭. */
 export const CompassIcon = ({ size = 21, stroke = "#000", strokeWidth = 1.6 }: P) => (
   <Svg {...base(size, stroke, strokeWidth)}>
     <Circle cx="12" cy="12" r="8.5" />
@@ -194,5 +194,13 @@ export const SearchLineIcon = ({ size = 16, stroke = "#4d4842", strokeWidth = 1.
   <Svg {...base(size, stroke, strokeWidth)}>
     <Circle cx="11" cy="11" r="6.5" />
     <Path d="M20 20l-4.2-4.2" />
+  </Svg>
+);
+
+/** 반짝이 — 커뮤니티 「탐색」(HANDOFF-recommend §1-2). */
+export const SparkIcon = ({ size = 21, stroke = "#000", strokeWidth = 1.6 }: P) => (
+  <Svg {...base(size, stroke, strokeWidth)}>
+    <Path d="M12 3.2l1.9 5.4 5.4 1.9-5.4 1.9L12 17.8l-1.9-5.4-5.4-1.9 5.4-1.9z" />
+    <Path d="M18.4 15.6l.7 1.9 1.9.7-1.9.7-.7 1.9-.7-1.9-1.9-.7 1.9-.7z" />
   </Svg>
 );

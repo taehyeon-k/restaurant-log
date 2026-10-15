@@ -25,8 +25,20 @@ const PROVIDER_LABEL: Record<string, string> = { apple: "애플", google: "구�
 const BASE = process.env.EXPO_PUBLIC_API_BASE_URL ?? "";
 const placeKeyOf = (r: Restaurant) => r.place_key ?? `${r.name}|${r.address ?? ""}`.toLowerCase();
 
-/** 내계정 탭 — 프로필·통계·모은 라벨·계정 관리(HANDOFF-auth.md §3.3). */
+/**
+ * 「연인」 탭 — 연인 기록장이면 연인계정(HANDOFF-couple-account §2). 개인 기록에선 탭바에 칸이 없어
+ * 링크로 들어온 때만 여기 오고, 그때는 내계정을 보여줍니다(HANDOFF-recommend §1-2).
+ */
 export default function AccountTab() {
+  const { isCouple } = useActiveBook();
+  return isCouple ? <CoupleAccount /> : <MyAccount />;
+}
+
+/**
+ * 내계정 — 프로필·통계·모은 라벨·계정 관리(HANDOFF-auth.md §3.3). 탭이 아니라 기록장 메뉴의 계정 사진으로
+ * 밀려 들어오는 화면이라 왼쪽 위에 「‹」(HANDOFF-recommend §2). 연인 기록 중에도 내 계정은 이 화면입니다.
+ */
+export function MyAccount() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const qc = useQueryClient();
@@ -40,10 +52,7 @@ export default function AccountTab() {
   const setCharacter = useSetCharacter();
   const setLeaderboardOptIn = useSetLeaderboardOptIn();
   const [error, setError] = useState("");
-  const { isCouple } = useActiveBook();
 
-  // 연인 기록장이면 「연인계정」(HANDOFF-couple-account §2) — 아래 개인 화면은 그대로.
-  if (isCouple) return <CoupleAccount />;
   if (!account) return <View style={{ flex: 1, backgroundColor: C.paper }} />;
 
   const records = rows.filter((r) => !r.pending).length;
@@ -129,7 +138,13 @@ export default function AccountTab() {
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: C.paper }} contentContainerStyle={{ paddingHorizontal: 20, paddingTop: insets.top + 14, paddingBottom: 74 + insets.bottom + 32 }}>
-      <Eyebrow wide>PROFILE</Eyebrow>
+      <View style={{ marginLeft: -12, marginTop: -10, flexDirection: "row", alignItems: "center" }}>
+        {/* 기록장 메뉴가 있는 지도로 돌아갑니다. */}
+        <Pressable onPress={() => router.navigate("/")} accessibilityLabel="뒤로" style={{ width: 44, height: 44, alignItems: "center", justifyContent: "center" }}>
+          <Text style={{ fontSize: 24, lineHeight: 28, color: C.ink }}>‹</Text>
+        </Pressable>
+        <Eyebrow wide>PROFILE</Eyebrow>
+      </View>
 
       <View style={{ marginTop: 16, flexDirection: "row", alignItems: "center", gap: 14 }}>
         <Pressable onPress={pickPhoto} disabled={avatarBusy} accessibilityLabel="프로필 사진 바꾸기" style={{ opacity: avatarBusy ? 0.7 : 1 }}>

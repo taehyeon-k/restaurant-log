@@ -18,7 +18,7 @@ type Filter = "all" | "friends" | "near" | "taste";
 const NEAR_M = 3000;
 const HERO_N = 3;
 
-/** 추천 — 내 기록과 친구 기록으로 고른 「다음에 갈 곳」(핸드오프 §6 · 2b). */
+/** 탐색(하단 「추천」 탭과 겹치지 않게 이름만 바꿈, HANDOFF-recommend §1-3) — 내 기록과 친구 기록으로 고른 「다음에 갈 곳」(핸드오프 §6 · 2b). */
 export default function RecsScreen() {
   const router = useRouter();
   // 위시에 담기 — 연인 기록장이 있으면 내 위시 / 우리 위시를 한 번 묻습니다.
@@ -85,7 +85,7 @@ export default function RecsScreen() {
   async function wish(r: Rec) {
     const who = r.friendIds[0] ? friends.get(r.friendIds[0])?.nickname : null;
     try {
-      const res = await addWish({ name: r.name, where_text: r.address ?? r.region, category: r.category, lat: r.lat, lng: r.lng, source: who ? `${who}의 기록` : "추천" });
+      const res = await addWish({ name: r.name, where_text: r.address ?? r.region, category: r.category, lat: r.lat, lng: r.lng, source: who ? `${who}의 기록` : "탐색" });
       if (res) setSaved((s) => ({ ...s, [r.place]: res }));
     } catch {}
   }
@@ -101,7 +101,7 @@ export default function RecsScreen() {
   const heroW = width - 32;
   const header = (
     <View>
-      <TitleBlock eyebrow="COMMUNITY · FOR YOU" title="추천" sub={`내 기록 ${myCount}건과 친구 기록으로 고릅니다`} />
+      <TitleBlock eyebrow="COMMUNITY · FOR YOU" title="탐색" sub={`내 기록 ${myCount}건과 친구 기록으로 고릅니다`} />
       {searching && (
         <TextInput
           autoFocus

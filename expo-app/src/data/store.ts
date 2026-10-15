@@ -20,10 +20,12 @@ type State = {
   mapSegment: MapSegment; communityTab: CommunityTab;
   /** 이번에 커뮤니티에 들어오기 직전의 last_seen_community_at — 친구 줄의 「새 기록」 테두리 기준. */
   communitySeenSince: string | null;
+  /** 추천 탭에서 칩으로 다시 넣은 종류 — 그 날만 기억합니다(HANDOFF-recommend §4-5). */
+  recExcludeOverride: { date: string; categories: string[] } | null;
 };
 let state: State = {
   kind: "restaurant", markerFilter: "all", ghost: null, spotPick: null,
-  mapSegment: "records", communityTab: "friends", communitySeenSince: null,
+  mapSegment: "records", communityTab: "friends", communitySeenSince: null, recExcludeOverride: null,
 };
 const subs = new Set<() => void>();
 

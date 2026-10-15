@@ -9,3 +9,5 @@ const hasBatchim = (word: string) => {
 export const iGa = (name: string) => `${name}${hasBatchim(name) ? "이" : "가"}`;
 /** 「태현과」 「미나와」 — 이름 뒤 접속 조사. */
 export const waGwa = (name: string) => `${name}${hasBatchim(name) ? "과" : "와"}`;
+/** 「중식을」 「스시를」 — 목적격 조사. */
+export const eulReul = (word: string) => `${word}${hasBatchim(word) ? "을" : "를"}`;

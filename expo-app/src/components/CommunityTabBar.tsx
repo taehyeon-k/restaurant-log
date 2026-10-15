@@ -2,13 +2,13 @@ import { useRouter, type Tabs } from "expo-router";
 import * as Haptics from "expo-haptics";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { BoardIcon, CameraIcon, CompassIcon, PeopleIcon, RankBarsIcon } from "./icons";
+import { BoardIcon, CameraIcon, PeopleIcon, RankBarsIcon, SparkIcon } from "./icons";
 import { setState, type CommunityTab } from "@/data/store";
 import { C, F, TAB_BAR_H } from "@/theme";
 
 const TABS: { name: CommunityTab; label: string; icon: (c: string) => React.ReactNode }[] = [
   { name: "friends", label: "친구", icon: (c) => <PeopleIcon stroke={c} /> },
-  { name: "recs", label: "추천", icon: (c) => <CompassIcon stroke={c} /> },
+  { name: "recs", label: "탐색", icon: (c) => <SparkIcon stroke={c} /> },
   { name: "ranking", label: "랭킹", icon: (c) => <RankBarsIcon stroke={c} /> },
   { name: "board", label: "게시판", icon: (c) => <BoardIcon stroke={c} /> },
 ];
@@ -17,7 +17,7 @@ type TabBarFn = NonNullable<React.ComponentProps<typeof Tabs>["tabBar"]>;
 type BottomTabBarProps = Parameters<TabBarFn>[0];
 
 /**
- * 커뮤니티 탭바(핸드오프 §4) — 메인 TabBar 와 같은 색 · 그림자 · 62px 카메라. 메뉴만 친구 · 추천 · [카메라] · 랭킹 · 게시판.
+ * 커뮤니티 탭바(핸드오프 §4) — 메인 TabBar 와 같은 색 · 그림자 · 62px 카메라. 메뉴만 친구 · 탐색 · [카메라] · 랭킹 · 게시판.
  * 마지막에 본 탭을 저장소에 남겨, 다음에 들어오면 그 탭부터 엽니다.
  */
 export default function CommunityTabBar({ state, navigation }: BottomTabBarProps) {

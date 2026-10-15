@@ -2,8 +2,9 @@ import { useRouter } from "expo-router";
 import { useMemo, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import Svg, { Path } from "react-native-svg";
 import { BookmarkIcon } from "@/components/icons";
-import { Eyebrow, PhotoBox } from "@/components/ui";
+import { PhotoBox } from "@/components/ui";
 import { useActiveBook, useAnniversaryPicks } from "@/data/books";
 import { useRows } from "@/data/queries";
 import MealPickSheet from "@/features/couple/MealPickSheet";
@@ -13,8 +14,26 @@ import {
 import { coverPhoto, dottedDate, type Restaurant } from "@/lib/types";
 import { C, F, TAB_BAR_H } from "@/theme";
 
+/** 「‹ 캘린더」 알약(HANDOFF-recommend §3-1) — 탭바는 그대로라 캘린더 탭으로 돌아갑니다. */
+function BackPill() {
+  const router = useRouter();
+  return (
+    <Pressable
+      onPress={() => router.navigate("/calendar")}
+      accessibilityRole="button"
+      accessibilityLabel="캘린더로 돌아가기"
+      style={{ alignSelf: "flex-start", height: 40, borderRadius: 20, borderWidth: 1, borderColor: "#d8d3c8", backgroundColor: C.card, paddingLeft: 10, paddingRight: 14, flexDirection: "row", alignItems: "center", gap: 4 }}
+    >
+      <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={C.ink} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+        <Path d="M15 5l-7 7 7 7" />
+      </Svg>
+      <Text style={{ fontFamily: F.sansMd, fontSize: 13, color: C.ink }}>캘린더</Text>
+    </Pressable>
+  );
+}
+
 /**
- * 기념일 탭(HANDOFF-couple §3-8, 시안 2d) — 연인 기록일 때 위시리스트 칸에 들어옵니다.
+ * 기념일 화면(HANDOFF-couple §3-8, 시안 2d) — 탭바 칸이 아니라 캘린더 위 배너에서 밀려 들어옵니다(HANDOFF-recommend §3).
  * 다음 기념일 카드 + 지난 기념일 목록(날짜 내림차순). 기념일마다 그날 식사(기본 = 그날 기록)를 보여주고 바꿀 수 있습니다.
  */
 export default function AnniversaryTab() {
@@ -33,8 +52,8 @@ export default function AnniversaryTab() {
   if (!startedOn || !book) {
     return (
       <View style={{ flex: 1, backgroundColor: C.paper, paddingTop: insets.top + 8, paddingHorizontal: 22 }}>
-        <Eyebrow wide>ANNIVERSARY</Eyebrow>
-        <Text style={{ marginTop: 8, fontFamily: F.serif, fontSize: 24, color: C.ink }}>우리의 기념일</Text>
+        <BackPill />
+        <Text style={{ marginTop: 12, fontFamily: F.serif, fontSize: 24, color: C.ink }}>우리의 기념일</Text>
         <Text style={{ marginTop: 10, fontFamily: F.sans, fontSize: 12.5, lineHeight: 20, color: C.faint }}>연인 기록장에서 볼 수 있어요. 지도 ≡ 메뉴에서 연인 기록을 골라 주세요.</Text>
       </View>
     );
@@ -94,8 +113,8 @@ export default function AnniversaryTab() {
   return (
     <View style={{ flex: 1, backgroundColor: C.paper }}>
       <ScrollView contentContainerStyle={{ paddingTop: insets.top + 8, paddingHorizontal: 22, paddingBottom: TAB_BAR_H + insets.bottom + 28 }}>
-        <Eyebrow wide>ANNIVERSARY</Eyebrow>
-        <View style={{ marginTop: 8, flexDirection: "row", alignItems: "baseline", justifyContent: "space-between" }}>
+        <BackPill />
+        <View style={{ marginTop: 12, flexDirection: "row", alignItems: "baseline", justifyContent: "space-between" }}>
           <Text style={{ fontFamily: F.serif, fontSize: 24, color: C.ink }}>우리의 기념일</Text>
           <Text style={{ fontFamily: F.mono, fontSize: 15, color: C.brick }}>D+{dayCount(startedOn, today)}</Text>
         </View>
