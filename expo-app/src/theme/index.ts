@@ -15,7 +15,6 @@ export const C = {
   mapGrid: "#dcd7c9",
   mapRoad: "#f1ede2",
   mapPark: "#dfe4d6",
-  kakao: "#fee500",
   /** 촬영 화면 배경 */
   dark: "#171614",
 } as const;

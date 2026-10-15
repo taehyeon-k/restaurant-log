@@ -21,7 +21,7 @@ import { supabase } from "@/lib/supabase";
 import type { Restaurant } from "@/lib/types";
 import { C, F } from "@/theme";
 
-const PROVIDER_LABEL: Record<string, string> = { kakao: "카카오", google: "구글" };
+const PROVIDER_LABEL: Record<string, string> = { apple: "애플", google: "구글" };
 const BASE = process.env.EXPO_PUBLIC_API_BASE_URL ?? "";
 const placeKeyOf = (r: Restaurant) => r.place_key ?? `${r.name}|${r.address ?? ""}`.toLowerCase();
 

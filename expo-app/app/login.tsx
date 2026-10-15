@@ -1,47 +1,52 @@
+import * as AppleAuthentication from "expo-apple-authentication";
 import * as Linking from "expo-linking";
 import * as WebBrowser from "expo-web-browser";
 import { useLocalSearchParams } from "expo-router";
-import { useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useEffect, useState } from "react";
+import { StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Svg, { Path } from "react-native-svg";
+import { AuthButton } from "@/components/AuthButton";
 import { finishOAuth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
-import { C, F, SHADOW } from "@/theme";
+import { C, F } from "@/theme";
 
 WebBrowser.maybeCompleteAuthSession();
 
-type Provider = "kakao" | "google";
+type Provider = "apple" | "google";
 
-/** 말풍선 마크 — 카카오 로그인 버튼 전용(카카오 브랜드 가이드가 정한 모양). */
-function KakaoIcon() {
-  return (
-    <View style={{ width: 22, height: 20 }}>
-      <View style={{ width: 22, height: 17, borderRadius: 11, backgroundColor: C.ink }} />
-      <View style={{ position: "absolute", left: 5, bottom: 0, width: 0, height: 0, borderLeftWidth: 2, borderRightWidth: 4, borderTopWidth: 6, borderLeftColor: "transparent", borderRightColor: "transparent", borderTopColor: C.ink }} />
-    </View>
-  );
-}
-
-/** 구글 공식 4색 G 마크 — "Google로 시작하기" 버튼 전용(웹 LoginScreen 과 같은 path). */
-function GoogleIcon() {
-  return (
-    <Svg width={18} height={18} viewBox="0 0 18 18">
-      <Path fill="#4285F4" d="M17.64 9.2045c0-.6381-.0573-1.2518-.1636-1.8409H9v3.4814h4.8436c-.2086 1.125-.8427 2.0782-1.7959 2.7164v2.2581h2.9087c1.7018-1.5668 2.6836-3.8741 2.6836-6.615z" />
-      <Path fill="#34A853" d="M9 18c2.43 0 4.4673-.8059 5.9564-2.1805l-2.9087-2.2581c-.8059.54-1.8368.8591-3.0477.8591-2.3441 0-4.3282-1.5831-5.0359-3.7104H.9573v2.3318C2.4382 15.9832 5.4818 18 9 18z" />
-      <Path fill="#FBBC05" d="M3.9641 10.71c-.18-.54-.2822-1.1168-.2822-1.71s.1023-1.17.2822-1.71V4.9582H.9573A8.9965 8.9965 0 000 9c0 1.4523.3477 2.8264.9573 4.0418L3.9641 10.71z" />
-      <Path fill="#EA4335" d="M9 3.5795c1.3214 0 2.5077.4541 3.4405 1.346l2.5814-2.5814C13.4632.8918 11.4259 0 9 0 5.4818 0 2.4382 2.0168.9573 4.9582L3.9641 7.29C4.6718 5.1627 6.6559 3.5795 9 3.5795z" />
-    </Svg>
-  );
-}
-
-/** 카카오·구글 로그인 — 웹의 auth/callback 라우트 대신 dinary://auth 딥링크로 돌아옵니다(핸드오프 §5). */
+/** 애플·구글 로그인 — 웹의 auth/callback 라우트 대신 dinary://auth 딥링크로 돌아옵니다(핸드오프 §5). */
 export default function Login() {
   const insets = useSafeAreaInsets();
   const [busy, setBusy] = useState<Provider | null>(null);
   // /auth 라우트가 실패하면 ?error= 로 돌려보냅니다.
   const { error: routeError } = useLocalSearchParams<{ error?: string }>();
   const [err, setErr] = useState(routeError ?? "");
+  const [appleOk, setAppleOk] = useState(false);
+  useEffect(() => {
+    AppleAuthentication.isAvailableAsync().then(setAppleOk, () => setAppleOk(false));
+  }, []);
+
+  async function loginApple() {
+    setBusy("apple");
+    setErr("");
+    try {
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [AppleAuthentication.AppleAuthenticationScope.FULL_NAME, AppleAuthentication.AppleAuthenticationScope.EMAIL],
+      });
+      if (!credential.identityToken) return setErr("로그인 정보를 받지 못했습니다");
+      const { error } = await supabase.auth.signInWithIdToken({ provider: "apple", token: credential.identityToken });
+      if (error) return setErr(error.message);
+      // 이름은 애플이 첫 로그인 때 한 번만 줍니다 — 받은 즉시 계정에 보관.
+      const n = credential.fullName;
+      const full_name = [n?.familyName, n?.givenName].filter(Boolean).join(" ");
+      if (full_name) await supabase.auth.updateUser({ data: { full_name } });
+    } catch (e) {
+      if ((e as { code?: string })?.code === "ERR_REQUEST_CANCELED") return;
+      setErr(e instanceof Error ? e.message : "로그인하지 못했습니다");
+    } finally {
+      setBusy(null);
+    }
+  }
 
   async function login(provider: Provider) {
     setBusy(provider);
@@ -73,14 +78,8 @@ export default function Login() {
       <View style={{ flex: 1 }} />
       {!!err && <Text style={s.err}>{err}</Text>}
       <View style={{ gap: 11 }}>
-        <Pressable style={[s.btn, s.kakao, SHADOW.card, busy && s.dim]} disabled={busy !== null} onPress={() => login("kakao")}>
-          <KakaoIcon />
-          <Text style={[s.btnText, { color: "#191600" }]}>{busy === "kakao" ? "연결하는 중…" : "카카오로 시작하기"}</Text>
-        </Pressable>
-        <Pressable style={[s.btn, s.google, busy && s.dim]} disabled={busy !== null} onPress={() => login("google")}>
-          <GoogleIcon />
-          <Text style={s.btnText}>{busy === "google" ? "연결하는 중…" : "Google로 시작하기"}</Text>
-        </Pressable>
+        {appleOk && <AuthButton variant="apple" busy={busy === "apple"} disabled={busy !== null} onPress={loginApple} />}
+        <AuthButton variant="google" busy={busy === "google"} disabled={busy !== null} onPress={() => login("google")} />
       </View>
     </View>
   );
@@ -91,9 +90,4 @@ const s = StyleSheet.create({
   logo: { fontFamily: F.serif, fontSize: 34, color: C.ink, letterSpacing: 2 },
   sub: { marginTop: 10, fontFamily: F.sans, fontSize: 13, color: C.muted },
   err: { fontFamily: F.sans, fontSize: 12, color: C.brick, marginBottom: 10, textAlign: "center" },
-  btn: { height: 52, borderRadius: 20, flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 18 },
-  btnText: { flex: 1, fontFamily: F.sansMd, fontSize: 15, color: C.ink },
-  kakao: { backgroundColor: C.kakao },
-  google: { backgroundColor: C.card, borderWidth: 1, borderColor: C.line },
-  dim: { opacity: 0.7 },
 });
