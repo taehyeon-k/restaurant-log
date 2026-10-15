@@ -1,17 +1,15 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
-import { Alert, Dimensions, Image, Platform, Pressable, ScrollView, Text, View } from "react-native";
+import { Alert, Dimensions, Image, Modal, Platform, Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Svg, { Path } from "react-native-svg";
 import { BookmarkIcon, ShareIcon, VerifiedMark } from "@/components/icons";
 import { ShareSheet } from "@/components/ShareSheet";
-import { BackButton, BottomSheetModal, Button, Eyebrow, MobileStars, PhotoBox, Pigs } from "@/components/ui";
+import { BackButton, Button, Eyebrow, MobileStars, PhotoBox, Pigs } from "@/components/ui";
 import { copyToPersonal, PARTNER_COLOR, setActiveBook, useActiveBook, useAnniversaryPicks, useRecordNotes, type BookMember } from "@/data/books";
 import { refreshAll } from "@/data/invalidate";
 import { usePersonalRows, useRows } from "@/data/queries";
 import { Pair } from "@/features/couple/Avatars";
-import { MenuLines } from "@/features/couple/BookDrawer";
 import CoupleNotes from "@/features/couple/CoupleNotes";
 import { dottedWithDay, mealLabels } from "@/lib/anniversary";
 import { iGa } from "@/lib/josa";
@@ -29,16 +27,10 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-const Check = ({ size = 14 }: { size?: number }) => (
-  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    <Path d="M5 12.5l4.5 4.5L19 7.5" stroke={C.brick} strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round" />
-  </Svg>
-);
-
-/** 「내 기록에도 남길까요?」 — 옮기는 것과 옮기지 않는 것을 보여 주고 복사본을 남깁니다(CLAUDE-CODE-couple-copy §2-3). */
-function KeepSheet({
-  visible, record, photoCount, partner, onClose, onDone,
-}: { visible: boolean; record: Restaurant; photoCount: number; partner: BookMember | null; onClose: () => void; onDone: (copyId: number) => void }) {
+/** 「내 기록에도 남기시겠습니까?」 — 가운데 뜨는 창(HANDOFF-copy-to-personal §2), 확인하면 복사본을 남깁니다. */
+function KeepDialog({
+  visible, record, partner, onClose, onDone,
+}: { visible: boolean; record: Restaurant; partner: BookMember | null; onClose: () => void; onDone: (copyId: number) => void }) {
   const qc = useQueryClient();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -57,47 +49,27 @@ function KeepSheet({
     }
   }
 
-  const lines = [
-    photoCount > 0 ? <Text style={{ fontFamily: F.sans, fontSize: 13, color: C.ink }}>사진 {photoCount}장 · 대표 사진</Text> : null,
-    record.verified && record.verified_at ? (
-      <Text style={{ fontFamily: F.sans, fontSize: 13, color: C.ink }}>
-        인증마크 · <Text style={{ fontFamily: F.mono, fontSize: 11.5 }}>{verifiedTime(record.verified_at)}</Text> 인증 시각
-      </Text>
-    ) : null,
-    <Text style={{ fontFamily: F.sans, fontSize: 13, color: C.ink }}>메뉴 · 내 별점과 한 줄</Text>,
-  ].filter(Boolean);
-
+  const close = saving ? () => {} : onClose;
   return (
-    <BottomSheetModal visible={visible} onClose={saving ? () => {} : onClose}>
-      <Text style={{ fontFamily: F.serif, fontSize: 19, color: C.ink }}>내 기록에도 남길까요?</Text>
-      <Text style={{ marginTop: 4, fontFamily: F.mono, fontSize: 11, color: C.faint }}>
-        {[record.name, record.visited_at && dottedWithDay(record.visited_at)].filter(Boolean).join(" · ")}
-      </Text>
-      <View style={{ marginTop: 16, borderRadius: 18, borderWidth: 1, borderColor: C.lineSoft, backgroundColor: C.card, paddingHorizontal: 14, paddingVertical: 4 }}>
-        {lines.map((line, i) => (
-          <View key={i} style={{ minHeight: 44, flexDirection: "row", alignItems: "center", gap: 10, borderTopWidth: i ? 1 : 0, borderTopColor: "#efeae0" }}>
-            <Check />
-            {line}
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={close} statusBarTranslucent>
+      <Pressable onPress={close} style={{ flex: 1, backgroundColor: "rgba(28,26,23,.38)", justifyContent: "center", paddingHorizontal: 36 }}>
+        <Pressable onPress={() => {}} style={{ borderRadius: 22, backgroundColor: C.card, paddingHorizontal: 20, paddingTop: 24, paddingBottom: 18 }}>
+          <Text style={{ textAlign: "center", fontFamily: F.serif, fontSize: 18, fontWeight: "bold", color: C.ink }}>내 기록에도 남기시겠습니까?</Text>
+          <Text style={{ marginTop: 10, textAlign: "center", fontFamily: F.sans, fontSize: 12, lineHeight: 19, color: C.muted }}>
+            사진·인증마크·메뉴·내 별점과 한 줄이 개인 기록에 복사됩니다. {partner?.nickname ?? "상대"}의 한 줄은 옮기지 않아요.
+          </Text>
+          {!!error && <Text style={{ marginTop: 10, textAlign: "center", fontFamily: F.sans, fontSize: 12, color: "#a8412a" }}>{error}</Text>}
+          <View style={{ marginTop: 20, flexDirection: "row", gap: 8 }}>
+            <Pressable onPress={onClose} disabled={saving} style={{ flex: 1, height: 48, borderRadius: 16, borderWidth: 1, borderColor: "#ded8cb", alignItems: "center", justifyContent: "center", opacity: saving ? 0.5 : 1 }}>
+              <Text style={{ fontFamily: F.sans, fontSize: 13.5, color: C.muted }}>취소</Text>
+            </Pressable>
+            <Pressable onPress={save} disabled={saving} style={{ flex: 1, height: 48, borderRadius: 16, backgroundColor: C.ink, alignItems: "center", justifyContent: "center", opacity: saving ? 0.7 : 1 }}>
+              <Text style={{ fontFamily: F.sansMd, fontSize: 13.5, color: C.card }}>{saving ? "남기는 중…" : "내 기록에 추가"}</Text>
+            </Pressable>
           </View>
-        ))}
-        <View style={{ minHeight: 44, flexDirection: "row", alignItems: "center", gap: 10, borderTopWidth: 1, borderTopColor: "#efeae0" }}>
-          <Text style={{ width: 14, textAlign: "center", fontFamily: F.sans, fontSize: 13, color: C.faint }}>–</Text>
-          <Text style={{ flex: 1, fontFamily: F.sans, fontSize: 13, color: C.faint }}>{partner?.nickname ?? "상대"}의 한 줄 · 기념일 라벨은 옮기지 않아요</Text>
-        </View>
-      </View>
-      <Text style={{ marginTop: 12, fontFamily: F.sans, fontSize: 11.5, lineHeight: 18, color: C.faint }}>
-        개인 기록장에 따로 저장돼요. 나중에 한쪽을 고쳐도 다른 쪽은 그대로예요.
-      </Text>
-      {!!error && <Text style={{ marginTop: 12, fontFamily: F.sans, fontSize: 12, color: "#a8412a" }}>{error}</Text>}
-      <View style={{ marginTop: 18, flexDirection: "row", gap: 8 }}>
-        <Pressable onPress={onClose} disabled={saving} style={{ minHeight: 50, borderRadius: 18, borderWidth: 1, borderColor: "#ded8cb", paddingHorizontal: 22, justifyContent: "center", opacity: saving ? 0.5 : 1 }}>
-          <Text style={{ fontFamily: F.sans, fontSize: 13, color: C.muted }}>취소</Text>
         </Pressable>
-        <Pressable onPress={save} disabled={saving} style={{ flex: 1, minHeight: 50, borderRadius: 18, backgroundColor: C.ink, alignItems: "center", justifyContent: "center", opacity: saving ? 0.7 : 1 }}>
-          <Text style={{ fontFamily: F.sansMd, fontSize: 13.5, color: C.card }}>{saving ? "남기는 중…" : "내 기록에 남기기"}</Text>
-        </Pressable>
-      </View>
-    </BottomSheetModal>
+      </Pressable>
+    </Modal>
   );
 }
 
@@ -118,7 +90,7 @@ export default function RecordRoute() {
   const { book, books, isCouple, readOnly, me, partner } = useActiveBook();
   const { data: notes = [] } = useRecordNotes();
   const { data: picks = [] } = useAnniversaryPicks();
-  // 내 기록에도 남기기(CLAUDE-CODE-couple-copy §2) — 개인 기록장에 이미 남긴 복사본이 있는지
+  // 내 기록에도 남기기(HANDOFF-copy-to-personal) — 개인 기록장에 이미 남긴 복사본이 있는지
   const { data: personalRows = [] } = usePersonalRows();
   const [keeping, setKeeping] = useState(false);
   const [keptId, setKeptId] = useState<number | null>(null);
@@ -142,7 +114,8 @@ export default function RecordRoute() {
   const anniversary =
     isCouple && book?.startedOn ? mealLabels(book.startedOn, picks, rows.filter((r) => !r.pending)).get(record.id) ?? null : null;
 
-  const canKeep = isCouple && record.user_id === me?.userId && !record.pending;
+  // 내가 찍어 인증한 기록일 때만, 읽기 전용 기록장이면 숨김(§1)
+  const canKeep = isCouple && !readOnly && record.user_id === me?.userId && record.verified && !record.pending;
   const copy = canKeep ? personalRows.find((r) => r.source_record_id === record.id) ?? null : null;
   const openCopy = (copyId: number) => {
     if (!books?.personal) return;
@@ -152,21 +125,6 @@ export default function RecordRoute() {
   // 개인 기록장에서 본 복사본 — 상대는 연인 기록장 멤버에서 찾고, 없으면 빈 원
   const copiedFrom = book?.kind === "personal" && !!record.copied_at;
   const copyPartner = copiedFrom ? books?.couple?.members.find((m) => m.userId !== me?.userId) ?? null : null;
-
-  const keepRow = !canKeep ? null : copy ? (
-    <Pressable onPress={() => openCopy(copy.id)} style={{ minHeight: 50, borderRadius: 18, borderWidth: 1, borderColor: "#e0c3b1", backgroundColor: C.brickSoft, paddingHorizontal: 16, flexDirection: "row", alignItems: "center", gap: 10 }}>
-      <Check />
-      <Text style={{ flex: 1, fontFamily: F.sans, fontSize: 13, color: "#a34d27" }}>내 기록에도 있어요</Text>
-      <Text style={{ fontFamily: F.sans, fontSize: 12, color: C.brick }}>보기 ›</Text>
-    </Pressable>
-  ) : (
-    <Pressable onPress={() => setKeeping(true)} style={{ minHeight: 50, borderRadius: 18, borderWidth: 1.5, borderColor: C.ink, backgroundColor: C.card, flexDirection: "row", gap: 8, alignItems: "center", justifyContent: "center" }}>
-      <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: "#efe9dc", alignItems: "center", justifyContent: "center" }}>
-        <MenuLines size={11} />
-      </View>
-      <Text style={{ fontFamily: F.sansMd, fontSize: 13.5, color: C.ink }}>내 기록에도 남기기</Text>
-    </Pressable>
-  );
 
   const idx = shown ?? cover;
   const current = photos[idx] ?? null;
@@ -311,7 +269,10 @@ export default function RecordRoute() {
               )}
             </Field>
             {isCouple ? (
-              <CoupleNotes record={record} notes={notes} me={me} partner={partner} readOnly={readOnly} />
+              <CoupleNotes
+                record={record} notes={notes} me={me} partner={partner} readOnly={readOnly}
+                keep={canKeep ? { kept: !!copy, onPress: () => (copy ? openCopy(copy.id) : setKeeping(true)) } : null}
+              />
             ) : (
               <Field label="메모">
                 <Text style={{ fontFamily: F.serif, fontSize: 16, lineHeight: 31, color: "#2e2a25" }}>{record.review || "메모가 비어 있습니다."}</Text>
@@ -358,7 +319,6 @@ export default function RecordRoute() {
               <BookmarkIcon size={14} fill={C.brick} stroke={C.brick} />
               <Text style={{ fontFamily: F.sans, fontSize: 13.5, color: C.ink }}>또 갈 예정으로 담기</Text>
             </Pressable>
-            {keepRow}
             {canEdit && <View style={{ flexDirection: "row", gap: 8 }}>
               <Button style={{ flex: 1, borderColor: "#e4dfd3" }} kind="line" label="기록 수정" onPress={() => router.push({ pathname: "/record/edit", params: { id: String(record.id) } })} />
               <Pressable onPress={remove} disabled={busy} style={{ minHeight: 50, borderRadius: 18, borderWidth: 1, borderColor: "#e4dfd3", paddingHorizontal: 18, justifyContent: "center", opacity: busy ? 0.5 : 1 }}>
@@ -366,7 +326,6 @@ export default function RecordRoute() {
               </Pressable>
             </View>}
           </View>}
-          {readOnly && keepRow && <View style={{ marginTop: 20 }}>{keepRow}</View>}
         </View>
       </ScrollView>
       <View style={{ position: "absolute", left: 16, top: insets.top + 8, backgroundColor: "rgba(251,250,246,.92)", borderRadius: 22 }}>
@@ -388,10 +347,9 @@ export default function RecordRoute() {
         </>
       )}
       {canKeep && (
-        <KeepSheet
+        <KeepDialog
           visible={keeping}
           record={record}
-          photoCount={photos.length}
           partner={partner}
           onClose={() => setKeeping(false)}
           onDone={(copyId) => { setKeeping(false); setKeptId(copyId); }}

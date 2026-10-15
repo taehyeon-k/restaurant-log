@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
+import Svg, { Path } from "react-native-svg";
 import { Button, BottomSheetModal, Eyebrow, fieldStyle, MobileStars } from "@/components/ui";
 import { ME_COLOR, PARTNER_COLOR, useSaveNote, type BookMember, type RecordNote } from "@/data/books";
 import type { Restaurant } from "@/lib/types";
@@ -17,13 +18,41 @@ export function lineOf(record: Restaurant, notes: RecordNote[], userId: string |
   return null;
 }
 
+/** 「내 기록에도 남기기」 마커(HANDOFF-copy-to-personal §1·§3) — 28 원, 남기기 전 ↓ 테두리 · 남긴 뒤 채운 ✓. */
+function KeepMarker({ kept, onPress }: { kept: boolean; onPress: () => void }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      hitSlop={8}
+      accessibilityLabel={kept ? "개인 기록의 복사본 보기" : "내 기록에도 남기기"}
+      style={{
+        width: 28, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center",
+        ...(kept ? { backgroundColor: C.brick } : { borderWidth: 1, borderColor: "#e0c3b1" }),
+      }}
+    >
+      {kept ? (
+        <Svg width={13} height={13} viewBox="0 0 24 24" fill="none">
+          <Path d="M5 12.5l4.5 4.5L19 7.5" stroke={C.card} strokeWidth={2.8} strokeLinecap="round" strokeLinejoin="round" />
+        </Svg>
+      ) : (
+        <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+          <Path d="M12 4v10 M7.5 9.5L12 14l4.5-4.5 M5 19h14" stroke={C.brick} strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" />
+        </Svg>
+      )}
+    </Pressable>
+  );
+}
+
 /**
  * 함께 쓴 기록의 사람별 카드 두 장(HANDOFF-couple §3-6, 시안 2c) — 아바타·이름·★별점·한 줄.
- * 내 카드만 고칠 수 있고, 상대가 아직 안 썼으면 빈 카드.
+ * 내 카드만 고칠 수 있고, 상대가 아직 안 썼으면 빈 카드. keep 이 있으면 내 카드 머리 줄에 ↓ 마커.
  */
 export default function CoupleNotes({
-  record, notes, me, partner, readOnly,
-}: { record: Restaurant; notes: RecordNote[]; me: BookMember | null; partner: BookMember | null; readOnly: boolean }) {
+  record, notes, me, partner, readOnly, keep,
+}: {
+  record: Restaurant; notes: RecordNote[]; me: BookMember | null; partner: BookMember | null; readOnly: boolean;
+  keep?: { kept: boolean; onPress: () => void } | null;
+}) {
   const [editing, setEditing] = useState(false);
   const mine = lineOf(record, notes, me?.userId);
   const theirs = lineOf(record, notes, partner?.userId);
@@ -50,7 +79,12 @@ export default function CoupleNotes({
               <Text style={{ fontFamily: F.mono, fontSize: 10.5, color: C.muted }}>{line.rating.toFixed(1)}</Text>
             </View>
           )}
-          {canEdit && <Text style={{ marginLeft: "auto", fontFamily: F.sans, fontSize: 11.5, color: C.brick }}>{line ? "고치기" : "쓰기"}</Text>}
+          {(canEdit || (isMe && keep)) && (
+            <View style={{ marginLeft: "auto", flexDirection: "row", alignItems: "center", gap: 12 }}>
+              {isMe && keep && <KeepMarker kept={keep.kept} onPress={keep.onPress} />}
+              {canEdit && <Text style={{ fontFamily: F.sans, fontSize: 11.5, color: C.brick }}>{line ? "수정" : "쓰기"}</Text>}
+            </View>
+          )}
         </View>
         <Text style={{ fontFamily: line?.note ? F.serif : F.sans, fontSize: line?.note ? 14.5 : 12, lineHeight: line?.note ? 25 : 19, color: line?.note ? "#2e2a25" : C.faint }}>
           {line?.note || (line ? "별점만 남겼어요" : isMe ? "아직 한 줄을 쓰지 않았어요" : `${name}의 한 줄을 기다리는 중`)}
