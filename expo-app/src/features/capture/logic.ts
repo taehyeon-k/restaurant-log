@@ -42,7 +42,7 @@ export function formatDistance(m: number) {
   return `${km % 1 === 0 ? km.toFixed(0) : km.toFixed(1)}km`;
 }
 
-export function metersBetween(a: Geo, lat: number, lng: number) {
+export function metersBetween(a: Pick<Geo, "lat" | "lng">, lat: number, lng: number) {
   const R = 6371000;
   const rad = (n: number) => (n * Math.PI) / 180;
   const dLat = rad(lat - a.lat);

@@ -2,11 +2,11 @@ import { useQuery, type QueryClient } from "@tanstack/react-query";
 import { refreshAll } from "@/data/invalidate";
 import { DEFAULT_CHARACTER, isCharacterId, type CharacterId } from "@/lib/characters";
 import { supabase } from "@/lib/supabase";
-import { matchWish, type Kind, type Wish } from "@/lib/types";
+import { coverPhoto, matchWish, type Kind, type Wish } from "@/lib/types";
 
 /**
  * 커뮤니티 데이터 — supabase/migrations/20261015000100_community.sql 의 표 · 뷰 · 함수를 읽습니다.
- * 남의 기록은 restaurants 가 아니라 shared_records / board_feed / board_answer_rows 뷰로만 옵니다.
+ * 남의 기록은 restaurants 가 아니라 friend_feed / shared_records / board_feed / board_answer_rows 뷰로만 옵니다.
  */
 
 export type PublicProfile = {
@@ -146,6 +146,93 @@ export const useSharedRecords = () =>
     },
   });
 
+/* ───────────── 친구 소식(직접 올리기 · HANDOFF-friend-posts) ───────────── */
+
+export type Audience = "friends" | "close";
+
+/** friend_feed 한 줄 — 내가 고른 기록 + 보여도 되는 칸. 기록의 메모(review)는 오지 않습니다. */
+export type FriendPost = {
+  id: number;
+  user_id: string;
+  record_id: number;
+  photo_index: number[];
+  note: string | null;
+  audience: Audience;
+  created_at: string;
+  updated_at: string;
+  name: string;
+  category: string | null;
+  region: string | null;
+  address: string | null;
+  rating: number | null;
+  verified_at: string | null;
+  photo_urls: string[];
+  cover_index: number;
+  photo_url: string | null;
+  lat: number | null;
+  lng: number | null;
+  place: string;
+};
+
+/** 소식에 보일 사진 — 고른 순서대로, 고른 게 없으면 대표 사진 한 장. */
+export function postPhotos(p: Pick<FriendPost, "photo_index" | "photo_urls" | "cover_index" | "photo_url">): string[] {
+  const picked = (p.photo_index ?? []).map((i) => p.photo_urls?.[i]).filter((u): u is string => !!u);
+  if (picked.length) return picked;
+  const cover = coverPhoto(p);
+  return cover ? [cover] : [];
+}
+
+export const useFriendFeed = () =>
+  useQuery({
+    queryKey: ["community", "feed"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("friend_feed").select("*").order("created_at", { ascending: false }).limit(400);
+      return soft("friend_feed 조회", error, (data ?? []) as FriendPost[]);
+    },
+  });
+
+export type PostInput = { recordId: number; photoIndex: number[]; note: string; audience: Audience };
+
+/** 올리기 · 고치기 — 같은 기록이면 새 소식이 아니라 고치기입니다(unique user_id, record_id). */
+export async function upsertFriendPost(qc: QueryClient, p: PostInput): Promise<number> {
+  const { data, error } = await supabase.rpc("upsert_friend_post", {
+    p_record_id: p.recordId, p_photo_index: p.photoIndex, p_note: stripContact(p.note).trim() || null, p_audience: p.audience,
+  });
+  if (error) throw new Error(boardError(error.message));
+  await qc.invalidateQueries({ queryKey: ["community", "feed"] });
+  return Number(data);
+}
+
+/** 소식에서 내리기 — 기록(restaurants)은 그대로입니다. */
+export async function removeFriendPost(qc: QueryClient, id: number) {
+  const { error } = await supabase.from("friend_posts").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+  await qc.invalidateQueries({ queryKey: ["community", "feed"] });
+}
+
+/** 내가 고른 친한 친구 id. */
+export const useCloseFriends = () =>
+  useQuery({
+    queryKey: ["community", "close"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("close_friends").select("friend_id");
+      return soft("close_friends 조회", error, ((data ?? []) as { friend_id: string }[]).map((r) => r.friend_id));
+    },
+  });
+
+/** 친한 친구를 통째로 바꿉니다. */
+export async function setCloseFriends(qc: QueryClient, ids: string[]) {
+  const me = await myId();
+  if (!me) return;
+  const { error: delErr } = await supabase.from("close_friends").delete().eq("user_id", me);
+  if (delErr) throw new Error(delErr.message);
+  if (ids.length) {
+    const { error } = await supabase.from("close_friends").insert(ids.map((friend_id) => ({ user_id: me, friend_id })));
+    if (error) throw new Error(error.message);
+  }
+  await qc.invalidateQueries({ queryKey: ["community", "close"] });
+}
+
 /** 공감 · 댓글 수와 내가 공감했는지. */
 export const useRecordSocial = (ids: number[]) =>
   useQuery({
@@ -201,7 +288,7 @@ export async function addComment(qc: QueryClient, recordId: number, body: string
   await qc.invalidateQueries({ queryKey: ["community", "social"] });
 }
 
-/** 탭바 커뮤니티 점 — 마지막으로 본 뒤 친구가 공유한 기록 수. */
+/** 탭바 커뮤니티 점 — 마지막으로 본 뒤 친구가 올린 소식 수(friend_feed). */
 export const useCommunityUnseen = (enabled = true) =>
   useQuery({
     queryKey: ["community", "unseen"],
