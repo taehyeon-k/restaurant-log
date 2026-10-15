@@ -51,7 +51,6 @@ const FILTERS: { id: MarkerFilter; label: string }[] = [
 /** 지도 콘텐츠 패딩(아래) — 카메라 중심을 시트 위로 올려둡니다. */
 const MAP_PAD_BOTTOM = 320;
 /** 웹 MobileShell 과 같은 네 단계 — peek 96 · 35% · 75% · full(화면 − 84). 처음엔 75% 로 엽니다. */
-const SHEET_START = 2;
 /** 시트가 이보다 낮으면 머리를 한 줄(맛집 기록 · 가게 N · 기록 M)로 줄입니다 — 웹 COMPACT_BELOW. */
 const COMPACT_BELOW = 200;
 /** 지도 위 단추들이 시트 윗변에서 띄우는 간격. 마커 필터는 웹(14)보다 24 높게 — 왼쪽 아래 네이버 로고를 가리면 약관 위반입니다. */
@@ -105,15 +104,25 @@ export default function MapTab() {
   const lastFit = useRef("");
   const holdFit = useRef(false);
 
-  // 네이버 로고는 콘텐츠 패딩 안쪽 귀퉁이에 놓여서, 그대로 두면 바닥에서 MAP_PAD_BOTTOM 만큼 뜬 「왼쪽 중간」에 보입니다.
-  // 시트 윗변 바로 위(= 보이는 지도의 왼쪽 아래 귀퉁이)에 붙여, 시트를 끄는 동안에도 같이 오르내리게 합니다. 로고를 가리면 약관 위반입니다.
+  // 네이버 로고는 왼쪽 위 귀퉁이(콘텐츠 패딩 top = insets.top+62, 검색줄 바로 아래)에 고정합니다. 음수 margin 은 영역 밖이라 로고가 사라집니다. 로고를 가리면 약관 위반입니다.
   const screenH = useSharedValue(0);
   const sheetTop = useSharedValue(0); // 시트 윗변의 y — BottomSheet 가 매 프레임 채웁니다.
-  const logoBottom = useDerivedValue(() => (screenH.value && sheetTop.value ? screenH.value - sheetTop.value + 6 - MAP_PAD_BOTTOM : null));
 
   const [layoutH, setLayoutH] = useState(0);
-  const sheetSnaps = useMemo(() => [96, "35%", "75%", Math.max(260, (layoutH || windowH) - 84)], [layoutH, windowH]);
-  const sheetIndex = useRef(SHEET_START);
+  // 시트는 아무 높이에서나 멈추게: 최소~최대 사이를 6px 간격으로 촘촘히 깔아, 손을 뗀 자리 가장 가까운 곳에 섭니다.
+  const sheetSnaps = useMemo(() => {
+    const H = layoutH || windowH;
+    const max = Math.max(260, H - 84);
+    const pts: number[] = [];
+    for (let y = 96; y < max; y += 6) pts.push(y);
+    pts.push(max);
+    return pts;
+  }, [layoutH, windowH]);
+  const sheetStartIndex = useMemo(() => {
+    const target = (layoutH || windowH) * 0.75;
+    return sheetSnaps.reduce((best, y, i) => (Math.abs(y - target) < Math.abs(sheetSnaps[best] - target) ? i : best), 0);
+  }, [sheetSnaps, layoutH, windowH]);
+  const sheetIndex = useRef(sheetStartIndex);
 
   // 지도 위 단추들은 시트 윗변을 따라 오르내립니다. 검색줄 위로는 올라가지 않습니다.
   const minTop = insets.top + 8 + 46 + 12;
@@ -256,7 +265,7 @@ export default function MapTab() {
     holdFit.current = true;
     setViewBounds(regionRef.current);
     setMapMoved(false);
-    if (sheetIndex.current === 0) sheetRef.current?.snapToIndex(1);
+    if (sheetIndex.current <= 3) sheetRef.current?.snapToPosition("35%");
   };
 
   const clearAll = () => { setCategories([]); setKeywords([]); setRevisitOnly(false); setVerifiedOnly(false); setViewBounds(null); };
@@ -292,7 +301,7 @@ export default function MapTab() {
   /** 누른 자리를 검색줄 아래 ~ 시트 위의 빈 곳 가운데에 둡니다. 카메라 중심(mapPadding 기준)에서 그만큼 남쪽을 봅니다. */
   const showAboveSheet = useCallback((lat: number, lng: number, z: number) => {
     const h = layoutH || windowH;
-    const centerY = (insets.top + 130 + h - MAP_PAD_BOTTOM) / 2;
+    const centerY = (insets.top + 62 + h - MAP_PAD_BOTTOM) / 2;
     const wantY = (insets.top + 62 + h - placesSheetH) / 2;
     const metersPerDp = (156543.03392 * Math.cos((lat * Math.PI) / 180)) / 2 ** z;
     const dLat = ((centerY - wantY) * metersPerDp) / 111320;
@@ -499,9 +508,9 @@ export default function MapTab() {
       <PaperMap
         ref={mapRef}
         initialCamera={{ latitude: 37.5605, longitude: 126.982, zoom: 12 }}
-        mapPadding={{ top: insets.top + 130, bottom: MAP_PAD_BOTTOM, left: 20, right: 20 }}
-        logoAlign="BottomLeft"
-        logoBottom={logoBottom}
+        mapPadding={{ top: insets.top + 62, bottom: MAP_PAD_BOTTOM, left: 20, right: 20 }}
+        logoAlign="TopLeft"
+        logoMargin={{ top: 20, left: 6, right: 0, bottom: 0 }}
         onCameraChanged={(e) => { if (e.reason === "Gesture") setMapMoved(true); }}
         onTapMap={(e) => onMapTap(e.latitude, e.longitude)}
         onCameraIdle={(e) => {
@@ -626,7 +635,7 @@ export default function MapTab() {
 
       <BottomSheet
         ref={sheetRef}
-        index={SHEET_START}
+        index={sheetStartIndex}
         snapPoints={sheetSnaps}
         backgroundStyle={[{ backgroundColor: C.paper, borderTopLeftRadius: 28, borderTopRightRadius: 28 }, SHADOW_SHEET]}
         handleIndicatorStyle={{ width: 42, height: 4, borderRadius: 2, backgroundColor: "#cfc8ba" }}
