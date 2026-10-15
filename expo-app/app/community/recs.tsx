@@ -1,4 +1,3 @@
-import { useQueryClient } from "@tanstack/react-query";
 import * as Haptics from "expo-haptics";
 import * as Location from "expo-location";
 import { useRouter } from "expo-router";
@@ -9,7 +8,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BookmarkIcon, SearchLineIcon } from "@/components/icons";
 import { useRows, useWishes } from "@/data/queries";
 import { setState } from "@/data/store";
-import { addWishFrom, useFriends, useSharedRecords } from "@/features/community/api";
+import { useFriends, useSharedRecords } from "@/features/community/api";
+import { useAddWish } from "@/features/community/useAddWish";
 import { buildRecs, km, useDislikes, weekIndex, type Rec } from "@/features/community/recs";
 import { CommunityHeader, FilterChips, K, metaLine, PhotoOrStripes, RoundButton, shortAddr, TitleBlock } from "@/features/community/ui";
 import { C, F, TAB_BAR_H } from "@/theme";
@@ -21,7 +21,8 @@ const HERO_N = 3;
 /** 추천 — 내 기록과 친구 기록으로 고른 「다음에 갈 곳」(핸드오프 §6 · 2b). */
 export default function RecsScreen() {
   const router = useRouter();
-  const qc = useQueryClient();
+  // 위시에 담기 — 연인 기록장이 있으면 내 위시 / 우리 위시를 한 번 묻습니다.
+  const { add: addWish, sheet: wishSheet } = useAddWish();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const { data: mine = [] } = useRows();
@@ -84,9 +85,8 @@ export default function RecsScreen() {
   async function wish(r: Rec) {
     const who = r.friendIds[0] ? friends.get(r.friendIds[0])?.nickname : null;
     try {
-      const res = await addWishFrom(qc, { name: r.name, where_text: r.address ?? r.region, category: r.category, lat: r.lat, lng: r.lng, source: who ? `${who}의 기록` : "추천" });
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      setSaved((s) => ({ ...s, [r.place]: res }));
+      const res = await addWish({ name: r.name, where_text: r.address ?? r.region, category: r.category, lat: r.lat, lng: r.lng, source: who ? `${who}의 기록` : "추천" });
+      if (res) setSaved((s) => ({ ...s, [r.place]: res }));
     } catch {}
   }
 
@@ -191,6 +191,7 @@ export default function RecsScreen() {
           </ReanimatedSwipeable>
         )}
       />
+      {wishSheet}
     </View>
   );
 }

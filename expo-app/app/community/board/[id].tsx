@@ -6,7 +6,8 @@ import { Alert, FlatList, Pressable, Text, TextInput, View } from "react-native"
 import { BottomSheetModal } from "@/components/ui";
 import { useAccount } from "@/data/profile";
 import { useRows } from "@/data/queries";
-import { addWishFrom, answerPost, blockUser, report, useAnswers, useBoardPost, useCurrentTheme, type AnswerGroup, type BoardPost } from "@/features/community/api";
+import { answerPost, blockUser, report, useAnswers, useBoardPost, useCurrentTheme, type AnswerGroup, type BoardPost } from "@/features/community/api";
+import { useAddWish } from "@/features/community/useAddWish";
 import { askTitle, AuthorRow, Cond, myVerifiedAt, PostBody, TYPE_LABEL } from "@/features/community/BoardPost";
 import { CommunityHeader, K, metaLine, Pill, shortAddr, TagChip, timeAgo } from "@/features/community/ui";
 import type { Restaurant } from "@/lib/types";
@@ -127,6 +128,7 @@ function AnswerCard({ group, post, rows }: { group: AnswerGroup; post: BoardPost
   const already = group.answers.some((x) => x.author_id === account?.userId);
   const [wish, setWish] = useState<"idle" | "added" | "exists">("idle");
   const [busy, setBusy] = useState(false);
+  const { add: addWish, sheet: wishSheet } = useAddWish();
 
   async function metoo() {
     if (!mine || busy) return;
@@ -155,7 +157,10 @@ function AnswerCard({ group, post, rows }: { group: AnswerGroup; post: BoardPost
       <View style={{ flexDirection: "row", gap: 6 }}>
         <Pressable
           disabled={wish !== "idle"}
-          onPress={async () => setWish(await addWishFrom(qc, { name: a.place_name, where_text: a.address, category: a.category, lat: a.lat, lng: a.lng, source: `${a.nickname ?? "게시판"}의 기록` }))}
+          onPress={async () => {
+            const res = await addWish({ name: a.place_name, where_text: a.address, category: a.category, lat: a.lat, lng: a.lng, source: `${a.nickname ?? "게시판"}의 기록` }).catch(() => null);
+            if (res) setWish(res);
+          }}
           style={{ minHeight: 28, borderRadius: 14, borderWidth: 1, borderColor: K.brickLine, paddingHorizontal: 10, justifyContent: "center", backgroundColor: wish === "idle" ? "transparent" : C.brickSoft }}
         >
           <Text style={{ fontFamily: F.sans, fontSize: 11, color: C.brick }}>{wish === "added" ? "✓ 위시에 담음" : wish === "exists" ? "이미 담아둔 곳" : "+ 위시에 담기"}</Text>
@@ -169,6 +174,7 @@ function AnswerCard({ group, post, rows }: { group: AnswerGroup; post: BoardPost
           <Text style={{ fontFamily: F.sans, fontSize: 11, color: C.muted }}>나도 이 집</Text>
         </Pressable>
       </View>
+      {wishSheet}
     </View>
   );
 }

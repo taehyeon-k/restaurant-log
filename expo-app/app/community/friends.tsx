@@ -1,10 +1,9 @@
-import { NaverMapMarkerOverlay } from "@mj-studio/react-native-naver-map";
 import { useQueryClient } from "@tanstack/react-query";
 import * as Haptics from "expo-haptics";
 import * as Location from "expo-location";
 import { useRouter } from "expo-router";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
-import { FlatList, Image, Platform, Pressable, ScrollView, Text, View, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native";
+import { FlatList, Image, Pressable, ScrollView, Text, View, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AddPersonIcon, BellLineIcon, BookmarkIcon } from "@/components/icons";
 import { PaperMap } from "@/components/PaperMap";
@@ -13,17 +12,20 @@ import { useAccount } from "@/data/profile";
 import { useWishes } from "@/data/queries";
 import { useAppState } from "@/data/store";
 import {
-  addWishFrom, postPhotos, removeFriendPost, toggleCheer, upsertFriendPost, useCloseFriends, useFriendFeed, useFriends, useRecordSocial,
-  type FriendPost, type PublicProfile,
+  postPhotos, removeFriendPost, toggleCheer, upsertFriendPost, useCloseFriends, useFriendFeed, useFriends, useRecordSocial,
+  type FriendPost, type WishSeed,
 } from "@/features/community/api";
 import CommentsSheet from "@/features/community/Comments";
 import PostSheet from "@/features/community/PostSheet";
+import { useAddWish, type WishResult } from "@/features/community/useAddWish";
 import { Avatar, CommunityHeader, K, metaLine, monthDay, PhotoOrStripes, RoundButton, Segmented, shortAddr, timeAgo, TitleBlock, VerifiedChip } from "@/features/community/ui";
 import { formatDistance, metersBetween } from "@/features/capture/logic";
+import { FriendMarker, friendPinSize } from "@/features/map/Markers";
 import { matchWish, type Wish } from "@/lib/types";
 import { C, F, SHADOW, TAB_BAR_H } from "@/theme";
 
 type View_ = "feed" | "map";
+type OnWish = (seed: WishSeed) => Promise<WishResult | null>;
 type Who = { id: string; nickname: string; avatarUrl: string | null };
 
 /**
@@ -47,6 +49,8 @@ export default function FriendsScreen() {
   const [removed, setRemoved] = useState<FriendPost | null>(null);
   const [scrollTo, setScrollTo] = useState<number | null>(null);
   const listRef = useRef<FlatList<FriendPost>>(null);
+  // 위시에 담기 — 연인 기록장이 있으면 내 위시 / 우리 위시를 한 번 묻습니다.
+  const { add: addWish, sheet: wishSheet } = useAddWish();
 
   const me = account?.userId ?? fr?.me ?? null;
   const friends = fr?.friends ?? [];
@@ -154,6 +158,7 @@ export default function FriendsScreen() {
 
   const sheets = (
     <>
+      {wishSheet}
       <PostSheet
         visible={!!posting}
         startRecordId={posting?.recordId ?? null}
@@ -199,6 +204,7 @@ export default function FriendsScreen() {
         <FriendMap
           posts={feed.filter((p) => p.user_id !== me)}
           people={people}
+          onWish={addWish}
           onShowInFeed={(p) => { setOnly(p.user_id); setView("feed"); setScrollTo(p.id); }}
         />
         {sheets}
@@ -219,6 +225,7 @@ export default function FriendsScreen() {
         empty={<Empty hasFriends={friends.length > 0} />}
         onComments={setCommentsFor}
         onMenu={setMenuFor}
+        onWish={addWish}
         bottom={TAB_BAR_H + insets.bottom + 24}
       />
       <CommentsSheet recordId={commentsFor} onClose={() => setCommentsFor(null)} />
@@ -268,10 +275,10 @@ function Empty({ hasFriends }: { hasFriends: boolean }) {
   );
 }
 
-function FlatListFeed({ listRef, posts, people, me, closeCount, header, empty, onComments, onMenu, bottom }: {
+function FlatListFeed({ listRef, posts, people, me, closeCount, header, empty, onComments, onMenu, onWish, bottom }: {
   listRef: React.RefObject<FlatList<FriendPost> | null>;
   posts: FriendPost[]; people: Map<string, Who>; me: string | null; closeCount: number;
-  header: React.ReactElement; empty: React.ReactElement; onComments: (recordId: number) => void; onMenu: (p: FriendPost) => void; bottom: number;
+  header: React.ReactElement; empty: React.ReactElement; onComments: (recordId: number) => void; onMenu: (p: FriendPost) => void; onWish: OnWish; bottom: number;
 }) {
   const { data: social } = useRecordSocial(posts.map((p) => p.record_id));
   return (
@@ -294,6 +301,7 @@ function FlatListFeed({ listRef, posts, people, me, closeCount, header, empty, o
             social={social?.get(item.record_id)}
             onComments={() => onComments(item.record_id)}
             onMenu={() => onMenu(item)}
+            onWish={onWish}
           />
         </View>
       )}
@@ -322,8 +330,8 @@ function PhotoPager({ urls, height }: { urls: string[]; height: number }) {
 }
 
 /** 소식 카드 — 고른 사진 · 한 줄. 내 카드는 먹색 테두리 + 받는 사람 칩 + ··· 메뉴, 위시 버튼 없음. */
-const FeedCard = memo(function FeedCard({ p, who, mine, closeCount, social, onComments, onMenu }: {
-  p: FriendPost; who?: Who; mine: boolean; closeCount: number; social?: { cheers: number; mine: boolean; comments: number }; onComments: () => void; onMenu: () => void;
+const FeedCard = memo(function FeedCard({ p, who, mine, closeCount, social, onComments, onMenu, onWish }: {
+  p: FriendPost; who?: Who; mine: boolean; closeCount: number; social?: { cheers: number; mine: boolean; comments: number }; onComments: () => void; onMenu: () => void; onWish: OnWish;
 }) {
   const qc = useQueryClient();
   const [wish, setWish] = useState<"idle" | "added" | "exists">("idle");
@@ -332,8 +340,8 @@ const FeedCard = memo(function FeedCard({ p, who, mine, closeCount, social, onCo
 
   async function addWish() {
     try {
-      setWish(await addWishFrom(qc, { name: p.name, where_text: p.address ?? p.region, category: p.category, lat: p.lat, lng: p.lng, source: `${name}의 소식` }));
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      const res = await onWish({ name: p.name, where_text: p.address ?? p.region, category: p.category, lat: p.lat, lng: p.lng, source: `${name}의 소식` });
+      if (res) setWish(res);
     } catch {
       setWish("idle");
     }
@@ -405,6 +413,8 @@ type MapFilter = "all" | "week" | "nowish";
 
 const DAY = 86400000;
 const STALE_DAYS = 30;
+/** 이 줌부터 핀 위에 이름표를 붙입니다. */
+const LABEL_ZOOM = 14;
 
 /** 위시에 이미 있는지 — 이름이 같거나 좌표가 60m 안. */
 function wishHas(wishes: Wish[], name: string, lat: number, lng: number) {
@@ -413,14 +423,15 @@ function wishHas(wishes: Wish[], name: string, lat: number, lng: number) {
 }
 
 /** 친구가 소식에 올린 가게만 한 지도에 — 핀은 올린 사람 얼굴. */
-function FriendMap({ posts, people, onShowInFeed }: { posts: FriendPost[]; people: Map<string, Who>; onShowInFeed: (p: FriendPost) => void }) {
-  const qc = useQueryClient();
+function FriendMap({ posts, people, onWish, onShowInFeed }: { posts: FriendPost[]; people: Map<string, Who>; onWish: OnWish; onShowInFeed: (p: FriendPost) => void }) {
   const insets = useSafeAreaInsets();
   const { data: wishes = [] } = useWishes();
   const [filter, setFilter] = useState<MapFilter>("all");
   const [picked, setPicked] = useState<string | null>(null);
   const [wish, setWish] = useState<"idle" | "added" | "exists">("idle");
   const [here, setHere] = useState<{ lat: number; lng: number } | null>(null);
+  // 확대 · 축소에 따라 핀 크기를 바꾸고, 충분히 확대하면 이름표(올린 사람 · 때)를 붙입니다.
+  const [zoom, setZoom] = useState(12.5);
 
   // 위치 권한이 이미 있을 때만 거리를 붙입니다(여기서 권한을 묻지 않음).
   useEffect(() => {
@@ -461,8 +472,8 @@ function FriendMap({ posts, people, onShowInFeed }: { posts: FriendPost[]; peopl
   async function addWish(s: Spot) {
     const top = s.posts[0];
     try {
-      setWish(await addWishFrom(qc, { name: s.name, where_text: top.address ?? top.region, category: top.category, lat: s.lat, lng: s.lng, source: `${nameOf(top.user_id)}의 소식` }));
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      const res = await onWish({ name: s.name, where_text: top.address ?? top.region, category: top.category, lat: s.lat, lng: s.lng, source: `${nameOf(top.user_id)}의 소식` });
+      if (res) setWish(res);
     } catch {
       setWish("idle");
     }
@@ -474,15 +485,30 @@ function FriendMap({ posts, people, onShowInFeed }: { posts: FriendPost[]; peopl
         initialCamera={{ latitude: center.lat, longitude: center.lng, zoom: spots.length ? 12.5 : 11 }}
         mapPadding={{ top: 0, bottom: TAB_BAR_H + insets.bottom, left: 20, right: 20 }}
         onTapMap={() => setPicked(null)}
+        onCameraIdle={(e) => { if (e.zoom != null) setZoom(e.zoom); }}
       >
-        {visible.map((s) => (
-          <FacePin
-            key={s.place}
-            spot={s}
-            people={people}
-            onTap={() => { Haptics.selectionAsync(); setWish(s.inWish ? "exists" : "idle"); setPicked(s.place); }}
-          />
-        ))}
+        {visible.map((s) => {
+          const n = s.posts.length;
+          const top = nameOf(s.posts[0].user_id);
+          const stale = Date.now() - Date.parse(s.latest) > STALE_DAYS * DAY;
+          return (
+            <FriendMarker
+              key={s.place}
+              lat={s.lat}
+              lng={s.lng}
+              letter={(top || "?").slice(0, 1)}
+              count={n}
+              size={friendPinSize(zoom) - (stale ? 4 : 0)}
+              stale={stale}
+              inWish={s.inWish}
+              showLabel={zoom >= LABEL_ZOOM || picked === s.place}
+              label={n > 1 ? `${top} 외 ${n - 1}` : top}
+              time={timeAgo(s.latest)}
+              zIndex={picked === s.place ? 1000 : n}
+              onTap={() => { Haptics.selectionAsync(); setWish(s.inWish ? "exists" : "idle"); setPicked(s.place); }}
+            />
+          );
+        })}
       </PaperMap>
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ position: "absolute", top: 12, left: 0, right: 0, flexGrow: 0 }} contentContainerStyle={{ paddingHorizontal: 20, gap: 6 }}>
@@ -552,54 +578,3 @@ function FriendMap({ posts, people, onShowInFeed }: { posts: FriendPost[]; peopl
     </View>
   );
 }
-
-/**
- * 얼굴 핀 — 한 명은 34px 얼굴(벽돌 2.5 + 바깥 흰 2), 여럿은 최근 두 얼굴을 14px 어긋나게 + 먹색 숫자 원.
- * 아래 꼬리표는 가장 최근 올린 사람. 30일 넘으면 흐리고 작게. 위시에 있으면 책갈피 배지.
- * 지도 마커는 그림으로 찍혀 나가서 사진이 늦게 뜨면 빈칸이 되므로, 얼굴은 첫 글자로 그립니다.
- */
-const FacePin = memo(function FacePin({ spot, people, onTap }: { spot: Spot; people: Map<string, Who>; onTap: () => void }) {
-  const stale = Date.now() - Date.parse(spot.latest) > STALE_DAYS * DAY;
-  const face = stale ? 30 : 34;
-  const ring = face + 5 + 4; // 벽돌 2.5 ×2 + 흰 2 ×2
-  const n = spot.posts.length;
-  const top = people.get(spot.posts[0].user_id)?.nickname ?? "친구";
-  const tag = `${n > 1 ? `${top} 외 ${n - 1}` : top} · ${timeAgo(spot.latest)}`;
-  const W = 130;
-  const H = ring + 6 + 20;
-  const facesW = n > 1 ? ring + 14 : ring;
-
-  const Face = ({ id, left }: { id: string; left: number }) => {
-    const who = people.get(id);
-    return (
-      <View style={[{ position: "absolute", left, top: 0, width: ring, height: ring, borderRadius: ring / 2, backgroundColor: C.card, alignItems: "center", justifyContent: "center" },
-        Platform.select({ ios: { shadowColor: C.ink, shadowOpacity: 0.2, shadowRadius: 3, shadowOffset: { width: 0, height: 1 } }, default: { elevation: 3 } })]}>
-        <View style={{ width: face + 5, height: face + 5, borderRadius: (face + 5) / 2, borderWidth: 2.5, borderColor: C.brick, alignItems: "center", justifyContent: "center" }}>
-          <Avatar name={who?.nickname ?? "?"} size={face} seed={id} />
-        </View>
-      </View>
-    );
-  };
-
-  return (
-    <NaverMapMarkerOverlay latitude={spot.lat} longitude={spot.lng} width={W} height={H} anchor={{ x: 0.5, y: ring / 2 / H }} onTap={onTap} zIndex={n}>
-      <View key={`${n}-${stale}-${spot.inWish}-${tag}`} collapsable={false} style={{ width: W, height: H, alignItems: "center", opacity: stale ? 0.6 : 1 }}>
-        <View style={{ width: facesW, height: ring }}>
-          {n > 1 && <Face id={spot.posts[1].user_id} left={14} />}
-          <Face id={spot.posts[0].user_id} left={0} />
-          {n > 1 && (
-            <View style={{ position: "absolute", right: -4, top: -2, width: 18, height: 18, borderRadius: 9, backgroundColor: C.ink, alignItems: "center", justifyContent: "center" }}>
-              <Text style={{ fontFamily: F.mono, fontSize: 10, color: C.card }}>{n}</Text>
-            </View>
-          )}
-          {spot.inWish && (
-            <View style={{ position: "absolute", left: ring - 14, top: ring - 14, width: 16, height: 16, borderRadius: 8, backgroundColor: C.card, alignItems: "center", justifyContent: "center" }}>
-              <BookmarkIcon size={11} fill={C.brick} stroke={C.brick} />
-            </View>
-          )}
-        </View>
-        <Text numberOfLines={1} style={{ marginTop: 6, maxWidth: W, borderRadius: 8, backgroundColor: C.card, paddingHorizontal: 7, paddingVertical: 2, fontFamily: F.sans, fontSize: 10, color: C.ink, overflow: "hidden" }}>{tag}</Text>
-      </View>
-    </NaverMapMarkerOverlay>
-  );
-});

@@ -199,3 +199,64 @@ export const GhostMarker = memo(function GhostMarker(p: Base & { name: string })
     </NaverMapMarkerOverlay>
   );
 });
+
+/** 친구 지도 핀 크기 — 확대할수록 커집니다(줌 11 이하 20px → 16 이상 32px). 짝수로 맞춰 다시 찍는 횟수를 줄입니다. */
+export const friendPinSize = (zoom: number) => Math.round(Math.min(32, Math.max(20, 20 + (zoom - 11) * 2.4)) / 2) * 2;
+
+type FriendProps = Base & {
+  /** 가장 최근에 올린 친구 닉네임 첫 글자 */
+  letter: string;
+  /** 올린 친구 수 — 둘 이상이면 오른쪽 위 먹색 숫자 */
+  count: number;
+  size: number;
+  /** 30일 넘게 새 소식이 없으면 흐리게 */
+  stale: boolean;
+  inWish: boolean;
+  showLabel: boolean;
+  /** 이름표 — 「지민 외 2」 + 「40분 전」 */
+  label: string;
+  time: string;
+};
+
+/**
+ * 친구 지도 핀(HANDOFF-friend-posts §3-4) — 기록 핀과 같은 물방울에, 가운데 점 대신 친구 닉네임 첫 글자.
+ * 이름표는 기록 핀과 같은 말풍선(이름 + 오른쪽 작은 시간). 기준점 = 상자 바닥에서 6px.
+ */
+export const FriendMarker = memo(function FriendMarker(p: FriendProps) {
+  const { size } = p;
+  const sw = size >= 28 ? 2 : 1.5;
+  const center = 8 + size / 2;
+  const labelW = p.showLabel ? tagWidth(p.label) + p.time.length * 8 + 6 : 0;
+  const labelBottom = 8 + size + 12;
+  const w = Math.max(size + 30, labelW);
+  const h = p.showLabel ? labelBottom + tagHeight("none") : size + 17;
+  const font = Math.round(size * 0.46);
+  return (
+    <NaverMapMarkerOverlay latitude={p.lat} longitude={p.lng} width={w} height={h} anchor={anchorAt(h, 6)} onTap={p.onTap} zIndex={p.zIndex ?? p.count}>
+      <View key={markerKey(w, h, size, p.letter, p.count, p.stale, p.inWish, p.showLabel && p.label, p.showLabel && p.time)} collapsable={false} style={{ width: w, height: h, opacity: p.stale ? 0.6 : 1 }}>
+        <GroundShadow w={size >= 28 ? 12 : 9} h={size >= 28 ? 4 : 3} opacity={0.16} />
+        <Svg width={size} height={dropH(size)} style={{ position: "absolute", alignSelf: "center", bottom: center - (size / 2) * Math.SQRT2 }}>
+          <Path d={dropPath(size, sw)} fill={C.brick} stroke={C.card} strokeWidth={sw} />
+        </Svg>
+        <View style={{ position: "absolute", left: 0, right: 0, bottom: center - size / 2, height: size, alignItems: "center", justifyContent: "center" }}>
+          <Text style={[textBase, { fontFamily: F.sansBd, fontSize: font, lineHeight: font + 2, color: C.card }]}>{p.letter}</Text>
+        </View>
+        {p.count > 1 && (
+          <View style={{ position: "absolute", left: w / 2 + size / 2 - 7, bottom: size - 2, minWidth: 16, height: 16, borderRadius: 8, borderWidth: 1.5, borderColor: C.card, backgroundColor: C.ink, paddingHorizontal: 3, alignItems: "center", justifyContent: "center" }}>
+            <Text style={[textBase, { fontFamily: F.mono, fontSize: 9, lineHeight: 11, color: C.card }]}>{p.count}</Text>
+          </View>
+        )}
+        {p.inWish && (
+          <View style={{ position: "absolute", left: w / 2 - size / 2 - 8, bottom: size - 2, width: 15, height: 15, borderRadius: 8, backgroundColor: C.card, alignItems: "center", justifyContent: "center" }}>
+            <Svg width={9} height={9} viewBox="0 0 24 24" fill={C.brick}><Path d={BOOKMARK_PATH} /></Svg>
+          </View>
+        )}
+        {p.showLabel && (
+          <View style={{ position: "absolute", left: 0, right: 0, bottom: labelBottom, alignItems: "center" }}>
+            <Tag name={p.label} badge={p.time} />
+          </View>
+        )}
+      </View>
+    </NaverMapMarkerOverlay>
+  );
+});

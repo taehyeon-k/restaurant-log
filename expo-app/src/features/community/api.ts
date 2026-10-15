@@ -315,13 +315,19 @@ export async function markCommunitySeen(qc: QueryClient): Promise<string | null>
 
 export type WishSeed = { name: string; where_text?: string | null; category?: string | null; lat?: number | null; lng?: number | null; source?: string };
 
-/** 위시에 담기 — 이미 같은 이름이 있으면 "exists". 출처(「민지의 기록」)는 메모 첫 줄에 남깁니다. */
-export async function addWishFrom(qc: QueryClient, seed: WishSeed): Promise<"added" | "exists"> {
-  const wishes = qc.getQueryData<Wish[]>(["wishes"]) ?? [];
-  if (matchWish(wishes, seed.name)) return "exists";
+/**
+ * 위시에 담기 — 그 기록장(bookId, 없으면 개인 기록장)에 같은 이름이 이미 있으면 "exists".
+ * 출처(「민지의 기록」)는 메모 첫 줄에 남깁니다. 연인 기록장이 있으면 화면이 useAddWish 로 어느 쪽인지 먼저 묻습니다.
+ */
+export async function addWishFrom(qc: QueryClient, seed: WishSeed, bookId: string | null = null): Promise<"added" | "exists"> {
   const me = await myId();
   if (!me) throw new Error("로그인이 필요합니다");
+  let q = supabase.from("wishes").select("id, name");
+  q = bookId ? q.eq("book_id", bookId) : q.eq("user_id", me);
+  const { data: existing } = await q;
+  if (matchWish((existing ?? []) as Wish[], seed.name)) return "exists";
   const { error } = await supabase.from("wishes").insert({
+    ...(bookId ? { book_id: bookId } : {}),
     user_id: me,
     name: seed.name,
     where_text: seed.where_text ?? null,
