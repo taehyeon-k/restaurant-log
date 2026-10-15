@@ -28,13 +28,11 @@ const monthOfKey = (k: string) => {
   return { year: y, month: m - 1 };
 };
 
+/** 달력 칸 — 달마다 칸 크기가 같도록 언제나 6주(42칸)를 채웁니다. 남는 앞뒤 칸은 이웃 달 날짜(흐리게). */
 function monthCells(year: number, month: number) {
   const first = new Date(year, month, 1);
-  const last = new Date(year, month + 1, 0);
-  const start = new Date(year, month, 1 - first.getDay());
-  const end = new Date(year, month, last.getDate() + (6 - last.getDay()));
   const cells: Date[] = [];
-  for (const d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) cells.push(new Date(d));
+  for (let i = 0; i < 42; i++) cells.push(new Date(year, month, 1 - first.getDay() + i));
   return cells;
 }
 
