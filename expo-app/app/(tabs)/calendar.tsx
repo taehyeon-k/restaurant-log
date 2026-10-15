@@ -1,6 +1,6 @@
 import { useRouter } from "expo-router";
 import { useMemo, useRef, useState } from "react";
-import { Modal, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Animated, Easing, Modal, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Eyebrow } from "@/components/ui";
 import { useActiveBook, useAnniversaryPicks } from "@/data/books";
@@ -106,19 +106,38 @@ export default function CalendarTab() {
     setCursorState({ year: d.getFullYear(), month: d.getMonth() });
   };
 
-  // 격자를 좌우로 밀면 달 이동(HANDOFF-calendar-nav §2) — 애니메이션 없이 바로. 스와이프로 잡힌 터치는 칸 onPress 가 나지 않습니다.
+  // 격자를 좌우로 밀면 달 이동(HANDOFF-calendar-nav §2). 스와이프로 잡힌 터치는 칸 onPress 가 나지 않습니다.
+  // 격자는 손가락을 따라오고, 넘기면 짧게 밀려 사라진 뒤 다음 달이 반대쪽에서 살짝 들어옵니다 — 어지럽지 않게 이동 폭은 작게.
   const shiftRef = useRef(shift);
   shiftRef.current = shift;
+  const tx = useRef(new Animated.Value(0)).current;
+  const fade = useRef(new Animated.Value(1)).current;
   const pan = useMemo(() => {
     const horizontal = (g: { dx: number; dy: number }) => Math.abs(g.dx) > 12 && Math.abs(g.dx) > Math.abs(g.dy);
+    const back = () => Animated.spring(tx, { toValue: 0, useNativeDriver: true, bounciness: 0, speed: 20 }).start();
     return PanResponder.create({
       onMoveShouldSetPanResponder: (_, g) => horizontal(g),
       onMoveShouldSetPanResponderCapture: (_, g) => horizontal(g),
+      onPanResponderMove: (_, g) => tx.setValue(g.dx),
       onPanResponderRelease: (_, g) => {
-        if (Math.abs(g.dx) > 40 && Math.abs(g.dx) > Math.abs(g.dy)) shiftRef.current(g.dx < 0 ? 1 : -1);
+        if (!(Math.abs(g.dx) > 40 && Math.abs(g.dx) > Math.abs(g.dy))) return back();
+        const sign = g.dx < 0 ? -1 : 1; // 손가락이 간 쪽
+        const ease = Easing.out(Easing.cubic);
+        Animated.parallel([
+          Animated.timing(tx, { toValue: sign * (Math.abs(g.dx) + 40), duration: 110, easing: ease, useNativeDriver: true }),
+          Animated.timing(fade, { toValue: 0, duration: 110, useNativeDriver: true }),
+        ]).start(() => {
+          shiftRef.current(-sign);
+          tx.setValue(-sign * 36);
+          Animated.parallel([
+            Animated.timing(tx, { toValue: 0, duration: 200, easing: ease, useNativeDriver: true }),
+            Animated.timing(fade, { toValue: 1, duration: 200, useNativeDriver: true }),
+          ]).start();
+        });
       },
+      onPanResponderTerminate: back,
     });
-  }, []);
+  }, [tx, fade]);
 
   // 연·월 다이얼(§3) — 누른 글자 바로 아래에 펼칩니다. 위치는 글자를 창 기준으로 재서 맞춥니다.
   const yearRef = useRef<View>(null);
@@ -203,7 +222,7 @@ export default function CalendarTab() {
         {WEEKDAYS.map((w) => <Text key={w} style={s.weekday}>{w}</Text>)}
       </View>
 
-      <View {...pan.panHandlers} style={{ flex: 1, paddingHorizontal: 12, paddingTop: 6, paddingBottom: 74 + insets.bottom + 12, gap: 4 }}>
+      <Animated.View {...pan.panHandlers} style={{ flex: 1, paddingHorizontal: 12, paddingTop: 6, paddingBottom: 74 + insets.bottom + 12, gap: 4, opacity: fade, transform: [{ translateX: tx }] }}>
         {weeks.map((week, i) => (
           <View key={i} style={{ flex: 1, flexDirection: "row", gap: 4 }}>
             {week.map((date) => {
@@ -252,7 +271,7 @@ export default function CalendarTab() {
             })}
           </View>
         ))}
-      </View>
+      </Animated.View>
 
       <Modal visible={!!picker} transparent animationType="none" onRequestClose={() => setPicker(null)} statusBarTranslucent>
         <Pressable onPress={() => setPicker(null)} style={{ flex: 1 }}>
