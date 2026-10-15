@@ -5,11 +5,14 @@ import * as WebBrowser from "expo-web-browser";
 import { useState } from "react";
 import { Alert, Image, Pressable, ScrollView, Share, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Row, Stat } from "@/components/AccountRows";
 import { Character } from "@/components/Character";
 import { Eyebrow, Toggle } from "@/components/ui";
+import { useActiveBook } from "@/data/books";
 import { useAccount, useOwnedCharacters, useSetCharacter, useSetLeaderboardOptIn, useTickets } from "@/data/profile";
 import { refreshAll } from "@/data/invalidate";
 import { usePersonalRows, usePersonalWishes } from "@/data/queries";
+import CoupleAccount from "@/features/couple/CoupleAccount";
 import { apiFetch } from "@/lib/api";
 import { CHARACTERS } from "@/lib/characters";
 import { earnedLabels } from "@/lib/labels";
@@ -21,24 +24,6 @@ import { C, F } from "@/theme";
 const PROVIDER_LABEL: Record<string, string> = { kakao: "카카오", google: "구글" };
 const BASE = process.env.EXPO_PUBLIC_API_BASE_URL ?? "";
 const placeKeyOf = (r: Restaurant) => r.place_key ?? `${r.name}|${r.address ?? ""}`.toLowerCase();
-
-function Stat({ value, label, brick, border }: { value: number; label: string; brick?: boolean; border?: boolean }) {
-  return (
-    <View style={{ flex: 1, alignItems: "center", paddingVertical: 14, borderLeftWidth: border ? 1 : 0, borderLeftColor: C.lineSoft }}>
-      <Text style={{ fontFamily: F.mono, fontSize: 22, color: brick ? C.brick : C.ink }}>{value}</Text>
-      <Text style={{ marginTop: 4, fontFamily: F.sans, fontSize: 11, color: C.faint }}>{label}</Text>
-    </View>
-  );
-}
-
-function Row({ label, right, onPress, danger, border = true }: { label: string; right: React.ReactNode; onPress?: () => void; danger?: boolean; border?: boolean }) {
-  return (
-    <Pressable onPress={onPress} disabled={!onPress} style={{ minHeight: 50, flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, borderTopWidth: border ? 1 : 0, borderTopColor: C.lineSoft }}>
-      <Text style={{ fontFamily: F.sans, fontSize: 13.5, color: danger ? C.faint : C.ink }}>{label}</Text>
-      {right}
-    </Pressable>
-  );
-}
 
 /** 내계정 탭 — 프로필·통계·모은 라벨·계정 관리(HANDOFF-auth.md §3.3). */
 export default function AccountTab() {
@@ -55,7 +40,10 @@ export default function AccountTab() {
   const setCharacter = useSetCharacter();
   const setLeaderboardOptIn = useSetLeaderboardOptIn();
   const [error, setError] = useState("");
+  const { isCouple } = useActiveBook();
 
+  // 연인 기록장이면 「연인계정」(HANDOFF-couple-account §2) — 아래 개인 화면은 그대로.
+  if (isCouple) return <CoupleAccount />;
   if (!account) return <View style={{ flex: 1, backgroundColor: C.paper }} />;
 
   const records = rows.filter((r) => !r.pending).length;

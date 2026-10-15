@@ -62,7 +62,7 @@ export default function TabBar({ state, navigation }: BottomTabBarProps) {
           {ICON[route.name]?.(color)}
           {dot && <View style={s.dot} />}
         </View>
-        <Text style={[s.label, { color }]}>{LABEL[route.name] ?? route.name}</Text>
+        <Text style={[s.label, { color }]}>{route.name === "account" && isCouple ? "연인계정" : LABEL[route.name] ?? route.name}</Text>
       </Pressable>
     );
   };

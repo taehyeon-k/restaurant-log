@@ -3,6 +3,7 @@ import { useQuery, useQueryClient, type QueryClient } from "@tanstack/react-quer
 import { useEffect, useSyncExternalStore } from "react";
 import { useAccount } from "@/data/profile";
 import type { AnniversaryPick } from "@/lib/anniversary";
+import { DEFAULT_CHARACTER, isCharacterId, type CharacterId } from "@/lib/characters";
 import { supabase } from "@/lib/supabase";
 
 /**
@@ -10,7 +11,13 @@ import { supabase } from "@/lib/supabase";
  * 모두 지금 고른 기록장(activeBookId) 기준입니다. 고른 값은 AsyncStorage `activeBookId:{userId}` 에 둡니다.
  */
 
-export type BookMember = { userId: string; nickname: string; avatarUrl: string | null };
+export type BookMember = {
+  userId: string;
+  nickname: string;
+  avatarUrl: string | null;
+  /** 대표 캐릭터 — 연인계정 「만난 지」 카드에 둘이 나란히(HANDOFF-couple-account §3). 바꾸기는 개인 내계정에서만. */
+  characterId?: CharacterId;
+};
 
 export type Book = {
   id: string;
@@ -48,8 +55,8 @@ export const useBooks = () =>
       }
       const ids = [...new Set((data ?? []).flatMap((b) => (b.book_members as { user_id: string }[]).map((m) => m.user_id)))];
       const { data: profiles } = ids.length
-        ? await supabase.from("profiles").select("id, nickname, avatar_url").in("id", ids)
-        : { data: [] as { id: string; nickname: string | null; avatar_url: string | null }[] };
+        ? await supabase.from("profiles").select("id, nickname, avatar_url, character_id").in("id", ids)
+        : { data: [] as { id: string; nickname: string | null; avatar_url: string | null; character_id: string | null }[] };
       const byId = new Map((profiles ?? []).map((p) => [p.id as string, p]));
       const all: Book[] = (data ?? []).map((b) => ({
         id: b.id,
@@ -61,6 +68,7 @@ export const useBooks = () =>
           userId: m.user_id,
           nickname: byId.get(m.user_id)?.nickname?.trim() || "이름 없음",
           avatarUrl: byId.get(m.user_id)?.avatar_url ?? null,
+          characterId: isCharacterId(byId.get(m.user_id)?.character_id) ? (byId.get(m.user_id)!.character_id as CharacterId) : DEFAULT_CHARACTER,
         })),
       }));
       return {
@@ -131,7 +139,7 @@ export function useActiveBook(): ActiveBook {
   const picked = books?.all.find((b) => b.id === s.id && (b.kind === "personal" || b.id === books.couple?.id));
   const book = picked ?? books?.personal ?? null;
   const isCouple = book?.kind === "couple";
-  const me = book?.members.find((m) => m.userId === userId) ?? (userId ? { userId, nickname: account?.nickname || "나", avatarUrl: account?.avatarUrl ?? null } : null);
+  const me = book?.members.find((m) => m.userId === userId) ?? (userId ? { userId, nickname: account?.nickname || "나", avatarUrl: account?.avatarUrl ?? null, characterId: account?.characterId ?? DEFAULT_CHARACTER } : null);
   const partner = isCouple ? book!.members.find((m) => m.userId !== userId) ?? null : null;
   return { ready, id: book?.id ?? null, book, books: books ?? null, isCouple, readOnly: isCouple && !!book?.closedAt, me, partner };
 }
