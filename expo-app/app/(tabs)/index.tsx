@@ -315,7 +315,6 @@ export default function MapTab() {
    */
   const openPlacesAt = placesAt.open;
   const onMapTap = useCallback((lat: number, lng: number) => {
-    if (__DEV__) console.log("[map-tap]", { lat, lng });
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setPlusOpen(false);
     openPlacesAt(lat, lng);

@@ -117,7 +117,6 @@ export function usePlacesAt() {
         return setState({ status: "done", point, data });
       } catch (e) {
         if (c.signal.aborted) return; // 새로 눌렀거나 닫았음
-        if (__DEV__) console.warn("[places-at] request failed", { radius: r, error: String(e) });
       }
     }
     setState({ status: "error", point, radius });

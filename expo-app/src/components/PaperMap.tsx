@@ -1,5 +1,5 @@
 import { NaverMapView, type NaverMapViewProps, type NaverMapViewRef } from "@mj-studio/react-native-naver-map";
-import { forwardRef, useEffect, useRef, useState } from "react";
+import { forwardRef, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { type SharedValue, useAnimatedReaction } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
@@ -21,7 +21,6 @@ type Props = NaverMapViewProps & {
 
 export const PaperMap = forwardRef<NaverMapViewRef, Props>(function PaperMap(props, ref) {
   const { onInitialized, onCameraIdle, logoBottom, logoMargin, ...rest } = props;
-  const idleLogged = useRef(false);
   const [liveLogoBottom, setLiveLogoBottom] = useState<number | null>(null);
 
   useAnimatedReaction(
@@ -31,21 +30,6 @@ export const PaperMap = forwardRef<NaverMapViewRef, Props>(function PaperMap(pro
     },
     [logoBottom],
   );
-
-  // 지도가 안 뜰 때 진단용 로그. 인증 실패 사유는 JS 로 오지 않고 네이티브 로그에만 남습니다:
-  //   adb logcat | grep -i naver
-  useEffect(() => {
-    console.log("[PaperMap] mount", { styleId: STYLE_ID ?? "(none)" });
-    // 10초 안에 초기화/첫 카메라 idle 이 없으면 원인 후보를 알려줍니다.
-    const t = setTimeout(() => {
-      if (!idleLogged.current) {
-        console.warn(
-          "[PaperMap] 10s passed without a camera idle — tiles likely failed to load. Check: (1) customStyleId valid? (try removing EXPO_PUBLIC_NAVER_MAP_STYLE_ID) (2) NCP Dynamic Map enabled + app.dinary registered (3) build made after NAVER_MAP_CLIENT_ID was set. Native details: adb logcat | grep -i naver",
-        );
-      }
-    }, 10000);
-    return () => clearTimeout(t);
-  }, []);
 
   return (
     <View style={StyleSheet.absoluteFill}>
@@ -58,17 +42,8 @@ export const PaperMap = forwardRef<NaverMapViewRef, Props>(function PaperMap(pro
         isShowScaleBar={false}
         isShowLocationButton={false}
         isExtentBoundedInKorea
-        onInitialized={() => {
-          console.log("[PaperMap] native map initialized");
-          onInitialized?.();
-        }}
-        onCameraIdle={(e) => {
-          if (!idleLogged.current) {
-            idleLogged.current = true;
-            console.log("[PaperMap] first camera idle (camera only; does not prove tiles loaded)", { zoom: e.zoom });
-          }
-          onCameraIdle?.(e);
-        }}
+        onInitialized={onInitialized}
+        onCameraIdle={onCameraIdle}
         {...rest}
         logoMargin={liveLogoBottom == null ? logoMargin : { ...logoMargin, bottom: liveLogoBottom }}
       />
