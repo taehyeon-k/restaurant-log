@@ -21,11 +21,12 @@ import { useRows, useWishes } from "@/data/queries";
 import { useAppState } from "@/data/store";
 import {
   buildCandidates, buildMine, formatDistance, hhmm, isoDate, metersBetween, nearToCandidate, noneNear, pickCandidates,
-  pickList, searchHits, PICK_MAX_M, type Candidate, type Geo, type PickItem,
+  HEADING_TTL_MS, liftHeading, pickList, searchHits, PICK_MAX_M, type Candidate, type Geo, type PickItem,
 } from "@/features/capture/logic";
 import { samePlace } from "@/lib/geo";
 import { nearbyPlaces, searchFoodPlaces, type FoodPlace } from "@/lib/geocode";
 import { drainQueue } from "@/features/queue/process";
+import { AfterCapture } from "@/features/recommend/AfterCapture";
 import { enqueue, persistPhoto } from "@/features/queue/db";
 import { MAX_PHOTOS, pickAlbumUris } from "@/lib/photos";
 import { supabase } from "@/lib/supabase";
@@ -229,7 +230,12 @@ export default function Capture() {
 
   const mine = useMemo(() => buildMine(rows, geo), [rows, geo]);
   const candidates = useMemo(() => buildCandidates(mine, extra, pickKind), [mine, extra, pickKind]);
-  const list = useMemo(() => pickList(pickCandidates(candidates, wishes, geo), geo), [candidates, wishes, geo]);
+  // 추천 탭에서 「여기로 갈게요」로 고른 가게(2시간 안) — 후보 맨 위로.
+  const heading = appState.recHeading && Date.now() - appState.recHeading.at < HEADING_TTL_MS ? appState.recHeading : null;
+  const list = useMemo(
+    () => pickList(liftHeading(pickCandidates(candidates, wishes, geo), heading, geo, pickKind), geo),
+    [candidates, wishes, geo, heading, pickKind]
+  );
   const none = noneNear(candidates, list, geo);
   const hits = useMemo(
     () => searchHits({ rows, extra, apiHits, query, geo, pickKind }),
@@ -571,6 +577,8 @@ export default function Capture() {
   const at = shotAt ?? new Date();
   const days = picked?.wish ? wishMetInfo(picked.wish, isoDate(at)).days : null;
   const stamp = `${isoDate(at).replaceAll("-", ".")} ${hhmm(at)}`;
+  const twinDone = picked ? rows.find((r) => r.kind === picked.kind && samePlace(r, picked)) : null;
+  const pickedKey = picked ? `${picked.name}|${twinDone?.address ?? picked.address ?? ""}`.toLowerCase() : null;
   return (
     <View style={[s.light, { paddingHorizontal: 20, paddingTop: insets.top + 12 }]}>
       <ScrollView showsVerticalScrollIndicator={false}>
@@ -589,6 +597,9 @@ export default function Capture() {
             </View>
           )}
         </View>
+        {picked && pickedKey && picked.kind === "restaurant" && (
+          <AfterCapture placeKey={pickedKey} name={picked.name} lat={twinDone?.lat ?? picked.lat} lng={twinDone?.lng ?? picked.lng} rows={rows} />
+        )}
         {saving && (
           <View style={s.upload}>
             <ActivityIndicator color={C.brick} />

@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import type { RecFilter } from "@/lib/recommend";
 import type { Kind } from "@/lib/types";
 
 /**
@@ -20,12 +21,23 @@ type State = {
   mapSegment: MapSegment; communityTab: CommunityTab;
   /** 이번에 커뮤니티에 들어오기 직전의 last_seen_community_at — 친구 줄의 「새 기록」 테두리 기준. */
   communitySeenSince: string | null;
-  /** 추천 탭에서 칩으로 다시 넣은 종류 — 그 날만 기억합니다(HANDOFF-recommend §4-5). */
-  recExcludeOverride: { date: string; categories: string[] } | null;
+  /** 추천 탭 필터 — 사용자가 바꾼 값은 그 날만 기억합니다(HANDOFF-recommend-all §5-2). */
+  recFilter: (RecFilter & { date: string }) | null;
+  /** 「여기로 갈게요」 · 「이 코스로 가기」 · 「코스 잇기」로 고른 가게 — 2시간 안에 찍으면 식당 후보 맨 위로(§5-4). */
+  recHeading: RecHeading | null;
+  /** 지금 따라가는 코스 — 다 인증하면 촬영 완료 화면에 「코스 완주」(§10). */
+  recCourse: RecCourse | null;
+  /** 추천 탭이 마지막으로 읽은 자리 — 코스 · 투어 상세가 같은 자리로 다시 셉니다. */
+  recHere: RecHere | null;
 };
+
+export type RecHeading = { placeKey: string; name: string; lat: number; lng: number; at: number };
+export type RecCourse = { id: string; date: string; places: { placeKey: string; name: string }[] };
+export type RecHere = { lat: number; lng: number; name: string | null; fallback: boolean };
 let state: State = {
   kind: "restaurant", markerFilter: "all", ghost: null, spotPick: null,
-  mapSegment: "records", communityTab: "friends", communitySeenSince: null, recExcludeOverride: null,
+  mapSegment: "records", communityTab: "friends", communitySeenSince: null,
+  recFilter: null, recHeading: null, recCourse: null, recHere: null,
 };
 const subs = new Set<() => void>();
 

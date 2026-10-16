@@ -514,7 +514,7 @@ export const usePostsToday = () =>
 
 /* ───────────── 신고 · 차단 ───────────── */
 
-export async function report(targetType: "post" | "answer" | "comment" | "user", targetId: string | number, reason: string) {
+export async function report(targetType: "post" | "answer" | "comment" | "user" | "tour", targetId: string | number, reason: string) {
   const me = await myId();
   const { error } = await supabase.from("reports").insert({ target_type: targetType, target_id: String(targetId), reporter_id: me, reason });
   if (error) throw new Error(error.message);

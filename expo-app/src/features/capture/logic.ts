@@ -164,3 +164,24 @@ export function searchHits(opts: {
 
   return hits.sort((a, b) => (a.distance ?? 1e9) - (b.distance ?? 1e9));
 }
+
+/** 추천 탭에서 「여기로 갈게요」로 고른 가게는 이만큼 안에 찍으면 후보 맨 위로(HANDOFF-recommend-all §5-4). */
+export const HEADING_TTL_MS = 2 * 60 * 60 * 1000;
+
+/**
+ * 고른 가게를 후보 맨 위로 — 이미 후보에 있으면 끌어올리고, 없으면 거리를 재서 넣습니다.
+ * 인증 거리(PICK_MAX_M)는 그대로라 멀면 pickList 가 far 로 막습니다.
+ */
+export function liftHeading(
+  list: ReturnType<typeof pickCandidates>, heading: { name: string; lat: number; lng: number } | null, geo: Geo | null, pickKind: Kind,
+): ReturnType<typeof pickCandidates> {
+  if (!heading) return list;
+  const i = list.findIndex((c) => norm(c.name) === norm(heading.name) && (c.lat == null || c.lng == null || metersBetween({ lat: c.lat, lng: c.lng }, heading.lat, heading.lng) <= 100));
+  if (i >= 0) return [list[i], ...list.slice(0, i), ...list.slice(i + 1)];
+  if (pickKind !== "restaurant") return list;
+  const injected = {
+    id: `heading:${heading.name}`, name: heading.name, kind: "restaurant" as Kind, category: null, region: null, address: null,
+    lat: heading.lat, lng: heading.lng, distance: geo ? metersBetween(geo, heading.lat, heading.lng) : null, mine: false, wish: null as Wish | null,
+  };
+  return [injected, ...list];
+}
