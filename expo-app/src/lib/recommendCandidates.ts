@@ -11,7 +11,7 @@ export async function recommendationCandidates(lat: number, lng: number, radius 
   return json.candidates ?? [];
 }
 
-type EventName = "impression" | "open" | "save";
+type EventName = "impression" | "open" | "wish_start";
 
 /** 서버는 원시 GPS 좌표를 기록하지 않습니다. 이벤트에는 추천한 장소 ID와 랭킹 맥락만 저장합니다. */
 export async function logRecommendationEvents(
