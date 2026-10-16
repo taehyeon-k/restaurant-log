@@ -1,10 +1,11 @@
-import { addDays, todayIso } from "./anniversary";
+import { addDays, daysBetween, todayIso } from "./anniversary";
 import { metersBetweenLL, norm } from "./geo";
 import { eulReul, euroRo } from "./josa";
 import { wishKind, type Restaurant, type Wish } from "./types";
 
 /**
- * 추천 탭 v2(HANDOFF-recommend-all §4–6) — 「지금 뭐 먹지 / 둘러보기」의 순수 계산.
+ * 추천 탭 v2(HANDOFF-recommend-all §4–6 · HANDOFF-recommend-fix-distance-hours) — 「지금 뭐 먹지 / 둘러보기」의 순수 계산.
+ * 화면의 숫자는 좌표 계산(직선거리) 또는 인증 기록에서만 나옵니다.
  * 남의 기록은 서버 함수(rec_places · rec_courses · …)가 숫자로만 돌려주고, 여기서는 그 숫자와 내 기록 · 위시로 고르고 까닭을 씁니다.
  * 셈에는 인증된 기록만(verified_at 있음 · 보관함 제외) 씁니다.
  */
@@ -36,45 +37,27 @@ export function recCategoryOf(category: string | null | undefined, name?: string
   return (REC_CATEGORIES as readonly string[]).includes(category ?? "") ? (category as RecCategory) : null;
 }
 
-/** 도보 거리 — 1분에 80m. */
-export const WALKS = [5, 10, 15] as const;
-export type Walk = (typeof WALKS)[number];
-export const DEFAULT_WALK: Walk = 10;
-const M_PER_MIN = 80;
-export const walkRadius = (min: number) => min * M_PER_MIN;
-export const walkMin = (m: number) => Math.max(1, Math.round(m / M_PER_MIN));
-/** 5곳이 안 차면 한 단계 늘려 다시 찾습니다(§12) — 15분 다음은 20분. */
-export const nextWalk = (min: number) => (min < 15 ? (min < 10 ? 10 : 15) : 20);
+/**
+ * 거리 — 직선거리(m)만 씁니다(HANDOFF-recommend-fix-distance-hours). 도보 시간은 실제 길과 달라 쓰지 않습니다.
+ */
+export const DISTS = [500, 1000, 2000] as const;
+export type Dist = (typeof DISTS)[number];
+export const DEFAULT_DIST: Dist = 1000;
+/** 옛 분 단위 값(5 · 10 · 15)이나 모르는 값은 기본 1km 로. */
+export const normalizeDist = (v: unknown): Dist => ((DISTS as readonly number[]).includes(v as number) ? (v as Dist) : DEFAULT_DIST);
 
-export const fmtDistance = (m: number) => (m < 1000 ? `${m}m` : `${(m / 1000).toFixed(1).replace(/\.0$/, "")}km`);
 const pad = (n: number) => String(n).padStart(2, "0");
 export const hhmmOf = (iso: string) => {
   const d = new Date(iso);
   return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 };
-/** 0시부터 분 → 「15:10」 */
-export const clockOf = (min: number) => `${pad(Math.floor(((min % 1440) + 1440) % 1440 / 60))}:${pad(((min % 60) + 60) % 60)}`;
-/** 「2시간 30분」 「40분」 */
-export const durationOf = (min: number) => {
-  const h = Math.floor(min / 60), m = min % 60;
-  return h ? (m ? `${h}시간 ${m}분` : `${h}시간`) : `${m}분`;
-};
 export const pctOf = (rate: number | string | null | undefined) => Math.round(Number(rate ?? 0) * 100);
 
-/** 시각 → 끼니 이름(코스 제목 「디저트 → 이른 저녁」). */
-export function slotOf(min: number) {
-  const h = (((min % 1440) + 1440) % 1440) / 60;
-  if (h < 10.5) return "아침";
-  if (h < 14) return "점심";
-  if (h < 17) return "오후";
-  if (h < 18.5) return "이른 저녁";
-  if (h < 21) return "저녁";
-  return "늦은 밤";
-}
+const DAY_NAMES = ["일요일", "월요일", "화요일", "수요일", "목요일", "금요일", "토요일"];
 
 /* ───────────── 필터 (§5-2) ───────────── */
 
-export type RecFilter = { inc: RecCategory[]; exc: RecCategory[]; dist: Walk };
+export type RecFilter = { inc: RecCategory[]; exc: RecCategory[]; dist: Dist };
 
 /**
  * 기본 「빼고 싶은 것」 — 최근 3일 인증 기록에서 어제 먹은 종류 + 3일 안 2번 이상 먹은 종류.
@@ -97,22 +80,23 @@ export function recentExclude(rows: Restaurant[], today = todayIso()) {
 }
 
 export const defaultFilter = (rows: Restaurant[], today = todayIso()): RecFilter => ({
-  inc: [], exc: recentExclude(rows, today).exc, dist: DEFAULT_WALK,
+  inc: [], exc: recentExclude(rows, today).exc, dist: DEFAULT_DIST,
 });
 
 /* ───────────── 「지금 뭐 먹지」 5곳 (§5-5) ───────────── */
 
-/** rec_places 한 줄. */
+/** rec_places 한 줄. slot_dow — 최근 4주 같은 요일 지금 ±1시간 인증 수, slot_any — 요일 상관없이. */
 export type PlaceStat = {
   place: string; name: string; category: string | null; kind: string; address: string | null;
-  lat: number; lng: number; distance_m: number; users: number; revisit_rate: number | string;
+  lat: number; lng: number; distance_m: number; place_url: string | null; users: number; revisit_rate: number | string;
   today_count: number; last_at: string | null; week_count: number; steady_years: number; mine: number;
+  slot_dow: number; slot_any: number;
 };
 
 export type Pick = {
   key: string; name: string; recCat: RecCategory | null; category: string | null;
-  lat: number; lng: number; distance: number; address: string | null;
-  stat: PlaceStat | null; wish: Wish | null; reasons: string[]; score: number;
+  lat: number; lng: number; distance: number; placeUrl: string | null;
+  stat: PlaceStat; wish: Wish | null; reasons: string[]; score: number;
 };
 
 /** 내 기록장에서 이 가게를 인증한 적이 있는지 — 서버 mine 은 개인 · 연인 기록장을 가리지 않습니다. */
@@ -120,74 +104,75 @@ const visitedIn = (rows: Restaurant[], name: string, lat: number, lng: number) =
   verifiedOnly(rows).some((r) => norm(r.name) === norm(name) && r.lat != null && r.lng != null && metersBetweenLL(r.lat, r.lng, lat, lng) <= 100);
 
 /**
- * 점수 = 재방문율 + 오늘 인증 수 가중 + 위시리스트 보너스 + 아직 안 간 곳 보너스.
- * 까닭 문장은 점수에 가장 크게 기여한 항목 순으로 3개.
+ * 「지금 뭐 먹지」 5곳(§5-5, 수정 §2-5).
+ *   1. 필터 거리 안 + 최근 4주 같은 요일 지금 ±1시간에 인증 1건 이상 — 5곳이 안 차면 요일 조건을 빼고 다시, 그래도 모자라면 있는 만큼.
+ *   2. 먹고 싶은 것이 있으면 그 종류만, 빼고 싶은 것은 뺌.
+ *   3. 점수 = 재방문율 + 오늘 인증 수 가중 + 시간대 인증 + 위시리스트 보너스 + 아직 안 간 곳 보너스.
+ * 까닭 문장은 기여가 큰 순으로 3개 — 인증 기록 · 위시 · 걸러낸 종류에서만 씁니다(영업시간 · 도보 시간 없음).
  */
 export function pickNow(opts: {
-  stats: PlaceStat[]; wishes: Wish[]; rows: Restaurant[]; here: { lat: number; lng: number };
-  filter: RecFilter; radius: number; yesterday: RecCategory[]; couple: boolean;
-}): Pick[] {
-  const { stats, wishes, rows, here, filter, radius, yesterday, couple } = opts;
-  const pool: Omit<Pick, "reasons" | "score">[] = [];
-
-  for (const s of stats) {
-    if (s.kind !== "restaurant" || s.distance_m > radius) continue;
-    pool.push({ key: s.place, name: s.name, recCat: recCategoryOf(s.category, s.name), category: s.category, lat: s.lat, lng: s.lng, distance: s.distance_m, address: s.address, stat: s, wish: null });
-  }
-  for (const w of wishes) {
-    if (w.lat == null || w.lng == null || wishKind(w) === "cafe") continue;
-    const d = Math.round(metersBetweenLL(here.lat, here.lng, w.lat, w.lng));
-    if (d > radius) continue;
-    const twin = pool.find((p) => norm(p.name) === norm(w.name) && metersBetweenLL(p.lat, p.lng, w.lat!, w.lng!) <= 100);
-    if (twin) { twin.wish ??= w; continue; }
-    pool.push({ key: `wish:${w.id}`, name: w.name, recCat: recCategoryOf(w.category, w.name), category: w.category, lat: w.lat, lng: w.lng, distance: d, address: w.where_text, stat: null, wish: w });
-  }
-
+  stats: PlaceStat[]; wishes: Wish[]; rows: Restaurant[]; filter: RecFilter; yesterday: RecCategory[]; couple: boolean;
+  today?: string; now?: Date;
+}): { picks: Pick[]; anyDay: boolean } {
+  const { stats, wishes, rows, filter, yesterday, couple, today = todayIso(), now = new Date() } = opts;
   const allowed = (c: RecCategory | null) => (filter.inc.length ? !!c && filter.inc.includes(c) : !c || !filter.exc.includes(c));
+  const base = stats.filter((s) => s.kind === "restaurant" && s.distance_m <= filter.dist && allowed(recCategoryOf(s.category, s.name)));
+  const byDow = base.filter((s) => s.slot_dow > 0);
+  const anyDay = byDow.length < 5;
+  const pool = anyDay ? base.filter((s) => s.slot_any > 0) : byDow;
   const swapped = yesterday.filter((c) => filter.exc.includes(c));
+  const dayName = DAY_NAMES[now.getDay()];
 
-  return pool
-    .filter((p) => allowed(p.recCat))
-    .map((p) => {
-      const s = p.stat;
-      const fresh = !(s && s.mine > 0) && !visitedIn(rows, p.name, p.lat, p.lng);
-      const parts: { v: number; text: string }[] = [];
-      if (s && pctOf(s.revisit_rate) > 0) parts.push({ v: pctOf(s.revisit_rate), text: `인증한 사람의 ${pctOf(s.revisit_rate)}%가 다시 갔어요` });
-      if (s && s.today_count > 0) parts.push({ v: Math.min(s.today_count, 10) * 4, text: `오늘 인증 ${s.today_count}건${s.last_at ? ` · 마지막 ${hhmmOf(s.last_at)}` : ""}` });
-      if (p.wish) parts.push({ v: 30, text: couple ? "우리 위시리스트에 담아 둔 곳이에요" : "위시리스트에 담아 둔 곳이에요" });
-      if (fresh) parts.push({ v: 15, text: "아직 안 가 본 곳이에요" });
-      if (s && s.steady_years > 0) parts.push({ v: 8, text: `${s.steady_years}년째 꾸준히 인증된 곳이에요` });
-      // 걸러낸 까닭 — 점수는 아니지만 셋을 채울 때 씁니다.
-      const why = swapped.length && p.recCat && !swapped.includes(p.recCat)
-        ? `어제 ${eulReul(swapped.join("·"))} 드셔서 ${euroRo(p.recCat)} 골랐어요`
-        : `걸어서 ${walkMin(p.distance)}분이에요`;
-      const score = parts.reduce((n, x) => n + x.v, 0);
-      const reasons = [...parts].sort((a, b) => b.v - a.v).map((x) => x.text).slice(0, 3);
-      if (reasons.length < 3) reasons.push(why);
-      return { ...p, score, reasons };
+  const picks = pool
+    .map((s): Pick => {
+      const recCat = recCategoryOf(s.category, s.name);
+      const wish = wishes.find((w) => wishKind(w) !== "cafe" && norm(w.name) === norm(s.name) && (w.lat == null || w.lng == null || metersBetweenLL(s.lat, s.lng, w.lat, w.lng) <= 100)) ?? null;
+      const fresh = s.mine === 0 && !visitedIn(rows, s.name, s.lat, s.lng);
+      const slot = anyDay ? s.slot_any : s.slot_dow;
+      const parts: { v: number; text?: string }[] = [];
+      if (pctOf(s.revisit_rate) > 0) parts.push({ v: pctOf(s.revisit_rate), text: `인증한 사람의 ${pctOf(s.revisit_rate)}%가 다시 갔어요` });
+      if (s.today_count > 0) parts.push({ v: Math.min(s.today_count, 10) * 4, text: `오늘 인증 ${s.today_count}건${s.last_at ? ` · 마지막 ${hhmmOf(s.last_at)}` : ""}` });
+      parts.push({ v: Math.min(slot, 10) * 3, text: anyDay ? `지난 4주 이 시간대에 인증 ${slot}건` : `지난 4주 ${dayName} 이 시간대에 인증 ${slot}건` });
+      if (wish) {
+        const days = Math.max(0, daysBetween(wish.saved_at.slice(0, 10), today));
+        parts.push({ v: 30, text: `${couple ? "우리 " : ""}위시리스트에 담은 지 ${days}일 된 곳이에요` });
+      }
+      if (swapped.length && recCat && !swapped.includes(recCat)) parts.push({ v: 10, text: `어제 ${eulReul(swapped.join("·"))} 드셔서 ${euroRo(recCat)} 골랐어요` });
+      if (fresh) parts.push({ v: 15 }); // 점수만 — 문장은 쓰지 않습니다.
+      const reasons = parts.filter((x) => x.text).sort((a, b) => b.v - a.v).map((x) => x.text!).slice(0, 3);
+      return {
+        key: s.place, name: s.name, recCat, category: s.category, lat: s.lat, lng: s.lng, distance: s.distance_m, placeUrl: s.place_url,
+        stat: s, wish, reasons, score: parts.reduce((n, x) => n + x.v, 0),
+      };
     })
     .sort((a, b) => b.score - a.score || a.distance - b.distance)
     .slice(0, 5);
+  return { picks, anyDay };
 }
 
 /* ───────────── 「둘러보기」 (§6) ───────────── */
 
-/** rec_courses 한 줄. */
+/** rec_courses 한 줄 — 두 곳 모두 최근 4주 지금 시간대에 인증이 있는 코스만 옵니다. 시각 · 머무는 시간은 없습니다. */
 export type Course = {
   id: string;
-  a_place: string; a_name: string; a_category: string | null; a_lat: number; a_lng: number; a_distance_m: number;
-  b_place: string; b_name: string; b_category: string | null; b_lat: number; b_lng: number;
-  walk_m: number; users: number; gap_min: number; start_min: number;
+  a_place: string; a_name: string; a_category: string | null; a_lat: number; a_lng: number; a_distance_m: number; a_place_url: string | null;
+  a_revisit_rate: number | string | null; a_today_count: number | null; a_last_at: string | null;
+  b_place: string; b_name: string; b_category: string | null; b_lat: number; b_lng: number; b_place_url: string | null;
+  b_revisit_rate: number | string | null; b_today_count: number | null; b_last_at: string | null;
+  between_m: number; users: number;
 };
 
-/** 「디저트 → 이른 저녁」 — 첫 곳은 종류, 둘째 곳은 끼니. */
-export const courseTitle = (c: Course) => `${c.a_category ?? slotOf(c.start_min)} → ${slotOf(c.start_min + c.gap_min)}`;
-/** 총 시간 — 첫 곳에 머문 시간 + 둘째 곳에서의 한 끼(60분으로 칩니다). */
-export const courseTotal = (c: Course) => c.gap_min + 60;
+/** 「카페 → 양식」 — 순서와 종류만. */
+export const courseTitle = (c: Course) => `${recCategoryOf(c.a_category, c.a_name) ?? c.a_category ?? c.a_name} → ${recCategoryOf(c.b_category, c.b_name) ?? c.b_category ?? c.b_name}`;
+
+/** 「오늘 인증 6건 · 마지막 16:48」 — 오늘 없으면 null. */
+export const todayLine = (n: number | null | undefined, last: string | null | undefined) =>
+  n ? `오늘 인증 ${n}건${last ? ` · 마지막 ${hhmmOf(last)}` : ""}` : null;
 
 /** 행 카드 Mono 줄(§6-3). */
 export function statLine(s: PlaceStat) {
-  if (s.today_count > 0) return `오늘 인증 ${s.today_count}건${s.last_at ? ` · 마지막 ${hhmmOf(s.last_at)}` : ""}`;
+  const today = todayLine(s.today_count, s.last_at);
+  if (today) return today;
   if (s.steady_years > 0) return `${s.steady_years}년째 꾸준히 인증 · 이번 주 ${s.week_count}건`;
   return `인증한 사람 ${s.users}명 · 이번 주 ${s.week_count}건`;
 }

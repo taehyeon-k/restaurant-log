@@ -29,19 +29,22 @@ export const useRecPlaces = (here: { lat: number; lng: number } | null, radius: 
     },
   });
 
+/** 「지금 시작하는 코스」 출발 반경. */
+const COURSE_START_M = 2000;
+
 export const useRecCourses = (here: { lat: number; lng: number } | null) =>
   useQuery({
     queryKey: ["rec", "courses", here && cell(here.lat), here && cell(here.lng)],
     enabled: !!here,
     staleTime: FIVE_MIN,
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("rec_courses", { p_lat: here!.lat, p_lng: here!.lng, p_radius_m: 1200 });
+      const { data, error } = await supabase.rpc("rec_courses", { p_lat: here!.lat, p_lng: here!.lng, p_radius_m: COURSE_START_M });
       if (error) throw new Error(error.message);
       return (data ?? []) as Course[];
     },
   });
 
-export type NextPlace = { place: string; name: string; category: string | null; lat: number; lng: number; users: number; gap_min: number };
+export type NextPlace = { place: string; name: string; category: string | null; lat: number; lng: number; users: number };
 
 export const useNextAfter = (placeKey: string | null) =>
   useQuery({
@@ -64,7 +67,7 @@ export type Tour = {
   total: number; done: number; finishers: number | null; in_progress: number | null; revisit_rate: number | null; completed_at: string | null;
 };
 export type TourPlace = {
-  place: string; name: string; category: string | null; address: string | null; lat: number | null; lng: number | null;
+  place: string; name: string; category: string | null; address: string | null; lat: number | null; lng: number | null; place_url: string | null;
   my_first_at: string | null; users: number | null; revisit_rate: number | null;
 };
 

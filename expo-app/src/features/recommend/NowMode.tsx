@@ -4,11 +4,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Animated, PanResponder, Pressable, ScrollView, Text, View } from "react-native";
 import { PaperMap } from "@/components/PaperMap";
 import { setState, type RecHere } from "@/data/store";
-import { nextWalk, pickNow, walkMin, walkRadius, type Pick, type PlaceStat, type RecCategory, type RecFilter } from "@/lib/recommend";
+import { formatDistance } from "@/lib/distance";
+import { DEFAULT_DIST, pickNow, type Pick, type PlaceStat, type RecCategory, type RecFilter } from "@/lib/recommend";
 import type { Restaurant, Wish } from "@/lib/types";
 import { C, F } from "@/theme";
 import { openDirections } from "./api";
-import { HereLegend, HereMarker, NumberMarker, REC, RingLabelMarker } from "./ui";
+import { HereLegend, HereMarker, KakaoLink, NumberMarker, REC, RingLabelMarker } from "./ui";
 
 const MAP_H = 270;
 /** 이만큼 끌면 다음 장(§5-3). */
@@ -23,7 +24,7 @@ function regionAround(lat: number, lng: number, radius: number) {
 
 /**
  * 「지금 뭐 먹지」(§5, 시안 5a) — 필터 줄 + 카드 한 장(위 지도 · 아래 가게 설명 가로 슬라이드).
- * 5곳이 안 차면 거리를 한 단계 늘려 다시 찾고, 그래도 없으면 빈 상태(§12).
+ * 후보는 필터 거리 안에서 최근 4주 같은 요일 · 시간대에 인증이 있는 곳 — 5곳이 안 차면 요일 조건을 빼고, 그래도 없으면 빈 상태.
  */
 export function NowMode({
   here, stats, loading, wishes, rows, filter, yesterday, couple, onOpenFilter, onChangeFilter,
@@ -32,20 +33,15 @@ export function NowMode({
   filter: RecFilter; yesterday: RecCategory[]; couple: boolean;
   onOpenFilter: () => void; onChangeFilter: (f: RecFilter) => void;
 }) {
-  const { picks, dist } = useMemo(() => {
-    if (!here) return { picks: [] as Pick[], dist: filter.dist as number };
-    const run = (min: number) => pickNow({ stats, wishes, rows, here, filter, radius: walkRadius(min), yesterday, couple });
-    const first = run(filter.dist);
-    if (first.length >= 5) return { picks: first, dist: filter.dist as number };
-    const wider = nextWalk(filter.dist);
-    const second = run(wider);
-    return second.length > first.length ? { picks: second, dist: wider } : { picks: first, dist: filter.dist as number };
-  }, [here, stats, wishes, rows, filter, yesterday, couple]);
+  const { picks, anyDay } = useMemo(
+    () => (here ? pickNow({ stats, wishes, rows, filter, yesterday, couple }) : { picks: [] as Pick[], anyDay: false }),
+    [here, stats, wishes, rows, filter, yesterday, couple]
+  );
 
   const [index, setIndex] = useState(0);
   useEffect(() => { setIndex(0); }, [picks]);
 
-  const count = filter.inc.length + filter.exc.length + (filter.dist !== 10 ? 1 : 0);
+  const count = filter.inc.length + filter.exc.length + (filter.dist !== DEFAULT_DIST ? 1 : 0);
   const chip = (key: string, text: string, kind: "inc" | "exc" | "dist", onRemove: () => void) => (
     <Pressable
       key={key}
@@ -72,7 +68,7 @@ export function NowMode({
         </Pressable>
         {filter.inc.map((c) => chip(`i${c}`, c, "inc", () => onChangeFilter({ ...filter, inc: filter.inc.filter((x) => x !== c) })))}
         {filter.exc.map((c) => chip(`e${c}`, `${c} 빼기`, "exc", () => onChangeFilter({ ...filter, exc: filter.exc.filter((x) => x !== c) })))}
-        {chip("dist", `도보 ${filter.dist}분`, "dist", onOpenFilter)}
+        {chip("dist", `${formatDistance(filter.dist)} 안`, "dist", onOpenFilter)}
       </ScrollView>
 
       <View style={{ flex: 1, marginTop: 12, minHeight: MAP_H + 190, borderRadius: 24, borderWidth: 1.5, borderColor: C.brick, backgroundColor: REC.paper, overflow: "hidden" }}>
@@ -81,7 +77,7 @@ export function NowMode({
         ) : picks.length === 0 ? (
           <Empty>
             <Text style={emptyText}>
-              {`도보 ${dist}분 안에서 고를 만한 곳을 아직 못 찾았어요.\n인증 기록이 쌓이면 이 동네도 추천해 드릴게요.`}
+              {`${formatDistance(filter.dist)} 안에서 최근 4주 이 시간대에 인증된 곳을 아직 못 찾았어요.\n인증 기록이 쌓이면 이 동네도 추천해 드릴게요.`}
             </Text>
             <Pressable onPress={onOpenFilter} style={{ marginTop: 10 }}>
               <Text style={{ fontFamily: F.sans, fontSize: 12.5, color: C.brick }}>필터 바꾸기</Text>
@@ -89,9 +85,9 @@ export function NowMode({
           </Empty>
         ) : (
           <>
-            <PickMap here={here} picks={picks} index={index} dist={dist} onPick={setIndex} />
-            {dist !== filter.dist && (
-              <Text style={{ marginTop: 8, marginHorizontal: 18, fontFamily: F.sans, fontSize: 11, color: C.faint }}>도보 {filter.dist}분 안이 적어 {dist}분까지 찾았어요</Text>
+            <PickMap here={here} picks={picks} index={index} dist={filter.dist} onPick={setIndex} />
+            {anyDay && (
+              <Text style={{ marginTop: 8, marginHorizontal: 18, fontFamily: F.sans, fontSize: 11, color: C.faint }}>같은 요일 기록이 적어 요일 상관없이 이 시간대로 골랐어요</Text>
             )}
             <Pager picks={picks} index={index} onIndex={setIndex} />
           </>
@@ -108,7 +104,7 @@ const Empty = ({ children }: { children: React.ReactNode }) => (
 
 /** 위: 지도(높이 270) — 내 위치 · 거리 범위 원 · 번호 마커. 상호작용은 끕니다. */
 function PickMap({ here, picks, index, dist, onPick }: { here: RecHere; picks: Pick[]; index: number; dist: number; onPick: (i: number) => void }) {
-  const radius = walkRadius(dist);
+  const radius = dist;
   const region = useMemo(() => regionAround(here.lat, here.lng, radius), [here.lat, here.lng, radius]);
   return (
     <View style={{ height: MAP_H, borderBottomWidth: 1, borderColor: C.lineSoft }}>
@@ -121,7 +117,7 @@ function PickMap({ here, picks, index, dist, onPick }: { here: RecHere; picks: P
         isShowIndoorLevelPicker={false}
       >
         <NaverMapCircleOverlay latitude={here.lat} longitude={here.lng} radius={radius} color="rgba(201,165,147,0.08)" outlineWidth={1.2} outlineColor={REC.ring} />
-        <RingLabelMarker lat={here.lat + radius / 111320} lng={here.lng} text={`도보 ${dist}분`} />
+        <RingLabelMarker lat={here.lat + radius / 111320} lng={here.lng} text={formatDistance(dist)} />
         <HereMarker lat={here.lat} lng={here.lng} />
         {picks.map((p, i) => (
           <NumberMarker key={p.key} lat={p.lat} lng={p.lng} n={i + 1} name={p.name} active={i === index} onTap={() => onPick(i)} />
@@ -185,8 +181,7 @@ function PickPage({ p, n, width }: { p: Pick; n: number; width: number }) {
     setState({ recHeading: { placeKey: p.key, name: p.name, lat: p.lat, lng: p.lng, at: Date.now() } });
     openDirections(p);
   };
-  // 영업 시간은 아직 출처가 없어(§11) 「영업 정보 없음」.
-  const sub = [p.recCat ?? p.category, `도보 ${walkMin(p.distance)}분`, "영업 정보 없음"].filter(Boolean).join(" · ");
+  const sub = [p.recCat ?? p.category, formatDistance(p.distance)].filter(Boolean).join(" · ");
   return (
     <View style={{ width, paddingHorizontal: 18, paddingTop: 16 }}>
       <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
@@ -199,6 +194,7 @@ function PickPage({ p, n, width }: { p: Pick; n: number; width: number }) {
         </Pressable>
       </View>
       <Text numberOfLines={1} style={{ marginTop: 6, fontFamily: F.sans, fontSize: 12, color: C.muted }}>{sub}</Text>
+      {!!p.placeUrl && <KakaoLink url={p.placeUrl} />}
       <View style={{ marginTop: 12, gap: 7 }}>
         {p.reasons.map((r, i) => (
           <View key={r} style={{ flexDirection: "row", gap: 8 }}>

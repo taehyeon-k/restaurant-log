@@ -6,9 +6,10 @@ import { PaperMap } from "@/components/PaperMap";
 import { useAppState } from "@/data/store";
 import { report } from "@/features/community/api";
 import { useMyTours, useTourDetail, useTourWeekly, type Tour, type TourPlace } from "@/features/recommend/api";
-import { BackPill, HereMarker, NumberMarker, REC, Stamp } from "@/features/recommend/ui";
+import { BackPill, HereMarker, KakaoLink, NumberMarker, REC, Stamp } from "@/features/recommend/ui";
 import { metersBetweenLL } from "@/lib/geo";
-import { fmtDistance, pctOf } from "@/lib/recommend";
+import { formatDistance } from "@/lib/distance";
+import { pctOf } from "@/lib/recommend";
 import { C, F } from "@/theme";
 
 const dotted = (iso: string) => {
@@ -97,13 +98,16 @@ export default function TourDetail() {
             return (
               <View key={p.place} style={{ flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 12, borderBottomWidth: i < sorted.length - 1 ? 1 : 0, borderColor: C.lineSoft }}>
                 <Text style={{ width: 18, fontFamily: F.mono, fontSize: 11, color: C.faint }}>{i + 1}</Text>
-                <View style={{ flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: 6 }}>
-                  <Text numberOfLines={1} style={{ flexShrink: 1, fontFamily: F.serif, fontSize: 14.5, color: C.ink }}>{p.name}</Text>
-                  {before && (
-                    <View style={{ borderRadius: 6, backgroundColor: REC.ink, paddingHorizontal: 6, paddingVertical: 2 }}>
-                      <Text style={{ fontFamily: F.sansMd, fontSize: 9.5, color: REC.paper }}>방송 전 방문</Text>
-                    </View>
-                  )}
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                    <Text numberOfLines={1} style={{ flexShrink: 1, fontFamily: F.serif, fontSize: 14.5, color: C.ink }}>{p.name}</Text>
+                    {before && (
+                      <View style={{ borderRadius: 6, backgroundColor: REC.ink, paddingHorizontal: 6, paddingVertical: 2 }}>
+                        <Text style={{ fontFamily: F.sansMd, fontSize: 9.5, color: REC.paper }}>방송 전 방문</Text>
+                      </View>
+                    )}
+                  </View>
+                  {!!p.place_url && <KakaoLink url={p.place_url} />}
                 </View>
                 {p.my_first_at ? (
                   <View style={{ borderRadius: 12, borderWidth: 1.2, borderStyle: "dashed", borderColor: C.brick, paddingHorizontal: 8, paddingVertical: 3 }}>
@@ -111,7 +115,7 @@ export default function TourDetail() {
                   </View>
                 ) : (
                   <Text style={{ fontFamily: F.mono, fontSize: 10.5, color: C.muted }}>
-                    {[p.distance != null && fmtDistance(p.distance), p.revisit_rate != null && `재방문 ${pctOf(p.revisit_rate)}%`].filter(Boolean).join(" · ")}
+                    {[p.distance != null && formatDistance(p.distance), p.revisit_rate != null && `재방문 ${pctOf(p.revisit_rate)}%`].filter(Boolean).join(" · ")}
                   </Text>
                 )}
               </View>

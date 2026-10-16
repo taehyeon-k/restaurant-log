@@ -1,6 +1,6 @@
 import { NaverMapMarkerOverlay } from "@mj-studio/react-native-naver-map";
 import { memo } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Linking, Pressable, Text, View } from "react-native";
 import Svg, { Circle, Path } from "react-native-svg";
 import { C, F } from "@/theme";
 
@@ -83,7 +83,7 @@ export const HereMarker = memo(function HereMarker({ lat, lng }: { lat: number; 
   );
 });
 
-/** 거리 범위 라벨(「도보 10분」) — 원 위 꼭대기에 붙입니다. */
+/** 거리 범위 라벨(「1km」) — 원 위 꼭대기에 붙입니다. */
 export const RingLabelMarker = memo(function RingLabelMarker({ lat, lng, text }: { lat: number; lng: number; text: string }) {
   const w = text.length * 10 + 16;
   return (
@@ -97,7 +97,7 @@ export const RingLabelMarker = memo(function RingLabelMarker({ lat, lng, text }:
   );
 });
 
-/** 경로 가운데 「도보 6분 · 450m」. */
+/** 경로 가운데 「450m」. */
 export const RouteLabelMarker = RingLabelMarker;
 
 /** 「● 내 위치」 범례 — 지도 오른쪽 아래. */
@@ -137,5 +137,19 @@ export function SectionHead({ title, right }: { title: string; right?: string })
       <Text style={{ fontFamily: F.serif, fontSize: 16, color: C.ink }}>{title}</Text>
       {!!right && <Text style={{ fontFamily: F.mono, fontSize: 10, color: C.faint }}>{right}</Text>}
     </View>
+  );
+}
+
+/** 「카카오맵에서 보기」 — 영업시간은 여기서 확인합니다. 12 #8a8377, 밑줄 없음, 터치 44. place_url 이 없으면 그리지 않습니다. */
+export function KakaoLink({ url }: { url: string }) {
+  return (
+    <Pressable
+      onPress={() => Linking.openURL(url).catch(() => {})}
+      accessibilityRole="link"
+      hitSlop={{ top: 12, bottom: 12, left: 4, right: 12 }}
+      style={{ alignSelf: "flex-start", minHeight: 20, justifyContent: "center", marginTop: 2 }}
+    >
+      <Text style={{ fontFamily: F.sans, fontSize: 12, color: REC.label }}>카카오맵에서 보기</Text>
+    </Pressable>
   );
 }

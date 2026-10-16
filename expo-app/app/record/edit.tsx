@@ -146,6 +146,8 @@ export default function EditRoute() {
 
   // 새 기록은 「가게」 칸에 적는 대로 음식점·카페를 찾아 고르면 자리까지 채웁니다.
   const [hits, setHits] = useState<FoodPlace[]>([]);
+  /** 검색에서 고른 가게의 카카오 장소 페이지. undefined = 손대지 않음, null = 이름을 고쳐 지움. */
+  const [placeUrl, setPlaceUrl] = useState<string | null | undefined>(undefined);
   const [suggestOpen, setSuggestOpen] = useState(false);
   const skipSearch = useRef(false);
   useEffect(() => {
@@ -160,6 +162,7 @@ export default function EditRoute() {
     skipSearch.current = true;
     setName(r.name);
     setAddress(r.address);
+    setPlaceUrl(r.place_url ?? null);
     setSpot({ lat: r.lat, lng: r.lng });
     setHits([]);
     setSuggestOpen(false);
@@ -189,6 +192,7 @@ export default function EditRoute() {
         revisit,
         ...(isVerified ? {} : { visited_at: visitedAt || null }),
         keywords,
+        ...(placeUrl !== undefined ? { place_url: placeUrl } : {}),
         updated_at: new Date().toISOString(),
         // TODO(커뮤니티 §5): 공개 범위(restaurants.visibility: private · friends · public) 선택 UI 는 아직 설계 중입니다.
         // 정해지면 여기서 함께 저장하세요. 그 전까지는 기본값 private 이고, 시험할 때는 DB 에서 직접 바꿉니다.
@@ -321,7 +325,7 @@ export default function EditRoute() {
           <Eyebrow>가게</Eyebrow>
           <TextInput
             value={name}
-            onChangeText={(t) => { setName(t); setSuggestOpen(true); }}
+            onChangeText={(t) => { setName(t); setPlaceUrl(null); setSuggestOpen(true); }}
             onFocus={() => setSuggestOpen(true)}
             onBlur={() => setTimeout(() => setSuggestOpen(false), 150)}
             placeholder="가게 이름" placeholderTextColor="#b3ada1" style={fieldStyle}

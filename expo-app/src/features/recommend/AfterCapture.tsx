@@ -3,7 +3,8 @@ import { Pressable, Text, View } from "react-native";
 import { setState, useAppState } from "@/data/store";
 import { todayIso } from "@/lib/anniversary";
 import { metersBetweenLL, norm } from "@/lib/geo";
-import { recCategoryOf, walkMin } from "@/lib/recommend";
+import { formatDistance } from "@/lib/distance";
+import { recCategoryOf } from "@/lib/recommend";
 import type { Restaurant } from "@/lib/types";
 import { C, F } from "@/theme";
 import { useMyTours, useNextAfter, useToursAt } from "./api";
@@ -79,7 +80,7 @@ export function AfterCapture({ placeKey, name, lat, lng, rows }: { placeKey: str
                       <Text style={{ fontFamily: F.sans, fontSize: 11, color: C.faint }}>{`  ${recCategoryOf(p.category, p.name) ?? p.category ?? ""}`}</Text>
                     </Text>
                     <Text style={{ marginTop: 2, fontFamily: F.mono, fontSize: 10, color: C.muted }}>
-                      {[d != null && `도보 ${walkMin(d)}분`, `이어서 간 사람 ${p.users}명`].filter(Boolean).join(" · ")}
+                      {[d != null && formatDistance(d), `이어서 간 사람 ${p.users}명`].filter(Boolean).join(" · ")}
                     </Text>
                   </View>
                   <Pressable

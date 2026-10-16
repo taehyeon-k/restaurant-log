@@ -313,6 +313,7 @@ export default function Capture() {
         region: twin?.region ?? picked.region,
         address,
         place_key: `${picked.name}|${address ?? ""}`.toLowerCase(),
+        place_url: twin?.place_url ?? picked.place_url ?? null,
         lat: twin?.lat ?? picked.lat, // 고른 가게의 좌표 — 읽은 위치는 저장하지 않습니다.
         lng: twin?.lng ?? picked.lng,
         rating: null, menu: null, menus: [], price_level: null, price_range: null, review: null, keywords: [],

@@ -2,13 +2,14 @@ import * as Haptics from "expo-haptics";
 import { useEffect, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { BottomSheetModal } from "@/components/ui";
-import { REC_CATEGORIES, WALKS, type RecCategory, type RecFilter } from "@/lib/recommend";
+import { formatDistance } from "@/lib/distance";
+import { DISTS, REC_CATEGORIES, type RecCategory, type RecFilter } from "@/lib/recommend";
 import { C, F } from "@/theme";
 import { REC } from "./ui";
 
 /**
  * 필터 시트(§5-2) — 먹고 싶은 것 · 빼고 싶은 것 · 거리. 한 종류는 둘 중 한쪽에만.
- * 「초기화」는 기본값(최근 3일 먹은 종류 빼기 · 도보 10분)으로 되돌립니다.
+ * 「초기화」는 기본값(최근 3일 먹은 종류 빼기 · 1km)으로 되돌립니다.
  */
 export function FilterSheet({
   visible, value, defaults, onClose, onApply,
@@ -67,7 +68,7 @@ export function FilterSheet({
 
       <Text style={{ marginTop: 18, fontFamily: F.sansBd, fontSize: 14, color: C.ink }}>거리</Text>
       <View style={{ marginTop: 10, flexDirection: "row", borderRadius: 18, borderWidth: 1, borderColor: C.lineSoft, backgroundColor: C.card, padding: 3 }}>
-        {WALKS.map((m) => {
+        {DISTS.map((m) => {
           const on = draft.dist === m;
           return (
             <Pressable
@@ -77,7 +78,7 @@ export function FilterSheet({
               accessibilityState={{ selected: on }}
               style={{ flex: 1, minHeight: 36, borderRadius: 15, alignItems: "center", justifyContent: "center", backgroundColor: on ? C.ink : "transparent" }}
             >
-              <Text style={{ fontFamily: F.sansMd, fontSize: 12.5, color: on ? C.card : C.muted }}>{m === WALKS[0] ? `도보 ${m}분` : `${m}분`}</Text>
+              <Text style={{ fontFamily: F.sansMd, fontSize: 12.5, color: on ? C.card : C.muted }}>{formatDistance(m)}</Text>
             </Pressable>
           );
         })}

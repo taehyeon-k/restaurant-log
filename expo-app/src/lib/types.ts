@@ -29,6 +29,8 @@ export type Restaurant = {
   photo_urls: string[];
  cover_index: number;
   place_key: string | null;
+  /** 카카오 장소 페이지(검색 · 둘레 후보에서 고른 가게만) — 추천 탭의 「카카오맵에서 보기」 */
+  place_url?: string | null;
   /** 그 자리에서 찍은 사진으로 인증된 기록 (모바일 카메라 흐름) */
   verified: boolean;
   /** 인증 촬영 시 위치 정확도(m). 좌표 자체는 남기지 않습니다. */

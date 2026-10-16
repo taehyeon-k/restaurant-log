@@ -23,6 +23,8 @@ export type Candidate = {
   distance: number | null;
   /** 이미 내 기록에 있는 가게 */
   mine: boolean;
+  /** 카카오 장소 페이지 — 기록에 함께 남깁니다. */
+  place_url?: string | null;
   /** 이 후보와 짝지어진 위시 — 담아둔 곳이면 후보 목록 맨 위로 올립니다. */
   wish?: Wish | null;
 };
@@ -85,6 +87,7 @@ export const nearToCandidate = (f: NearbyPlace): Candidate => ({
   lat: f.lat,
   lng: f.lng,
   distance: f.distance,
+  place_url: f.place_url ?? null,
   mine: false,
 });
 
@@ -158,6 +161,7 @@ export function searchHits(opts: {
       lat: p.lat,
       lng: p.lng,
       distance: geo ? metersBetween(geo, p.lat, p.lng) : null,
+      place_url: p.place_url ?? null,
       mine: false,
     });
   }

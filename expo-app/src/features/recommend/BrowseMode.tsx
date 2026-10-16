@@ -1,7 +1,8 @@
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
-import { clockOf, courseTitle, courseTotal, durationOf, fmtDistance, pctOf, recCategoryOf, statLine, walkMin, type Course, type PlaceStat } from "@/lib/recommend";
+import { formatDistance } from "@/lib/distance";
+import { courseTitle, pctOf, recCategoryOf, statLine, type Course, type PlaceStat } from "@/lib/recommend";
 import { C, F } from "@/theme";
 import type { Tour } from "./api";
 import { REC, SectionHead, Stamp } from "./ui";
@@ -25,7 +26,7 @@ export function BrowseMode({ courses, tours, revisits }: { courses: Course[]; to
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Text numberOfLines={1} style={{ fontFamily: F.serif, fontSize: 15, color: C.ink }}>{s.name}</Text>
                   <Text numberOfLines={1} style={{ marginTop: 2, fontFamily: F.sans, fontSize: 11, color: C.faint }}>
-                    {[recCategoryOf(s.category, s.name) ?? s.category, fmtDistance(s.distance_m)].filter(Boolean).join(" · ")}
+                    {[recCategoryOf(s.category, s.name) ?? s.category, formatDistance(s.distance_m)].filter(Boolean).join(" · ")}
                   </Text>
                   <Text numberOfLines={1} style={{ marginTop: 5, fontFamily: F.mono, fontSize: 10, color: C.muted }}>{statLine(s)}</Text>
                 </View>
@@ -57,9 +58,9 @@ function CourseCard({ courses }: { courses: Course[] }) {
   const router = useRouter();
   const [i, setI] = useState(0);
   const c = courses[Math.min(i, courses.length - 1)];
-  const cell = (time: string, kind: string | null, name: string) => (
+  const cell = (kind: string | null, name: string) => (
     <View style={{ flex: 1, minWidth: 0 }}>
-      <Text style={{ fontFamily: F.mono, fontSize: 10, color: REC.sub }}>{[time, kind].filter(Boolean).join(" · ")}</Text>
+      <Text style={{ fontFamily: F.mono, fontSize: 10, color: REC.sub }}>{kind ?? "—"}</Text>
       <Text numberOfLines={1} style={{ marginTop: 3, fontFamily: F.sansMd, fontSize: 13.5, color: REC.paper }}>{name}</Text>
     </View>
   );
@@ -79,13 +80,13 @@ function CourseCard({ courses }: { courses: Course[] }) {
       </View>
       <Text style={{ marginTop: 6, fontFamily: F.serif, fontSize: 19, color: REC.paper }}>{courseTitle(c)}</Text>
       <View style={{ marginTop: 14, flexDirection: "row", alignItems: "center", gap: 10 }}>
-        {cell(clockOf(c.start_min), c.a_category, c.a_name)}
-        <Text style={{ fontFamily: F.mono, fontSize: 10, color: REC.accent }}>도보 {walkMin(c.walk_m)}분 →</Text>
-        {cell(clockOf(c.start_min + c.gap_min), c.b_category, c.b_name)}
+        {cell(recCategoryOf(c.a_category, c.a_name) ?? c.a_category, c.a_name)}
+        <Text style={{ fontFamily: F.mono, fontSize: 10, color: REC.accent }}>{formatDistance(c.between_m)} →</Text>
+        {cell(recCategoryOf(c.b_category, c.b_name) ?? c.b_category, c.b_name)}
       </View>
       <View style={{ marginTop: 16, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
         <Text style={{ flex: 1, fontFamily: F.sans, fontSize: 11.5, color: REC.sub }}>
-          이 순서로 인증한 사람 {c.users}명 · 총 {durationOf(courseTotal(c))}
+          이 순서로 인증한 사람 {c.users}명
         </Text>
         <Pressable onPress={() => router.push({ pathname: "/recommend/course/[id]", params: { id: c.id } })} accessibilityRole="button" style={{ height: 34, borderRadius: 17, backgroundColor: REC.paper, paddingHorizontal: 13, justifyContent: "center" }}>
           <Text style={{ fontFamily: F.sansMd, fontSize: 12, color: REC.ink }}>코스 보기</Text>

@@ -12,7 +12,7 @@ type Place = {
   lng: number;
 };
 
-type NearbyPlace = Place & { distance: number; category: string | null; kind: "restaurant" | "cafe" };
+type NearbyPlace = Place & { distance: number; category: string | null; kind: "restaurant" | "cafe"; place_url: string | null };
 
 /** 카카오 카테고리 코드 — 음식점 / 카페 */
 const GROUP = { restaurant: "FD6", cafe: "CE7" } as const;
@@ -88,6 +88,7 @@ export async function GET(req: Request) {
             lng: Number(d.x),
             distance: Number(d.distance) || 0,
             kind,
+            place_url: d.place_url || null,
           };
         });
 
@@ -148,6 +149,7 @@ export async function GET(req: Request) {
             lng: Number(d.x),
             distance: 0,
             kind,
+            place_url: d.place_url || null,
           };
         });
 

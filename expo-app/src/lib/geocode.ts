@@ -17,11 +17,14 @@ export type NearbyPlace = Place & {
   distance: number;
   category: string | null;
   kind: "restaurant" | "cafe";
+  /** 카카오 장소 페이지 — 「카카오맵에서 보기」. 배포 전 서버면 없습니다. */
+  place_url?: string | null;
 };
 
 export type FoodPlace = Place & {
   category: string | null;
   kind: "restaurant" | "cafe";
+  place_url?: string | null;
 };
 
 async function ask(params: Record<string, string>, signal?: AbortSignal) {

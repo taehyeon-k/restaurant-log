@@ -6,19 +6,16 @@ import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-nati
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { PaperMap } from "@/components/PaperMap";
 import { setState, useAppState } from "@/data/store";
-import { openDirections, useRecCourses, useRecPlaces } from "@/features/recommend/api";
-import { BackPill, HereMarker, NumberMarker, REC, RouteLabelMarker } from "@/features/recommend/ui";
+import { openDirections, useRecCourses } from "@/features/recommend/api";
+import { BackPill, HereMarker, KakaoLink, NumberMarker, REC, RouteLabelMarker } from "@/features/recommend/ui";
 import { todayIso } from "@/lib/anniversary";
-import { clockOf, courseTitle, courseTotal, durationOf, fmtDistance, recCategoryOf, walkMin, walkRadius } from "@/lib/recommend";
+import { formatDistance } from "@/lib/distance";
+import { courseTitle, pctOf, recCategoryOf, todayLine } from "@/lib/recommend";
 import { C, F } from "@/theme";
-
-const nowMin = () => {
-  const d = new Date();
-  return d.getHours() * 60 + d.getMinutes();
-};
 
 /**
  * 코스 상세(HANDOFF-recommend-all §7, 시안 5c) — 같은 날 A 인증 후 2시간 안에 B 를 인증한 사람이 3명 넘는 동선.
+ * 시각 · 소요 시간 · 머무는 시간 · 영업 정보는 쓰지 않고 순서 · 거리 · 사람 수 · 인증 기록만 보여 줍니다(fix-distance-hours §4).
  * 추천 탭이 마지막으로 읽은 자리(store.recHere)로 rec_courses 를 다시 읽어(캐시) 이 코스를 찾습니다.
  */
 export default function CourseDetail() {
@@ -27,7 +24,6 @@ export default function CourseDetail() {
   const insets = useSafeAreaInsets();
   const { recHere: here } = useAppState();
   const { data: courses, isLoading } = useRecCourses(here);
-  const { data: stats = [] } = useRecPlaces(here, walkRadius(20));
   const c = courses?.find((x) => x.id === id) ?? null;
 
   const region = useMemo(() => {
@@ -53,8 +49,6 @@ export default function CourseDetail() {
     );
   }
 
-  const todayOf = (place: string) => stats.find((s) => s.place === place)?.today_count ?? 0;
-  const arrive = clockOf(nowMin() + walkMin(c.a_distance_m));
   const go = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setState({
@@ -68,25 +62,27 @@ export default function CourseDetail() {
     router.navigate("/");
   };
 
-  const row = (n: number, name: string, category: string | null, right: string) => (
+  const row = (n: number, name: string, category: string | null, today: string | null, rate: number | string | null, url: string | null) => (
     <View style={{ flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 12, borderBottomWidth: n === 1 ? 1 : 0, borderColor: C.lineSoft }}>
       <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: C.brick, alignItems: "center", justifyContent: "center" }}>
         <Text style={{ fontFamily: F.mono, fontSize: 11, color: "#ffffff" }}>{n}</Text>
       </View>
       <View style={{ flex: 1, minWidth: 0 }}>
-        <Text numberOfLines={1} style={{ fontFamily: F.serif, fontSize: 15, color: C.ink }}>{name}</Text>
-        <Text numberOfLines={1} style={{ marginTop: 2, fontFamily: F.sans, fontSize: 11, color: C.faint }}>
-          {[recCategoryOf(category, name) ?? category, "영업 정보 없음"].filter(Boolean).join(" · ")}
+        <Text numberOfLines={1} style={{ fontFamily: F.serif, fontSize: 15, color: C.ink }}>
+          {name}
+          <Text style={{ fontFamily: F.sans, fontSize: 11, color: C.faint }}>{`  ${recCategoryOf(category, name) ?? category ?? ""}`}</Text>
         </Text>
+        {!!today && <Text numberOfLines={1} style={{ marginTop: 2, fontFamily: F.sans, fontSize: 11, color: C.muted }}>{today}</Text>}
+        {!!url && <KakaoLink url={url} />}
       </View>
-      <Text style={{ fontFamily: F.mono, fontSize: 10.5, color: C.muted }}>{right}</Text>
+      {rate != null && <Text style={{ fontFamily: F.mono, fontSize: 10.5, color: C.brick }}>재방문 {pctOf(rate)}%</Text>}
     </View>
   );
 
   const reasons = [
     `최근 8주 동안 ${c.users}명이 이 순서로 이어 갔어요`,
-    `첫 곳에서 보통 ${durationOf(c.gap_min)} 머물고 걸어서 ${walkMin(c.walk_m)}분 옮겨요`,
-    here && !here.fallback ? `지금 출발하면 첫 곳에 ${arrive}쯤 닿아요` : `첫 곳 인증이 가장 많은 때는 ${clockOf(c.start_min)}이에요`,
+    "지난 4주 이 시간대에 두 곳 모두 인증이 있어요.",
+    ...(c.a_revisit_rate != null && pctOf(c.a_revisit_rate) > 0 ? [`첫 곳은 인증한 사람의 ${pctOf(c.a_revisit_rate)}%가 다시 갔어요`] : []),
   ];
 
   return (
@@ -96,7 +92,7 @@ export default function CourseDetail() {
         <Text style={{ marginTop: 18, fontFamily: F.mono, fontSize: 10, letterSpacing: 2.2, color: REC.label }}>COURSE{here?.name ? ` · ${here.name}` : ""}</Text>
         <Text style={{ marginTop: 6, fontFamily: F.serif, fontSize: 24, color: C.ink }}>{courseTitle(c)}</Text>
         <Text style={{ marginTop: 4, fontFamily: F.sans, fontSize: 12, color: C.muted }}>
-          총 {durationOf(courseTotal(c))} · 도보 {walkMin(c.walk_m)}분 · 2곳
+          {formatDistance(c.between_m)} · 2곳
         </Text>
 
         <View style={{ marginTop: 16, height: 178, borderRadius: 18, overflow: "hidden", borderWidth: 1, borderColor: C.lineSoft }}>
@@ -110,13 +106,13 @@ export default function CourseDetail() {
             {here && <HereMarker lat={here.lat} lng={here.lng} />}
             <NumberMarker lat={c.a_lat} lng={c.a_lng} n={1} name={c.a_name} active={false} label />
             <NumberMarker lat={c.b_lat} lng={c.b_lng} n={2} name={c.b_name} active={false} label />
-            <RouteLabelMarker lat={(c.a_lat + c.b_lat) / 2} lng={(c.a_lng + c.b_lng) / 2} text={`도보 ${walkMin(c.walk_m)}분 · ${fmtDistance(c.walk_m)}`} />
+            <RouteLabelMarker lat={(c.a_lat + c.b_lat) / 2} lng={(c.a_lng + c.b_lng) / 2} text={formatDistance(c.between_m)} />
           </PaperMap>
         </View>
 
         <View style={{ marginTop: 6 }}>
-          {row(1, c.a_name, c.a_category, `${clockOf(c.start_min)} · 머묾 ${c.gap_min}분`)}
-          {row(2, c.b_name, c.b_category, `${clockOf(c.start_min + c.gap_min)} · 오늘 인증 ${todayOf(c.b_place)}`)}
+          {row(1, c.a_name, c.a_category, todayLine(c.a_today_count, c.a_last_at), c.a_revisit_rate, c.a_place_url)}
+          {row(2, c.b_name, c.b_category, todayLine(c.b_today_count, c.b_last_at), c.b_revisit_rate, c.b_place_url)}
         </View>
 
         <Text style={{ marginTop: 18, fontFamily: F.serif, fontSize: 16, color: C.ink }}>이 코스를 고른 까닭</Text>

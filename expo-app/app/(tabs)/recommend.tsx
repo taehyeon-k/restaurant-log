@@ -12,15 +12,15 @@ import { FilterSheet } from "@/features/recommend/FilterSheet";
 import { NowMode } from "@/features/recommend/NowMode";
 import { REC } from "@/features/recommend/ui";
 import { todayIso } from "@/lib/anniversary";
-import { defaultFilter, recentExclude, REC_MODE_LABEL, walkRadius, type RecFilter, type RecMode } from "@/lib/recommend";
+import { defaultFilter, DISTS, normalizeDist, recentExclude, REC_MODE_LABEL, type RecFilter, type RecMode } from "@/lib/recommend";
 import { C, F, TAB_BAR_H } from "@/theme";
 
 const DAYS = ["일", "월", "화", "수", "목", "금", "토"];
 const pad = (n: number) => String(n).padStart(2, "0");
 const nowLabel = (d: Date) => `${DAYS[d.getDay()]} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 
-/** 「지금 뭐 먹지」는 도보 20분까지 한 번에 받아 두고 앱에서 거리를 좁힙니다(5곳이 안 차면 한 단계 늘리므로). */
-const NOW_FETCH_M = walkRadius(20);
+/** 「지금 뭐 먹지」는 가장 넓은 거리(2km)까지 한 번에 받아 두고 앱에서 필터 거리로 좁힙니다. */
+const NOW_FETCH_M = DISTS[DISTS.length - 1];
 /** 「다시 가는 사람이 많은 곳」 둘레. */
 const BROWSE_M = 3000;
 
@@ -50,10 +50,13 @@ export default function RecommendTab() {
   const { data: courses = [] } = useRecCourses(mode === "browse" ? here : null);
   const { data: tours = [] } = useMyTours();
 
-  // 필터 — 기본은 최근 3일 먹은 종류 빼기 · 도보 10분. 바꾼 값은 그 날만.
+  // 필터 — 기본은 최근 3일 먹은 종류 빼기 · 1km. 바꾼 값은 그 날만(옛 분 단위 거리는 1km 로).
   const defaults = useMemo(() => defaultFilter(rows, today), [rows, today]);
   const yesterday = useMemo(() => recentExclude(rows, today).yesterday, [rows, today]);
-  const filter: RecFilter = recFilter?.date === today ? recFilter : defaults;
+  const filter: RecFilter = useMemo(
+    () => (recFilter?.date === today ? { ...recFilter, dist: normalizeDist(recFilter.dist) } : defaults),
+    [recFilter, today, defaults]
+  );
   const applyFilter = (f: RecFilter) => {
     setState({ recFilter: { ...f, date: today } });
     setSheet(false);
