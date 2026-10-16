@@ -3,9 +3,8 @@ import { useMemo, useState } from "react";
 import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { PaperMap } from "@/components/PaperMap";
-import { useAppState } from "@/data/store";
 import { report } from "@/features/community/api";
-import { useMyTours, useTourDetail, useTourWeekly, type Tour, type TourPlace } from "@/features/recommend/api";
+import { useMyTours, useRecPoint, useTourDetail, useTourWeekly, type Tour, type TourPlace } from "@/features/recommend/api";
 import { BackPill, HereMarker, KakaoLink, NumberMarker, REC, Stamp } from "@/features/recommend/ui";
 import { metersBetweenLL } from "@/lib/geo";
 import { formatDistance } from "@/lib/distance";
@@ -27,7 +26,7 @@ export default function TourDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { recHere: here } = useAppState();
+  const { here } = useRecPoint();
   const { data: tours = [], isLoading } = useMyTours();
   const { data: places = [] } = useTourDetail(id);
   const t = tours.find((x) => x.id === id) ?? null;
@@ -189,7 +188,7 @@ function AfterAir({ tour, weekly }: { tour: Tour; weekly: { week_start: string; 
 /** 후보를 번호 마커로 — 화면을 덮는 지도. */
 function TourMap({ visible, places, onClose }: { visible: boolean; places: (TourPlace & { distance: number | null })[]; onClose: () => void }) {
   const insets = useSafeAreaInsets();
-  const { recHere: here } = useAppState();
+  const { here } = useRecPoint();
   const pts = useMemo(() => places.filter((p) => p.lat != null && p.lng != null), [places]);
   const region = useMemo(() => {
     const all = [...pts.map((p) => [p.lat!, p.lng!]), ...(here ? [[here.lat, here.lng]] : [])];

@@ -101,11 +101,11 @@ export const RingLabelMarker = memo(function RingLabelMarker({ lat, lng, text }:
 export const RouteLabelMarker = RingLabelMarker;
 
 /** 「● 내 위치」 범례 — 지도 오른쪽 아래. */
-export function HereLegend() {
+export function HereLegend({ label = "내 위치" }: { label?: string }) {
   return (
     <View pointerEvents="none" style={{ position: "absolute", right: 10, bottom: 10, flexDirection: "row", alignItems: "center", gap: 5, borderRadius: 10, backgroundColor: "rgba(251,250,246,.92)", paddingHorizontal: 8, paddingVertical: 4 }}>
       <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: REC.here }} />
-      <Text style={{ fontFamily: F.sans, fontSize: 10, color: C.muted }}>내 위치</Text>
+      <Text style={{ fontFamily: F.sans, fontSize: 10, color: C.muted }}>{label}</Text>
     </View>
   );
 }

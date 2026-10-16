@@ -1,12 +1,12 @@
 import { NaverMapPolylineOverlay } from "@mj-studio/react-native-naver-map";
 import * as Haptics from "expo-haptics";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { PaperMap } from "@/components/PaperMap";
-import { setState, useAppState } from "@/data/store";
-import { openDirections, useRecCourses } from "@/features/recommend/api";
+import { setState } from "@/data/store";
+import { openDirections, useRecCourses, useRecPoint } from "@/features/recommend/api";
 import { BackPill, HereMarker, KakaoLink, NumberMarker, REC, RouteLabelMarker } from "@/features/recommend/ui";
 import { todayIso } from "@/lib/anniversary";
 import { formatDistance } from "@/lib/distance";
@@ -16,14 +16,16 @@ import { C, F } from "@/theme";
 /**
  * 코스 상세(HANDOFF-recommend-all §7, 시안 5c) — 같은 날 A 인증 후 2시간 안에 B 를 인증한 사람이 3명 넘는 동선.
  * 시각 · 소요 시간 · 머무는 시간 · 영업 정보는 쓰지 않고 순서 · 거리 · 사람 수 · 인증 기록만 보여 줍니다(fix-distance-hours §4).
- * 추천 탭이 마지막으로 읽은 자리(store.recHere)로 rec_courses 를 다시 읽어(캐시) 이 코스를 찾습니다.
+ * 추천 탭과 같은 기준(고른 자리 · 시각, 없으면 지금 위치 · 지금)으로 rec_courses 를 다시 읽어(캐시) 이 코스를 찾습니다.
  */
 export default function CourseDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { recHere: here } = useAppState();
-  const { data: courses, isLoading } = useRecCourses(here);
+  const { here, at } = useRecPoint();
+  const { data: courses, isLoading } = useRecCourses(here, at);
+  // 지도를 만지는 동안 세로 스크롤을 멈춥니다.
+  const [mapTouch, setMapTouch] = useState(false);
   const c = courses?.find((x) => x.id === id) ?? null;
 
   const region = useMemo(() => {
@@ -87,7 +89,7 @@ export default function CourseDetail() {
 
   return (
     <View style={{ flex: 1, backgroundColor: C.paper }}>
-      <ScrollView contentContainerStyle={{ paddingTop: insets.top + 10, paddingHorizontal: 22, paddingBottom: 24 }}>
+      <ScrollView scrollEnabled={!mapTouch} contentContainerStyle={{ paddingTop: insets.top + 10, paddingHorizontal: 22, paddingBottom: 24 }}>
         <BackPill label="둘러보기" onPress={() => router.back()} />
         <Text style={{ marginTop: 18, fontFamily: F.mono, fontSize: 10, letterSpacing: 2.2, color: REC.label }}>COURSE{here?.name ? ` · ${here.name}` : ""}</Text>
         <Text style={{ marginTop: 6, fontFamily: F.serif, fontSize: 24, color: C.ink }}>{courseTitle(c)}</Text>
@@ -95,8 +97,13 @@ export default function CourseDetail() {
           {formatDistance(c.between_m)} · 2곳
         </Text>
 
-        <View style={{ marginTop: 16, height: 178, borderRadius: 18, overflow: "hidden", borderWidth: 1, borderColor: C.lineSoft }}>
-          <PaperMap region={region} isScrollGesturesEnabled={false} isZoomGesturesEnabled={false} isRotateGesturesEnabled={false} isTiltGesturesEnabled={false}>
+        <View
+          style={{ marginTop: 16, height: 178, borderRadius: 18, overflow: "hidden", borderWidth: 1, borderColor: C.lineSoft }}
+          onTouchStart={() => setMapTouch(true)}
+          onTouchEnd={() => setMapTouch(false)}
+          onTouchCancel={() => setMapTouch(false)}
+        >
+          <PaperMap region={region} isRotateGesturesEnabled={false} isTiltGesturesEnabled={false}>
             <NaverMapPolylineOverlay
               coords={[...(here ? [{ latitude: here.lat, longitude: here.lng }] : []), { latitude: c.a_lat, longitude: c.a_lng }, { latitude: c.b_lat, longitude: c.b_lng }]}
               width={2.5}

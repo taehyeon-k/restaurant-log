@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import * as Location from "expo-location";
 import { useEffect, useState } from "react";
 import { Linking } from "react-native";
-import { getState, setState, type RecHere } from "@/data/store";
+import { getState, setState, useAppState, type RecHere } from "@/data/store";
 import { reverseGeocode } from "@/lib/geocode";
 import { areaOf, frequentSpot, type Course, type PlaceStat } from "@/lib/recommend";
 import { supabase } from "@/lib/supabase";
@@ -17,13 +17,16 @@ import type { Restaurant } from "@/lib/types";
 const cell = (n: number) => Math.round(n * 1000) / 1000;
 const FIVE_MIN = 5 * 60 * 1000;
 
-export const useRecPlaces = (here: { lat: number; lng: number } | null, radius: number) =>
+/** at — 기준 시각(ms). null 이면 지금(서버 now()). 시간대 인증 수가 이 요일 · 시각으로 셉니다. */
+const atParam = (at: number | null | undefined) => (at ? { p_at: new Date(at).toISOString() } : {});
+
+export const useRecPlaces = (here: { lat: number; lng: number } | null, radius: number, at?: number | null) =>
   useQuery({
-    queryKey: ["rec", "places", here && cell(here.lat), here && cell(here.lng), radius],
+    queryKey: ["rec", "places", here && cell(here.lat), here && cell(here.lng), radius, at ?? null],
     enabled: !!here,
     staleTime: FIVE_MIN,
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("rec_places", { p_lat: here!.lat, p_lng: here!.lng, p_radius_m: radius });
+      const { data, error } = await supabase.rpc("rec_places", { p_lat: here!.lat, p_lng: here!.lng, p_radius_m: radius, ...atParam(at) });
       if (error) throw new Error(error.message);
       return (data ?? []) as PlaceStat[];
     },
@@ -32,13 +35,13 @@ export const useRecPlaces = (here: { lat: number; lng: number } | null, radius: 
 /** 「지금 시작하는 코스」 출발 반경. */
 const COURSE_START_M = 2000;
 
-export const useRecCourses = (here: { lat: number; lng: number } | null) =>
+export const useRecCourses = (here: { lat: number; lng: number } | null, at?: number | null) =>
   useQuery({
-    queryKey: ["rec", "courses", here && cell(here.lat), here && cell(here.lng)],
+    queryKey: ["rec", "courses", here && cell(here.lat), here && cell(here.lng), at ?? null],
     enabled: !!here,
     staleTime: FIVE_MIN,
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("rec_courses", { p_lat: here!.lat, p_lng: here!.lng, p_radius_m: COURSE_START_M });
+      const { data, error } = await supabase.rpc("rec_courses", { p_lat: here!.lat, p_lng: here!.lng, p_radius_m: COURSE_START_M, ...atParam(at) });
       if (error) throw new Error(error.message);
       return (data ?? []) as Course[];
     },
@@ -150,6 +153,15 @@ export function useRecHere(rows: Restaurant[]) {
   }, [spot?.name, spot?.lat, spot?.lng]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return { here, denied };
+}
+
+/**
+ * 추천 기준 — 머리에서 고른 자리 · 시각이 있으면 그것, 없으면 지금 위치(store.recHere) · 지금 시각(at = null).
+ * 코스 · 투어 상세가 탭과 같은 기준으로 셉니다.
+ */
+export function useRecPoint() {
+  const { recHere, recPlace, recAt } = useAppState();
+  return { here: recPlace ?? recHere, at: recAt };
 }
 
 /** 길 안내 — 네이버 지도 앱 도보 길찾기, 앱이 없으면 웹 검색. */

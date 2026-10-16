@@ -26,15 +26,20 @@ function regionAround(lat: number, lng: number, radius: number) {
  * 후보는 2km 안, 가까운 곳 위주로(모자라면 조건을 풀고 10km · 내 위시까지, recommend.ts pickNow) — 최근 4주 같은 요일 · 시간대에 인증이 있는 곳 — 5곳이 안 차면 요일 조건을 빼고, 그래도 없으면 빈 상태.
  */
 export function NowMode({
-  here, stats, loading, wishes, rows, filter, yesterday, couple, onOpenFilter, onChangeFilter,
+  here, stats, loading, wishes, rows, filter, yesterday, couple, at, pointLabel, onMapTouch, onOpenFilter, onChangeFilter,
 }: {
   here: RecHere | null; stats: PlaceStat[]; loading: boolean; wishes: Wish[]; rows: Restaurant[];
   filter: RecFilter; yesterday: RecCategory[]; couple: boolean;
+  /** 머리에서 고른 기준 시각(ms) — null 이면 지금. 까닭 문장의 요일도 이 시각으로. */
+  at: number | null;
+  pointLabel: string;
+  /** 지도를 만지기 시작 · 끝 — 부모가 세로 스크롤을 잠급니다. */
+  onMapTouch: (touching: boolean) => void;
   onOpenFilter: () => void; onChangeFilter: (f: RecFilter) => void;
 }) {
   const { picks, relax } = useMemo(
-    () => (here ? pickNow({ stats, wishes, rows, filter, yesterday, couple, here }) : { picks: [] as Pick[], relax: { kind: "strict" } as Relax }),
-    [here, stats, wishes, rows, filter, yesterday, couple]
+    () => (here ? pickNow({ stats, wishes, rows, filter, yesterday, couple, here, now: at ? new Date(at) : undefined }) : { picks: [] as Pick[], relax: { kind: "strict" } as Relax }),
+    [here, stats, wishes, rows, filter, yesterday, couple, at]
   );
 
   const [index, setIndex] = useState(0);
@@ -83,7 +88,7 @@ export function NowMode({
           </Empty>
         ) : (
           <>
-            <PickMap here={here} picks={picks} index={index} onPick={setIndex} />
+            <PickMap here={here} picks={picks} index={index} onPick={setIndex} pointLabel={pointLabel} onTouch={onMapTouch} />
             {relax.kind !== "strict" && (
               <Text style={{ marginTop: 8, marginHorizontal: 18, fontFamily: F.sans, fontSize: 11, color: C.faint }}>{relaxLine(relax)}</Text>
             )}
@@ -108,16 +113,21 @@ const Empty = ({ children }: { children: React.ReactNode }) => (
   <View style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: 24 }}>{children}</View>
 );
 
-/** 위: 지도(높이 270) — 내 위치 · 번호 마커. 가장 먼 후보까지 담고, 상호작용은 끕니다. */
-function PickMap({ here, picks, index, onPick }: { here: RecHere; picks: Pick[]; index: number; onPick: (i: number) => void }) {
+/** 위: 지도(높이 270) — 기준 위치 · 번호 마커. 처음엔 가장 먼 후보까지 담고, 끌기 · 확대 · 축소가 됩니다. */
+function PickMap({
+  here, picks, index, onPick, pointLabel, onTouch,
+}: { here: RecHere; picks: Pick[]; index: number; onPick: (i: number) => void; pointLabel: string; onTouch: (touching: boolean) => void }) {
   const radius = Math.max(250, ...picks.map((p) => p.distance)) * 1.1;
   const region = useMemo(() => regionAround(here.lat, here.lng, radius), [here.lat, here.lng, radius]);
   return (
-    <View style={{ height: MAP_H, borderBottomWidth: 1, borderColor: C.lineSoft }}>
+    <View
+      style={{ height: MAP_H, borderBottomWidth: 1, borderColor: C.lineSoft }}
+      onTouchStart={() => onTouch(true)}
+      onTouchEnd={() => onTouch(false)}
+      onTouchCancel={() => onTouch(false)}
+    >
       <PaperMap
         region={region}
-        isScrollGesturesEnabled={false}
-        isZoomGesturesEnabled={false}
         isRotateGesturesEnabled={false}
         isTiltGesturesEnabled={false}
         isShowIndoorLevelPicker={false}
@@ -127,7 +137,7 @@ function PickMap({ here, picks, index, onPick }: { here: RecHere; picks: Pick[];
           <NumberMarker key={p.key} lat={p.lat} lng={p.lng} n={i + 1} name={p.name} active={i === index} onTap={() => onPick(i)} />
         ))}
       </PaperMap>
-      <HereLegend />
+      <HereLegend label={pointLabel} />
     </View>
   );
 }

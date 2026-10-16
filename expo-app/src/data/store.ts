@@ -27,8 +27,11 @@ type State = {
   recHeading: RecHeading | null;
   /** 지금 따라가는 코스 — 다 인증하면 촬영 완료 화면에 「코스 완주」(§10). */
   recCourse: RecCourse | null;
-  /** 추천 탭이 마지막으로 읽은 자리 — 코스 · 투어 상세가 같은 자리로 다시 셉니다. */
+  /** 추천 탭이 마지막으로 읽은 자리(GPS 또는 자주 기록한 동네) — 코스 · 투어 상세가 같은 자리로 다시 셉니다. */
   recHere: RecHere | null;
+  /** 추천 탭 머리에서 고른 자리 · 시각 — null 이면 지금 위치 · 지금 시각. 앱을 닫으면 잊습니다. */
+  recPlace: RecHere | null;
+  recAt: number | null;
 };
 
 export type RecHeading = { placeKey: string; name: string; lat: number; lng: number; at: number };
@@ -37,7 +40,7 @@ export type RecHere = { lat: number; lng: number; name: string | null; fallback:
 let state: State = {
   kind: "restaurant", markerFilter: "all", ghost: null, spotPick: null,
   mapSegment: "records", communityTab: "friends", communitySeenSince: null,
-  recFilter: null, recHeading: null, recCourse: null, recHere: null,
+  recFilter: null, recHeading: null, recCourse: null, recHere: null, recPlace: null, recAt: null,
 };
 const subs = new Set<() => void>();
 
