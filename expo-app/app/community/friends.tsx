@@ -3,7 +3,7 @@ import * as Haptics from "expo-haptics";
 import * as Location from "expo-location";
 import { useRouter } from "expo-router";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
-import { FlatList, Image, Pressable, ScrollView, Text, View, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native";
+import { FlatList, Pressable, ScrollView, Text, View, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AddPersonIcon, BellLineIcon, BookmarkIcon } from "@/components/icons";
 import { PaperMap } from "@/components/PaperMap";
@@ -23,6 +23,7 @@ import { formatDistance, metersBetween } from "@/features/capture/logic";
 import { FriendMarker, friendPinSize } from "@/features/map/Markers";
 import { matchWish, type Wish } from "@/lib/types";
 import { C, F, SHADOW, TAB_BAR_H } from "@/theme";
+import { SignedImage } from "@/lib/signedPhoto";
 
 type View_ = "feed" | "map";
 type OnWish = (seed: WishSeed) => Promise<WishResult | null>;
@@ -319,7 +320,7 @@ function PhotoPager({ urls, height }: { urls: string[]; height: number }) {
     <View onLayout={(e) => setW(e.nativeEvent.layout.width)} style={{ height, borderRadius: 14, overflow: "hidden", backgroundColor: K.stripe }}>
       {w > 0 && (
         <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false} onMomentumScrollEnd={onScroll} nestedScrollEnabled>
-          {urls.map((u, i) => <Image key={u + i} source={{ uri: u }} style={{ width: w, height }} resizeMode="cover" />)}
+          {urls.map((u, i) => <SignedImage key={u + i} uri={u} style={{ width: w, height }} resizeMode="cover" />)}
         </ScrollView>
       )}
       <View pointerEvents="none" style={{ position: "absolute", bottom: 9, left: 0, right: 0, flexDirection: "row", justifyContent: "center", gap: 5 }}>

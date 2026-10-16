@@ -2,12 +2,13 @@ import * as ImagePicker from "expo-image-picker";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
-import { Image, KeyboardAvoidingView, Platform, Pressable, Text, TextInput, View } from "react-native";
+import { KeyboardAvoidingView, Platform, Pressable, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { refreshAll } from "@/data/invalidate";
 import { uploadPhoto } from "@/lib/photos";
 import { supabase } from "@/lib/supabase";
 import { C, F, SHADOW } from "@/theme";
+import { SignedImage } from "@/lib/signedPhoto";
 
 const MAX_LEN = 12;
 
@@ -78,7 +79,7 @@ export default function Welcome() {
 
       <View style={{ marginTop: 34, flexDirection: "row", alignItems: "center", gap: 16 }}>
         <View style={{ width: 78, height: 78, borderRadius: 39, borderWidth: 1, borderColor: C.line, backgroundColor: "#ded8cb", overflow: "hidden", alignItems: "center", justifyContent: "center" }}>
-          {avatarUrl ? <Image source={{ uri: avatarUrl }} style={{ width: 78, height: 78 }} /> : <Text style={{ fontFamily: F.mono, fontSize: 8.5, letterSpacing: 0.5, color: C.faint }}>{uploading ? "…" : "PHOTO"}</Text>}
+          {avatarUrl ? <SignedImage uri={avatarUrl} style={{ width: 78, height: 78 }} /> : <Text style={{ fontFamily: F.mono, fontSize: 8.5, letterSpacing: 0.5, color: C.faint }}>{uploading ? "…" : "PHOTO"}</Text>}
         </View>
         <Pressable onPress={pickPhoto} disabled={uploading} style={{ minHeight: 38, borderRadius: 19, borderWidth: 1, borderColor: C.line, backgroundColor: C.card, paddingHorizontal: 14, justifyContent: "center", opacity: uploading ? 0.7 : 1 }}>
           <Text style={{ fontFamily: F.sans, fontSize: 12.5, color: C.ink }}>{uploading ? "올리는 중…" : "사진 고르기"}</Text>

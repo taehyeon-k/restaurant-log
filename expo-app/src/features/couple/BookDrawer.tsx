@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import { Alert, Image, Modal, Platform, Pressable, ScrollView, Text, View } from "react-native";
+import { Alert, Modal, Platform, Pressable, ScrollView, Text, View } from "react-native";
 import Animated, { SlideInLeft } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
@@ -16,6 +16,7 @@ import { dayCount, todayIso } from "@/lib/anniversary";
 import { dottedDate, type Restaurant } from "@/lib/types";
 import { C, F } from "@/theme";
 import { Pair } from "./Avatars";
+import { SignedImage } from "@/lib/signedPhoto";
 
 const DRAWER_W = 308;
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -53,7 +54,7 @@ function AccountPhoto() {
         }}
       >
         {account?.avatarUrl ? (
-          <Image source={{ uri: account.avatarUrl }} style={{ width: 36, height: 36 }} />
+          <SignedImage uri={account.avatarUrl} style={{ width: 36, height: 36 }} />
         ) : account?.characterId ? (
           <View style={{ marginTop: 6 }}><Character id={account.characterId} size={34} /></View>
         ) : (

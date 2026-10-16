@@ -5,6 +5,7 @@ import { VerifiedMark } from "./icons";
 import { feltLevel, type PriceRow } from "@/lib/price";
 import { pinColor } from "@/lib/types";
 import { C, F, SHADOW } from "@/theme";
+import { SignedImage } from "@/lib/signedPhoto";
 
 export { VerifiedMark };
 
@@ -122,7 +123,7 @@ export function PhotoBox({
   };
   return (
     <View style={[box, style]}>
-      {src ? <Image source={{ uri: src }} style={StyleSheet.absoluteFill} /> : null}
+      {src ? <SignedImage uri={src} style={StyleSheet.absoluteFill} /> : null}
       {children}
     </View>
   );

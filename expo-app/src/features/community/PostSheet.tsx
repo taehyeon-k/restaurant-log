@@ -2,7 +2,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
-import { FlatList, Image, Modal, Pressable, ScrollView, Text, TextInput, useWindowDimensions, View } from "react-native";
+import { FlatList, Modal, Pressable, ScrollView, Text, TextInput, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
 import { CameraIcon } from "@/components/icons";
@@ -13,6 +13,7 @@ import { coverPhoto, type Restaurant } from "@/lib/types";
 import { C, F, SHADOW } from "@/theme";
 import { setCloseFriends, upsertFriendPost, useCloseFriends, type Audience, type FriendPost, type PublicProfile } from "./api";
 import { Avatar, K, PhotoOrStripes, Segmented } from "./ui";
+import { SignedImage } from "@/lib/signedPhoto";
 
 const NOTE_MAX = 40;
 
@@ -198,7 +199,7 @@ export default function PostSheet({
             return (
               <Pressable key={url + i} onPress={() => togglePhoto(i)} accessibilityLabel={`사진 ${i + 1}${order >= 0 ? `, ${order + 1}번째` : ""}`}
                 style={{ width: 62, height: 62, borderRadius: 12, overflow: "hidden", borderWidth: order >= 0 ? 2 : 1, borderColor: order >= 0 ? C.brick : C.lineSoft }}>
-                <Image source={{ uri: url }} style={{ width: "100%", height: "100%", opacity: order >= 0 ? 1 : 0.55 }} />
+                <SignedImage uri={url} style={{ width: "100%", height: "100%", opacity: order >= 0 ? 1 : 0.55 }} />
                 {order >= 0 && (
                   <View style={{ position: "absolute", top: 4, right: 4, width: 18, height: 18, borderRadius: 9, backgroundColor: C.brick, alignItems: "center", justifyContent: "center" }}>
                     <Text style={{ fontFamily: F.mono, fontSize: 10, color: C.card }}>{order + 1}</Text>

@@ -1,7 +1,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
-import { Alert, Dimensions, Image, Modal, Platform, Pressable, ScrollView, Text, View } from "react-native";
+import { Alert, Dimensions, Modal, Platform, Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BookmarkIcon, ShareIcon, VerifiedMark } from "@/components/icons";
 import { ShareSheet } from "@/components/ShareSheet";
@@ -17,6 +17,7 @@ import { photosOf } from "@/lib/record";
 import { supabase } from "@/lib/supabase";
 import { dottedDate, verifiedDateTime, verifiedTime, type Restaurant } from "@/lib/types";
 import { C, F } from "@/theme";
+import { SignedImage } from "@/lib/signedPhoto";
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -206,7 +207,7 @@ export default function RecordRoute() {
             {photos.map((url, i) => (
               <Pressable key={url} onPress={() => setShown(i)} accessibilityLabel={`사진 ${i + 1}`}
                 style={{ width: 54, height: 54, borderRadius: 14, overflow: "hidden", backgroundColor: "#eae5da", borderWidth: i === idx ? 1.5 : 1, borderColor: i === idx ? C.brick : "#ded8cb" }}>
-                <Image source={{ uri: url }} style={{ width: "100%", height: "100%" }} />
+                <SignedImage uri={url} style={{ width: "100%", height: "100%" }} />
                 {i === cover && <Text style={{ position: "absolute", top: 1, right: 3, fontSize: 8, color: C.brick }}>★</Text>}
               </Pressable>
             ))}

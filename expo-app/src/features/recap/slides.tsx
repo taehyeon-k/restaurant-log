@@ -1,4 +1,4 @@
-import { Image, Pressable, StyleSheet, Text, View, type TextStyle } from "react-native";
+import { Pressable, StyleSheet, Text, View, type TextStyle } from "react-native";
 import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
 import { REGION_TIERS } from "@/lib/labels";
 import { pinColor } from "@/lib/types";
@@ -6,6 +6,7 @@ import { F } from "@/theme";
 import { A, CountUp, Rosette, Star } from "./anim";
 import type { RecapData, TopPlace } from "./compute";
 import { eunNeun, gwaWa, mdd, mmdd, nativeCount, parseQuarter, type Season } from "./seasons";
+import { SignedImage } from "@/lib/signedPhoto";
 
 /**
  * 리캡 14장 — HANDOFF quarterly recap §1 Slides. 위치·크기·문구는 「DINARY Quarterly Recap - Player」
@@ -44,7 +45,7 @@ const mono = (size: number, color?: string, ls = 0): TextStyle => ({ fontFamily:
 function Thumb({ uri, category, size, radius, h }: { uri: string | null; category: string | null; size?: number; radius: number; h?: number }) {
   return (
     <View style={{ width: size ?? "100%", height: h ?? size, borderRadius: radius, overflow: "hidden", backgroundColor: uri ? "#ded8cb" : pinColor(category) + "40" }}>
-      {uri ? <Image source={{ uri }} style={StyleSheet.absoluteFill} resizeMode="cover" /> : null}
+      {uri ? <SignedImage uri={uri} style={StyleSheet.absoluteFill} resizeMode="cover" /> : null}
     </View>
   );
 }

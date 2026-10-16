@@ -1,9 +1,10 @@
 import { useNavigation, useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
-import { Image, Pressable, ScrollView, Text, View, type ViewStyle } from "react-native";
+import { Pressable, ScrollView, Text, View, type ViewStyle } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LABELS } from "@/lib/labels";
 import { C, F } from "@/theme";
+import { SignedImage } from "@/lib/signedPhoto";
 
 /** 디자인에서 거듭 쓰는 색 — 토큰(src/theme)에 없는 것만. */
 export const K = {
@@ -164,7 +165,7 @@ export function Avatar({ name, url, size, ring, seed }: { name: string; url?: st
   const inner = (
     <View style={{ width: ring ? size - 8 : size, height: ring ? size - 8 : size, borderRadius: size, overflow: "hidden", backgroundColor: tint(seed ?? name), alignItems: "center", justifyContent: "center" }}>
       {url ? (
-        <Image source={{ uri: url }} style={{ width: "100%", height: "100%" }} />
+        <SignedImage uri={url} style={{ width: "100%", height: "100%" }} />
       ) : (
         <Text style={{ fontFamily: F.serif, fontSize: Math.round(size * 0.38), color: C.ink }}>{(name || "?").slice(0, 1)}</Text>
       )}
@@ -205,7 +206,7 @@ export function PhotoOrStripes({ uri, height, width, radius, label }: { uri?: st
   return (
     <View style={{ width: width ?? "100%", height, borderRadius: radius, overflow: "hidden", backgroundColor: K.stripe, alignItems: "center", justifyContent: "center" }}>
       {uri ? (
-        <Image source={{ uri }} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
+        <SignedImage uri={uri} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
       ) : label ? (
         <Text style={{ fontFamily: F.mono, fontSize: 10, letterSpacing: 1.4, color: C.faint }}>{label}</Text>
       ) : null}

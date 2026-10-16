@@ -3,7 +3,7 @@ import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import { useState } from "react";
-import { Alert, Image, Pressable, ScrollView, Share, Text, View } from "react-native";
+import { Alert, Pressable, ScrollView, Share, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Row, Stat } from "@/components/AccountRows";
 import { Character } from "@/components/Character";
@@ -20,6 +20,7 @@ import { uploadPhoto } from "@/lib/photos";
 import { supabase } from "@/lib/supabase";
 import type { Restaurant } from "@/lib/types";
 import { C, F } from "@/theme";
+import { SignedImage } from "@/lib/signedPhoto";
 
 const PROVIDER_LABEL: Record<string, string> = { apple: "애플", google: "구글" };
 const BASE = process.env.EXPO_PUBLIC_API_BASE_URL ?? "";
@@ -149,7 +150,7 @@ export function MyAccount() {
       <View style={{ marginTop: 16, flexDirection: "row", alignItems: "center", gap: 14 }}>
         <Pressable onPress={pickPhoto} disabled={avatarBusy} accessibilityLabel="프로필 사진 바꾸기" style={{ opacity: avatarBusy ? 0.7 : 1 }}>
           <View style={{ width: 64, height: 64, borderRadius: 32, borderWidth: 1, borderColor: C.line, backgroundColor: "#ded8cb", overflow: "hidden" }}>
-            {account.avatarUrl && <Image source={{ uri: account.avatarUrl }} style={{ width: 64, height: 64 }} />}
+            {account.avatarUrl && <SignedImage uri={account.avatarUrl} style={{ width: 64, height: 64 }} />}
           </View>
           <View style={{ position: "absolute", right: -2, bottom: -2, width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: C.paper, backgroundColor: C.ink, alignItems: "center", justifyContent: "center" }}>
             <Text style={{ fontSize: 10, color: C.card }}>✎</Text>
