@@ -3,7 +3,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import { CameraView, useCameraPermissions, type CameraType, type FlashMode } from "expo-camera";
 import * as Haptics from "expo-haptics";
 import * as ImageManipulator from "expo-image-manipulator";
-import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
 import * as MediaLibrary from "expo-media-library/legacy";
 import { useNetInfo } from "@react-native-community/netinfo";
@@ -28,6 +27,7 @@ import { samePlace } from "@/lib/geo";
 import { nearbyPlaces, searchFoodPlaces, type FoodPlace } from "@/lib/geocode";
 import { drainQueue } from "@/features/queue/process";
 import { enqueue, persistPhoto } from "@/features/queue/db";
+import { MAX_PHOTOS, pickAlbumUris } from "@/lib/photos";
 import { supabase } from "@/lib/supabase";
 import {
   findMatchingWish, wishKind, wishMetInfo, WISH_AUTO_M, type Kind, type Wish,
@@ -214,8 +214,10 @@ export default function Capture() {
   }, [step]);
 
   async function fromGallery() {
-    const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.9 });
-    if (!res.canceled) onUnverified(); // 갤러리 사진은 인증되지 않습니다
+    const uris = await pickAlbumUris(MAX_PHOTOS);
+    if (!uris.length) return;
+    // 갤러리 사진은 인증되지 않습니다 — 기록 입력에 앨범 사진으로만 붙습니다
+    router.replace({ pathname: "/record/edit", params: { kind: pickKind, photos: JSON.stringify(uris) } });
   }
 
   /** 인증 없이 기록만 남깁니다 — 이름·종류를 채워 기록 입력을 엽니다. */

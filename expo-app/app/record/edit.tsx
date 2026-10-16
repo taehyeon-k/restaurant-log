@@ -3,18 +3,21 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  ActivityIndicator, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View,
+  ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { CameraIcon, VerifiedMark } from "@/components/icons";
+import { VerifiedMark } from "@/components/icons";
 import { Chip, Eyebrow, fieldStyle } from "@/components/ui";
 import { useActiveBook, useSaveNote } from "@/data/books";
 import { refreshAll } from "@/data/invalidate";
 import { useRows, useWishes } from "@/data/queries";
 import { samePlace } from "@/lib/geo";
 import { forwardGeocode, searchFoodPlaces, type FoodPlace } from "@/lib/geocode";
+import { MAX_PHOTOS, pickAlbumUris, removePhotoObjects, uploadAlbumPhoto } from "@/lib/photos";
 import { FELT_PRICE } from "@/lib/price";
+import { photosOf, verifiedShotOf } from "@/lib/record";
 import { regionFromAddress } from "@/lib/regions";
+import { SignedImage } from "@/lib/signedPhoto";
 import { supabase } from "@/lib/supabase";
 import {
   CATEGORIES, findMatchingWish, KEYWORDS, verifiedDateTime, wishMetInfo, WISH_AUTO_M, type Kind, type MenuItem,
@@ -24,6 +27,19 @@ import { C, F, SHADOW } from "@/theme";
 const pad = (n: number) => String(n).padStart(2, "0");
 const isoOf = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 const today = () => isoOf(new Date());
+/** 폼에 올라온 사진 한 장 — 이미 올린 것(ref, 버킷 경로)이거나 앨범에서 막 고른 것(uri). */
+type Pic = { ref: string; local: boolean };
+
+/** 촬영 화면이 넘긴 앨범 uri 들(JSON). 깨진 값은 빈 목록. */
+function parsePhotos(raw?: string): string[] {
+  try {
+    const v = JSON.parse(raw ?? "[]");
+    return Array.isArray(v) ? v.filter((u): u is string => typeof u === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
 const menuDigits = (v: string) => v.replace(/[^0-9]/g, "").slice(0, 9);
 
 /**
@@ -33,7 +49,7 @@ const menuDigits = (v: string) => v.replace(/[^0-9]/g, "").slice(0, 9);
 export default function EditRoute() {
   const p = useLocalSearchParams<{
     id?: string; kind?: Kind; name?: string; address?: string; lat?: string; lng?: string;
-    category?: string; revisit?: string; visitedAt?: string;
+    category?: string; revisit?: string; visitedAt?: string; photos?: string;
   }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -69,6 +85,43 @@ export default function EditRoute() {
   const [keywords, setKeywords] = useState<string[]>(record?.keywords ?? []);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  // 사진 — 고치기면 지금 사진들, 새 기록이면 촬영 화면에서 고른 앨범 사진들. 대표는 순서가 아니라 cover 로 가리킵니다.
+  const [pics, setPics] = useState<Pic[]>(() =>
+    [
+      ...(record ? photosOf(record).map((ref) => ({ ref, local: false })) : []),
+      ...parsePhotos(p.photos).map((ref) => ({ ref, local: true })),
+    ].slice(0, MAX_PHOTOS)
+  );
+  const [cover, setCover] = useState(() => (record ? Math.min(record.cover_index ?? 0, Math.max(0, photosOf(record).length - 1)) : 0));
+  // 인증 사진은 방문의 근거라 지울 수 없습니다.
+  const lockedRef = record ? verifiedShotOf(record) : null;
+
+  async function addPhotos() {
+    const uris = await pickAlbumUris(MAX_PHOTOS - pics.length);
+    if (uris.length) setPics((l) => [...l, ...uris.map((ref) => ({ ref, local: true }))].slice(0, MAX_PHOTOS));
+  }
+
+  function removePic(i: number) {
+    setPics((l) => l.filter((_, n) => n !== i));
+    setCover((c) => (i < c ? c - 1 : i === c ? 0 : c));
+  }
+
+  function photoMenu(i: number) {
+    const pic = pics[i];
+    if (pic.ref === lockedRef) {
+      Alert.alert("인증 사진", i === cover ? "지금 대표 사진이에요. 인증 사진은 방문의 근거라 지울 수 없어요." : "인증 사진은 방문의 근거라 지울 수 없어요.", [
+        ...(i === cover ? [] : [{ text: "대표 사진으로", onPress: () => setCover(i) }]),
+        { text: "확인", style: "cancel" as const },
+      ]);
+      return;
+    }
+    Alert.alert(`사진 ${i + 1}`, undefined, [
+      ...(i === cover ? [] : [{ text: "대표 사진으로", onPress: () => setCover(i) }]),
+      { text: "사진 지우기", style: "destructive" as const, onPress: () => removePic(i) },
+      { text: "취소", style: "cancel" as const },
+    ]);
+  }
 
   const setMenuAt = (i: number, patch: Partial<MenuItem>) => setMenus((l) => l.map((m, n) => (n === i ? { ...m, ...patch } : m)));
   const menuTotal = menus.reduce((sum, m) => sum + (m.price ?? 0), 0);
@@ -119,6 +172,7 @@ export default function EditRoute() {
     if (!canSave || saving) return;
     setSaving(true);
     setError("");
+    const uploaded: string[] = [];
     try {
       const cleanName = name.trim();
       const cleanAddress = address.trim();
@@ -140,10 +194,22 @@ export default function EditRoute() {
         // 정해지면 여기서 함께 저장하세요. 그 전까지는 기본값 private 이고, 시험할 때는 DB 에서 직접 바꿉니다.
       };
 
+      // 앨범에서 고른 사진을 먼저 올립니다. 인증 여부(verified · verified_at)는 건드리지 않습니다.
+      const refs: string[] = [];
+      for (const pic of pics) {
+        if (!pic.local) { refs.push(pic.ref); continue; }
+        const path = await uploadAlbumPhoto(pic.ref);
+        uploaded.push(path);
+        refs.push(path);
+      }
+      const coverAt = Math.min(cover, Math.max(0, refs.length - 1));
+      const photoFields = { photo_urls: refs, cover_index: coverAt, photo_url: refs[coverAt] ?? null };
+
       if (record) {
         const region = regionFromAddress(cleanAddress) || record.region;
-        const { error } = await supabase.from("restaurants").update({ ...shared, region, pending: false }).eq("id", record.id);
+        const { error } = await supabase.from("restaurants").update({ ...shared, ...photoFields, region, pending: false }).eq("id", record.id);
         if (error) throw new Error(error.message);
+        await removePhotoObjects(photosOf(record).filter((u) => !refs.includes(u)));
         // 연인 기록이면 별점·메모가 곧 찍은 사람의 한 줄입니다(HANDOFF-couple §3-6).
         if (isCouple) await saveNote(record.user_id, record.id, shared.rating, shared.review, false);
         await refreshAll(qc);
@@ -172,7 +238,7 @@ export default function EditRoute() {
         user_id: user.id, ...(bookId ? { book_id: bookId } : {}), kind, region: finalRegion,
         place_key: `${cleanName}|${finalAddress ?? ""}`.toLowerCase(),
         lat, lng, verified: false, acc: null,
-        ...shared, address: finalAddress,
+        ...shared, ...photoFields, address: finalAddress,
         revisit: revisit || Boolean(twin),
         from_wish: fromWish,
       }).select("id").single();
@@ -183,6 +249,7 @@ export default function EditRoute() {
       await refreshAll(qc);
       router.dismissAll();
     } catch (err) {
+      await removePhotoObjects(uploaded); // 기록이 저장되지 않았으니 올린 사진도 거둡니다
       setError(err instanceof Error ? err.message : "저장에 실패했습니다");
       setSaving(false);
     }
@@ -211,6 +278,44 @@ export default function EditRoute() {
             </View>
           </View>
         )}
+
+        <View style={{ marginTop: 18, gap: 9 }}>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "baseline" }}>
+            <Eyebrow>사진</Eyebrow>
+            {pics.length > 0 && <Text style={{ fontFamily: F.mono, fontSize: 11, color: C.faint }}>{pics.length}장 · 앨범</Text>}
+          </View>
+          {pics.length === 0 ? (
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
+              <Pressable onPress={addPhotos} accessibilityLabel="앨범에서 사진 고르기" style={s.addTile}>
+                <Text style={s.addTileText}>+ 앨범</Text>
+              </Pressable>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontFamily: F.sansMd, fontSize: 13, color: C.ink }}>앨범에서 고르기</Text>
+                <Text style={{ marginTop: 3, fontFamily: F.sans, fontSize: 11.5, lineHeight: 18, color: C.faint }}>
+                  최대 10장. 지금 없으면 나중에 기록 상세에서 더할 수 있어요.
+                </Text>
+              </View>
+            </View>
+          ) : (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+              {pics.map((pic, i) => (
+                <Pressable key={pic.ref} onPress={() => photoMenu(i)} accessibilityLabel={`사진 ${i + 1}`}
+                  style={[s.thumb, i === cover && { borderWidth: 1.5, borderColor: C.brick }]}>
+                  {pic.local
+                    ? <Image source={{ uri: pic.ref }} style={{ width: "100%", height: "100%" }} />
+                    : <SignedImage uri={pic.ref} style={{ width: "100%", height: "100%" }} />}
+                  {i === cover && <Text style={s.coverTag}>대표</Text>}
+                  {pic.ref === lockedRef && <View style={{ position: "absolute", right: 4, bottom: 4 }}><VerifiedMark size={18} /></View>}
+                </Pressable>
+              ))}
+              {pics.length < MAX_PHOTOS && (
+                <Pressable onPress={addPhotos} accessibilityLabel="앨범에서 사진 더하기" style={s.addTile}>
+                  <Text style={s.addTileText}>+ 앨범</Text>
+                </Pressable>
+              )}
+            </ScrollView>
+          )}
+        </View>
 
         <View style={{ marginTop: 18 }}>
           <Eyebrow>가게</Eyebrow>
@@ -379,11 +484,6 @@ export default function EditRoute() {
           </View>
         </View>
 
-        <View style={s.photoNote}>
-          <CameraIcon size={20} stroke={C.faint} strokeWidth={1.6} />
-          <Text style={{ flex: 1, fontFamily: F.sans, fontSize: 11.5, lineHeight: 18, color: C.faint }}>사진은 그 자리에서 찍으면 인증 도장이 함께 붙습니다.</Text>
-        </View>
-
         {!!error && <Text style={{ marginTop: 14, fontFamily: F.sans, fontSize: 12.5, color: "#a8412a" }}>{error}</Text>}
 
         <Pressable
@@ -417,8 +517,14 @@ const s = StyleSheet.create({
     marginTop: 20, flexDirection: "row", alignItems: "center", gap: 14, borderRadius: 18, borderWidth: 1,
     borderColor: "#e2c9bb", backgroundColor: "#f9f0e9", paddingHorizontal: 16, paddingVertical: 14,
   },
-  photoNote: {
-    marginTop: 16, flexDirection: "row", alignItems: "center", gap: 10, borderRadius: 18, borderWidth: 1,
-    borderStyle: "dashed", borderColor: "#d8d3c8", paddingHorizontal: 16, paddingVertical: 14,
+  addTile: {
+    width: 76, height: 76, borderRadius: 16, borderWidth: 1.5, borderStyle: "dashed", borderColor: "#cdc6b8",
+    alignItems: "center", justifyContent: "center",
+  },
+  addTileText: { fontFamily: F.sansMd, fontSize: 12, color: C.muted },
+  thumb: { width: 76, height: 76, borderRadius: 16, overflow: "hidden", backgroundColor: "#eae5da" },
+  coverTag: {
+    position: "absolute", left: 5, top: 5, borderRadius: 7, backgroundColor: C.brick, paddingHorizontal: 5, paddingVertical: 2,
+    fontFamily: F.mono, fontSize: 9, color: C.card, overflow: "hidden",
   },
 });

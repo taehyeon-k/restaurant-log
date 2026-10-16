@@ -1,11 +1,11 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
-import { Alert, Dimensions, Modal, Platform, Pressable, ScrollView, Text, View } from "react-native";
+import { ActivityIndicator, Alert, Dimensions, Image, Modal, Platform, Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BookmarkIcon, ShareIcon, VerifiedMark } from "@/components/icons";
 import { ShareSheet } from "@/components/ShareSheet";
-import { BackButton, Button, Eyebrow, MobileStars, PhotoBox, Pigs } from "@/components/ui";
+import { BackButton, BottomSheetModal, Button, Eyebrow, MobileStars, PhotoBox, Pigs } from "@/components/ui";
 import { copyToPersonal, PARTNER_COLOR, setActiveBook, useActiveBook, useAnniversaryPicks, useRecordNotes, type BookMember } from "@/data/books";
 import { refreshAll } from "@/data/invalidate";
 import { usePersonalRows, useRows } from "@/data/queries";
@@ -13,7 +13,8 @@ import { Pair } from "@/features/couple/Avatars";
 import CoupleNotes from "@/features/couple/CoupleNotes";
 import { dottedWithDay, mealLabels } from "@/lib/anniversary";
 import { iGa } from "@/lib/josa";
-import { photosOf } from "@/lib/record";
+import { MAX_PHOTOS, pickAlbumUris, removePhotoObjects, uploadAlbumPhoto } from "@/lib/photos";
+import { photosOf, verifiedShotOf } from "@/lib/record";
 import { supabase } from "@/lib/supabase";
 import { dottedDate, verifiedDateTime, verifiedTime, type Restaurant } from "@/lib/types";
 import { C, F } from "@/theme";
@@ -87,6 +88,9 @@ export default function RecordRoute() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [sharing, setSharing] = useState(false);
+  // 앨범에서 막 고른 사진 — 올리는 동안 썸네일 줄 끝에 어둡게 보입니다.
+  const [pending, setPending] = useState<string[]>([]);
+  const [sheetIdx, setSheetIdx] = useState<number | null>(null);
   // 연인 기록(HANDOFF-couple §3-6) — 사람별 한 줄, 「태현이 인증」, 기념일 라벨. 기록 자체는 찍은 사람만 고칩니다.
   const { book, books, isCouple, readOnly, me, partner } = useActiveBook();
   const { data: notes = [] } = useRecordNotes();
@@ -129,6 +133,72 @@ export default function RecordRoute() {
 
   const idx = shown ?? cover;
   const current = photos[idx] ?? null;
+  const verifiedShot = verifiedShotOf(record);
+  // 연인 기록은 둘 다 사진을 더할 수 있습니다. 인증·인증 사진은 그대로 둡니다.
+  const canAddPhotos = !readOnly && !record.pending;
+  const room = MAX_PHOTOS - photos.length - pending.length;
+
+  /** 사진 목록을 한꺼번에 바꿔 저장합니다(photo_url 은 늘 대표와 맞춥니다). verified · verified_at 은 건드리지 않습니다. */
+  async function savePhotos(list: string[], coverAt: number) {
+    const at = Math.min(coverAt, Math.max(0, list.length - 1));
+    const { error } = await supabase
+      .from("restaurants")
+      .update({ photo_urls: list, cover_index: at, photo_url: list[at] ?? null, updated_at: new Date().toISOString() })
+      .eq("id", record!.id);
+    if (error) throw new Error(error.message);
+    await refreshAll(qc);
+  }
+
+  async function addAlbum() {
+    if (room <= 0) return setError(`사진은 최대 ${MAX_PHOTOS}장이에요`);
+    const uris = await pickAlbumUris(room);
+    if (!uris.length) return;
+    setError("");
+    setPending((l) => [...l, ...uris]);
+    const uploaded: string[] = [];
+    try {
+      for (const uri of uris) uploaded.push(await uploadAlbumPhoto(uri));
+      // 그 사이 다른 쪽(연인)이 더했을 수 있어 DB 의 지금 목록 뒤에 붙입니다.
+      const { data, error } = await supabase.from("restaurants").select("photo_urls, photo_url, cover_index").eq("id", record!.id).single();
+      if (error) throw new Error(error.message);
+      const now = photosOf(data as Restaurant);
+      await savePhotos([...now, ...uploaded].slice(0, MAX_PHOTOS), (data as Restaurant).cover_index ?? 0);
+    } catch (e) {
+      await removePhotoObjects(uploaded);
+      setError(e instanceof Error ? e.message : "사진을 올리지 못했어요");
+    } finally {
+      setPending((l) => l.filter((u) => !uris.includes(u)));
+    }
+  }
+
+  async function setCoverAt(i: number) {
+    setSheetIdx(null);
+    setBusy(true);
+    try { await savePhotos(photos, i); } catch (e) { setError((e as Error).message); }
+    setBusy(false);
+  }
+
+  function deleteAt(i: number) {
+    setSheetIdx(null);
+    Alert.alert(`사진 ${i + 1}을 지울까요?`, undefined, [
+      { text: "취소", style: "cancel" },
+      {
+        text: "지우기",
+        style: "destructive",
+        onPress: async () => {
+          setBusy(true);
+          try {
+            await savePhotos(photos.filter((_, n) => n !== i), i < cover ? cover - 1 : i === cover ? 0 : cover);
+            await removePhotoObjects([photos[i]]);
+            setShown(null);
+          } catch (e) {
+            setError((e as Error).message);
+          }
+          setBusy(false);
+        },
+      },
+    ]);
+  }
 
   async function makeCover() {
     setBusy(true);
@@ -184,13 +254,23 @@ export default function RecordRoute() {
   return (
     <View style={{ flex: 1, backgroundColor: C.paper }}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}>
-        <PhotoBox src={current} category={record.category} radius={0} style={{ width: Dimensions.get("window").width, height: 268 }}>
-          {!current && (
-            <Text style={{ fontFamily: F.mono, fontSize: 10, letterSpacing: 1.4, color: "rgba(251,250,246,.9)" }}>
-              PHOTO {idx + 1} / {Math.max(1, photos.length)}
-            </Text>
+        <PhotoBox src={current} category={record.category} radius={0} style={{ width: Dimensions.get("window").width, height: 268, ...(!current && { backgroundColor: "#efeade" }) }}>
+          {!current && canAddPhotos && (
+            <Pressable onPress={addAlbum} disabled={pending.length > 0} accessibilityLabel="앨범에서 사진 추가"
+              style={{ width: 220, height: 118, borderRadius: 20, borderWidth: 1.5, borderStyle: "dashed", borderColor: "#cdc6b8", alignItems: "center", justifyContent: "center", gap: 4 }}>
+              {pending.length > 0 ? <ActivityIndicator color={C.brick} /> : (
+                <>
+                  <Text style={{ fontFamily: F.sans, fontSize: 24, color: C.muted }}>+</Text>
+                  <Text style={{ fontFamily: F.sansMd, fontSize: 13.5, color: C.ink }}>앨범에서 사진 추가</Text>
+                  <Text style={{ fontFamily: F.sans, fontSize: 11, color: C.faint }}>최대 {MAX_PHOTOS}장</Text>
+                </>
+              )}
+            </Pressable>
           )}
-          {record.verified && (
+          {!current && !canAddPhotos && (
+            <Text style={{ fontFamily: F.mono, fontSize: 10, letterSpacing: 1.4, color: C.faint }}>사진 없음</Text>
+          )}
+          {!!current && current === verifiedShot && (
             <View style={{ position: "absolute", right: 16, bottom: 16 }}>
               <VerifiedMark size={52} />
             </View>
@@ -202,15 +282,33 @@ export default function RecordRoute() {
           )}
         </PhotoBox>
 
-        {photos.length > 1 && (
+        {photos.length > 0 && (photos.length > 1 || canAddPhotos || pending.length > 0) && (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 7, paddingHorizontal: 16, paddingVertical: 10, alignItems: "center" }} style={{ borderBottomWidth: 1, borderBottomColor: "#e6e0d3" }}>
             {photos.map((url, i) => (
-              <Pressable key={url} onPress={() => setShown(i)} accessibilityLabel={`사진 ${i + 1}`}
-                style={{ width: 54, height: 54, borderRadius: 14, overflow: "hidden", backgroundColor: "#eae5da", borderWidth: i === idx ? 1.5 : 1, borderColor: i === idx ? C.brick : "#ded8cb" }}>
+              <Pressable key={url} onPress={() => setShown(i)} onLongPress={canAddPhotos ? () => setSheetIdx(i) : undefined} accessibilityLabel={`사진 ${i + 1}`}
+                style={{ width: 54, height: 54, borderRadius: 14, overflow: "hidden", backgroundColor: "#eae5da", borderWidth: i === cover ? 1.5 : 1, borderColor: i === cover ? C.brick : "#ded8cb" }}>
                 <SignedImage uri={url} style={{ width: "100%", height: "100%" }} />
-                {i === cover && <Text style={{ position: "absolute", top: 1, right: 3, fontSize: 8, color: C.brick }}>★</Text>}
+                {i === cover && (
+                  <Text style={{ position: "absolute", left: 3, top: 3, borderRadius: 5, backgroundColor: C.brick, paddingHorizontal: 3, fontFamily: F.mono, fontSize: 8, color: C.card, overflow: "hidden" }}>대표</Text>
+                )}
+                {url === verifiedShot && <View style={{ position: "absolute", right: 2, bottom: 2 }}><VerifiedMark size={18} /></View>}
               </Pressable>
             ))}
+            {pending.map((uri) => (
+              <View key={uri} style={{ width: 54, height: 54, borderRadius: 14, overflow: "hidden", backgroundColor: "#eae5da" }}>
+                <Image source={{ uri }} style={{ width: "100%", height: "100%" }} />
+                <View style={{ position: "absolute", left: 0, right: 0, top: 0, bottom: 0, backgroundColor: "rgba(28,26,23,.45)", alignItems: "center", justifyContent: "center", gap: 2 }}>
+                  <ActivityIndicator size="small" color={C.card} />
+                  <Text style={{ fontFamily: F.mono, fontSize: 9, color: C.card }}>올리는 중</Text>
+                </View>
+              </View>
+            ))}
+            {canAddPhotos && room > 0 && (
+              <Pressable onPress={addAlbum} accessibilityLabel="앨범에서 사진 더하기"
+                style={{ width: 54, height: 54, borderRadius: 14, borderWidth: 1.5, borderStyle: "dashed", borderColor: "#cdc6b8", alignItems: "center", justifyContent: "center" }}>
+                <Text style={{ fontFamily: F.sansMd, fontSize: 11, color: C.muted }}>+ 앨범</Text>
+              </Pressable>
+            )}
             {idx !== cover && canEdit && (
               <Pressable onPress={makeCover} disabled={busy} style={{ minHeight: 44, borderRadius: 14, borderWidth: 1, borderStyle: "dashed", borderColor: C.line, paddingHorizontal: 13, justifyContent: "center" }}>
                 <Text style={{ fontFamily: F.sans, fontSize: 11.5, color: C.muted }}>대표사진으로</Text>
@@ -252,7 +350,10 @@ export default function RecordRoute() {
                   <VerifiedMark size={14} />
                 </View>
               ) : (
-                <Text style={{ fontFamily: F.sans, fontSize: 13.5, color: C.ink }}>{dottedDate(record.visited_at) || "날짜를 쓰지 않았습니다"}</Text>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                  <Text style={{ fontFamily: F.sans, fontSize: 13.5, color: C.ink }}>{dottedDate(record.visited_at) || "날짜를 쓰지 않았습니다"}</Text>
+                  <Text style={{ borderRadius: 10, borderWidth: 1, borderColor: C.line, paddingHorizontal: 8, paddingVertical: 2, fontFamily: F.sans, fontSize: 10.5, color: C.faint, overflow: "hidden" }}>인증 없음</Text>
+                </View>
               )}
             </Field>
             <Field label="메뉴">
@@ -356,6 +457,40 @@ export default function RecordRoute() {
           onDone={(copyId) => { setKeeping(false); setKeptId(copyId); }}
         />
       )}
+      {sheetIdx != null && photos[sheetIdx] && (() => {
+        const i = sheetIdx;
+        const locked = photos[i] === verifiedShot;
+        const isCover = i === cover;
+        const rows: { label: string; sub: string; disabled?: boolean; danger?: boolean; onPress: () => void }[] = [
+          isCover
+            ? { label: "대표 사진", sub: "지금 대표 사진이에요", disabled: true, onPress: () => {} }
+            : { label: locked ? "대표 사진" : "대표 사진으로", sub: "상세 맨 위와 목록에 보여요", onPress: () => setCoverAt(i) },
+          locked
+            ? { label: "사진 지우기", sub: "인증 사진은 방문의 근거라 지울 수 없어요", disabled: true, onPress: () => {} }
+            : { label: "사진 지우기", sub: "기록에서 이 사진을 빼요", danger: true, onPress: () => deleteAt(i) },
+        ];
+        return (
+          <BottomSheetModal visible onClose={() => setSheetIdx(null)}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 12, paddingBottom: 14 }}>
+              <View style={{ width: 54, height: 54, borderRadius: 14, overflow: "hidden", backgroundColor: "#eae5da" }}>
+                <SignedImage uri={photos[i]} style={{ width: "100%", height: "100%" }} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontFamily: F.serif, fontSize: 17, color: C.ink }}>{locked ? "인증 사진" : `사진 ${i + 1}`}</Text>
+                <Text style={{ marginTop: 2, fontFamily: F.sans, fontSize: 11.5, color: C.faint }}>
+                  {locked && record.verified_at ? `${verifiedDateTime(record.verified_at)} · 가게 앞에서 촬영` : "앨범에서 더한 사진"}
+                </Text>
+              </View>
+            </View>
+            {rows.map((r) => (
+              <Pressable key={r.label} onPress={r.onPress} disabled={r.disabled} style={{ paddingVertical: 13, borderTopWidth: 1, borderTopColor: "#e6e0d3" }}>
+                <Text style={{ fontFamily: F.sansMd, fontSize: 14, color: r.disabled ? "#b3ada1" : r.danger ? "#a8412a" : C.ink }}>{r.label}</Text>
+                <Text style={{ marginTop: 2, fontFamily: F.sans, fontSize: 11.5, color: r.disabled ? "#b3ada1" : C.faint }}>{r.sub}</Text>
+              </Pressable>
+            ))}
+          </BottomSheetModal>
+        );
+      })()}
       {keptId != null && (
         <View style={{ position: "absolute", left: 24, right: 24, bottom: insets.bottom + 16, borderRadius: 16, backgroundColor: C.ink, paddingVertical: 13, paddingHorizontal: 16, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
           <Text style={{ fontFamily: F.sans, fontSize: 12.5, color: C.card }}>개인 기록에 남겼어요</Text>
