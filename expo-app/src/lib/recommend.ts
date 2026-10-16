@@ -39,10 +39,13 @@ export function recCategoryOf(category: string | null | undefined, name?: string
 
 /**
  * 거리 — 직선거리(m)만 씁니다(HANDOFF-recommend-fix-distance-hours). 도보 시간은 실제 길과 달라 쓰지 않습니다.
- * 거리 필터는 없애고 이 반경 안에서 가까울수록 점수를 더 줍니다.
+ * 거리 필터는 없고, 2km 안에서 가까울수록 점수를 더 줍니다. 모자라면 5km · 10km 까지 넓힙니다.
  */
 export const NEAR_MAX_M = 2000;
-/** 가까움 점수 — 0m 에서 60, NEAR_MAX_M 에서 0. 재방문율(최대 100)과 함께 「가까운 곳 위주」가 되도록 큰 편입니다. */
+export const WIDER_M = [5000, 10000] as const;
+/** 한 번에 받아 둘 반경 — 가장 넓게 찾는 단계까지. */
+export const FETCH_MAX_M = WIDER_M[WIDER_M.length - 1];
+/** 가까움 점수 — 0m 에서 60, 그 단계 반경 끝에서 0. 재방문율(최대 100)과 함께 「가까운 곳 위주」가 되도록 큰 편입니다. */
 const NEAR_WEIGHT = 60;
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -95,60 +98,122 @@ export type PlaceStat = {
 export type Pick = {
   key: string; name: string; recCat: RecCategory | null; category: string | null;
   lat: number; lng: number; distance: number; placeUrl: string | null;
-  stat: PlaceStat; wish: Wish | null; reasons: string[]; score: number;
+  /** 남의 인증 숫자 — 내 위시 · 다시 간 곳으로 채운 카드면 null. */
+  stat: PlaceStat | null; wish: Wish | null; reasons: string[]; score: number;
 };
+
+/**
+ * 후보가 모자라 푼 조건(가장 많이 푼 것) — 카드 위 한 줄 안내.
+ *   strict: 2km · 같은 요일 이 시간대 / anyDay: 요일 뺌 / anyTime: 시간대도 뺌 / wider: 반경을 넓힘 / mine: 내 위시 · 다시 간 곳으로 채움
+ */
+export type Relax = { kind: "strict" | "anyDay" | "anyTime" | "mine" } | { kind: "wider"; radius: number };
 
 /** 내 기록장에서 이 가게를 인증한 적이 있는지 — 서버 mine 은 개인 · 연인 기록장을 가리지 않습니다. */
 const visitedIn = (rows: Restaurant[], name: string, lat: number, lng: number) =>
   verifiedOnly(rows).some((r) => norm(r.name) === norm(name) && r.lat != null && r.lng != null && metersBetweenLL(r.lat, r.lng, lat, lng) <= 100);
 
 /**
- * 「지금 뭐 먹지」 5곳(§5-5, 수정 §2-5).
- *   1. 2km 안 + 최근 4주 같은 요일 지금 ±1시간에 인증 1건 이상 — 5곳이 안 차면 요일 조건을 빼고 다시, 그래도 모자라면 있는 만큼.
- *   2. 먹고 싶은 것이 있으면 그 종류만, 빼고 싶은 것은 뺌.
- *   3. 점수 = 가까움 + 재방문율 + 오늘 인증 수 가중 + 시간대 인증 + 위시리스트 보너스 + 아직 안 간 곳 보너스.
+ * 「지금 뭐 먹지」 5곳(§5-5, 수정 §2-5). 5곳이 찰 때까지 조건을 하나씩 풀며 채웁니다 — 앞 단계 후보가 늘 앞에 섭니다.
+ *   1. 2km 안 + 최근 4주 같은 요일 지금 ±1시간 인증 → 2. 요일 뺌 → 3. 시간대도 뺌
+ *   4. 5km → 10km 까지 넓힘(시간대 조건 없음)
+ *   5. 그래도 모자라면 10km 안의 내 위시리스트 · 내가 다시 간 곳(남의 숫자 없이)
+ *   어디서도 없으면 빈 목록 → 빈 상태.
+ * 먹고 싶은 것이 있으면 그 종류만, 빼고 싶은 것은 늘 뺍니다.
+ * 점수 = 가까움 + 재방문율 + 오늘 인증 수 가중 + 시간대 인증 + 위시리스트 보너스 + 아직 안 간 곳 보너스.
  * 까닭 문장은 기여가 큰 순으로 3개 — 인증 기록 · 위시 · 걸러낸 종류에서만 씁니다(영업시간 · 도보 시간 없음).
  */
 export function pickNow(opts: {
   stats: PlaceStat[]; wishes: Wish[]; rows: Restaurant[]; filter: RecFilter; yesterday: RecCategory[]; couple: boolean;
-  today?: string; now?: Date;
-}): { picks: Pick[]; anyDay: boolean } {
-  const { stats, wishes, rows, filter, yesterday, couple, today = todayIso(), now = new Date() } = opts;
+  here: { lat: number; lng: number }; today?: string; now?: Date;
+}): { picks: Pick[]; relax: Relax } {
+  const { stats, wishes, rows, filter, yesterday, couple, here, today = todayIso(), now = new Date() } = opts;
   const allowed = (c: RecCategory | null) => (filter.inc.length ? !!c && filter.inc.includes(c) : !c || !filter.exc.includes(c));
-  const base = stats.filter((s) => s.kind === "restaurant" && s.distance_m <= NEAR_MAX_M && allowed(recCategoryOf(s.category, s.name)));
-  const byDow = base.filter((s) => s.slot_dow > 0);
-  const anyDay = byDow.length < 5;
-  const pool = anyDay ? base.filter((s) => s.slot_any > 0) : byDow;
+  const base = stats.filter((s) => s.kind === "restaurant" && allowed(recCategoryOf(s.category, s.name)));
   const swapped = yesterday.filter((c) => filter.exc.includes(c));
   const dayName = DAY_NAMES[now.getDay()];
+  const wishOf = (name: string, lat: number, lng: number) =>
+    wishes.find((w) => wishKind(w) !== "cafe" && norm(w.name) === norm(name) && (w.lat == null || w.lng == null || metersBetweenLL(lat, lng, w.lat, w.lng) <= 100)) ?? null;
+  const wishLine = (w: Wish) => `${couple ? "우리 " : ""}위시리스트에 담은 지 ${Math.max(0, daysBetween(w.saved_at.slice(0, 10), today))}일 된 곳이에요`;
 
-  const picks = pool
-    .map((s): Pick => {
-      const recCat = recCategoryOf(s.category, s.name);
-      const wish = wishes.find((w) => wishKind(w) !== "cafe" && norm(w.name) === norm(s.name) && (w.lat == null || w.lng == null || metersBetweenLL(s.lat, s.lng, w.lat, w.lng) <= 100)) ?? null;
-      const fresh = s.mine === 0 && !visitedIn(rows, s.name, s.lat, s.lng);
-      const slot = anyDay ? s.slot_any : s.slot_dow;
-      const parts: { v: number; text?: string }[] = [
-        { v: Math.round(NEAR_WEIGHT * Math.max(0, 1 - s.distance_m / NEAR_MAX_M)) }, // 점수만 — 거리는 보조줄에 있습니다.
-      ];
-      if (pctOf(s.revisit_rate) > 0) parts.push({ v: pctOf(s.revisit_rate), text: `인증한 사람의 ${pctOf(s.revisit_rate)}%가 다시 갔어요` });
-      if (s.today_count > 0) parts.push({ v: Math.min(s.today_count, 10) * 4, text: `오늘 인증 ${s.today_count}건${s.last_at ? ` · 마지막 ${hhmmOf(s.last_at)}` : ""}` });
-      parts.push({ v: Math.min(slot, 10) * 3, text: anyDay ? `지난 4주 이 시간대에 인증 ${slot}건` : `지난 4주 ${dayName} 이 시간대에 인증 ${slot}건` });
-      if (wish) {
-        const days = Math.max(0, daysBetween(wish.saved_at.slice(0, 10), today));
-        parts.push({ v: 30, text: `${couple ? "우리 " : ""}위시리스트에 담은 지 ${days}일 된 곳이에요` });
-      }
-      if (swapped.length && recCat && !swapped.includes(recCat)) parts.push({ v: 10, text: `어제 ${eulReul(swapped.join("·"))} 드셔서 ${euroRo(recCat)} 골랐어요` });
-      if (fresh) parts.push({ v: 15 }); // 점수만 — 문장은 쓰지 않습니다.
-      const reasons = parts.filter((x) => x.text).sort((a, b) => b.v - a.v).map((x) => x.text!).slice(0, 3);
-      return {
-        key: s.place, name: s.name, recCat, category: s.category, lat: s.lat, lng: s.lng, distance: s.distance_m, placeUrl: s.place_url,
-        stat: s, wish, reasons, score: parts.reduce((n, x) => n + x.v, 0),
-      };
-    })
-    .sort((a, b) => b.score - a.score || a.distance - b.distance)
-    .slice(0, 5);
-  return { picks, anyDay };
+  const score = (s: PlaceStat, slot: "dow" | "any" | null, radius: number): Pick => {
+    const recCat = recCategoryOf(s.category, s.name);
+    const wish = wishOf(s.name, s.lat, s.lng);
+    const fresh = s.mine === 0 && !visitedIn(rows, s.name, s.lat, s.lng);
+    const n = slot === "dow" ? s.slot_dow : s.slot_any;
+    const parts: { v: number; text?: string }[] = [
+      { v: Math.round(NEAR_WEIGHT * Math.max(0, 1 - s.distance_m / radius)) }, // 점수만 — 거리는 보조줄에 있습니다.
+    ];
+    if (pctOf(s.revisit_rate) > 0) parts.push({ v: pctOf(s.revisit_rate), text: `인증한 사람의 ${pctOf(s.revisit_rate)}%가 다시 갔어요` });
+    if (s.today_count > 0) parts.push({ v: Math.min(s.today_count, 10) * 4, text: `오늘 인증 ${s.today_count}건${s.last_at ? ` · 마지막 ${hhmmOf(s.last_at)}` : ""}` });
+    if (n > 0) parts.push({ v: Math.min(n, 10) * 3, text: slot === "dow" ? `지난 4주 ${dayName} 이 시간대에 인증 ${n}건` : `지난 4주 이 시간대에 인증 ${n}건` });
+    if (wish) parts.push({ v: 30, text: wishLine(wish) });
+    if (swapped.length && recCat && !swapped.includes(recCat)) parts.push({ v: 10, text: `어제 ${eulReul(swapped.join("·"))} 드셔서 ${euroRo(recCat)} 골랐어요` });
+    if (fresh) parts.push({ v: 15 }); // 점수만 — 문장은 쓰지 않습니다.
+    return {
+      key: s.place, name: s.name, recCat, category: s.category, lat: s.lat, lng: s.lng, distance: s.distance_m, placeUrl: s.place_url,
+      stat: s, wish, reasons: parts.filter((x) => x.text).sort((a, b) => b.v - a.v).map((x) => x.text!).slice(0, 3),
+      score: parts.reduce((t, x) => t + x.v, 0),
+    };
+  };
+
+  const stages: { relax: Relax; pick: () => Pick[] }[] = [
+    { relax: { kind: "strict" }, pick: () => base.filter((s) => s.distance_m <= NEAR_MAX_M && s.slot_dow > 0).map((s) => score(s, "dow", NEAR_MAX_M)) },
+    { relax: { kind: "anyDay" }, pick: () => base.filter((s) => s.distance_m <= NEAR_MAX_M && s.slot_any > 0).map((s) => score(s, "any", NEAR_MAX_M)) },
+    { relax: { kind: "anyTime" }, pick: () => base.filter((s) => s.distance_m <= NEAR_MAX_M).map((s) => score(s, "any", NEAR_MAX_M)) },
+    ...WIDER_M.map((r) => ({ relax: { kind: "wider", radius: r } as Relax, pick: () => base.filter((s) => s.distance_m <= r).map((s) => score(s, "any", r)) })),
+    { relax: { kind: "mine" }, pick: () => mineNear(rows, wishes, here, allowed, wishLine) },
+  ];
+
+  const picks: Pick[] = [];
+  let relax: Relax = { kind: "strict" };
+  for (const stage of stages) {
+    if (picks.length >= 5) break;
+    const fresh = stage.pick()
+      .filter((p) => !picks.some((q) => q.key === p.key || (norm(q.name) === norm(p.name) && metersBetweenLL(q.lat, q.lng, p.lat, p.lng) <= 100)))
+      .sort((a, b) => b.score - a.score || a.distance - b.distance);
+    if (fresh.length) relax = stage.relax;
+    picks.push(...fresh.slice(0, 5 - picks.length));
+  }
+  return { picks, relax };
+}
+
+/** 마지막 단계 — 10km 안의 내 위시 · 내가 두 번 넘게 인증한 곳. 남의 숫자 없이 가까운 순. */
+function mineNear(
+  rows: Restaurant[], wishes: Wish[], here: { lat: number; lng: number },
+  allowed: (c: RecCategory | null) => boolean, wishLine: (w: Wish) => string,
+): Pick[] {
+  const out: Pick[] = [];
+  const near = (lat: number, lng: number) => Math.round(metersBetweenLL(here.lat, here.lng, lat, lng));
+  const places = new Map<string, Restaurant[]>();
+  for (const r of verifiedOnly(rows)) {
+    if (r.kind !== "restaurant" || r.lat == null || r.lng == null) continue;
+    const k = r.place_key ?? `${r.name}|${r.address ?? ""}`.toLowerCase();
+    places.set(k, [...(places.get(k) ?? []), r]);
+  }
+  for (const [k, list] of places) {
+    const days = new Set(list.map((r) => r.visited_at)).size;
+    const r = list[0];
+    const d = near(r.lat!, r.lng!);
+    const recCat = recCategoryOf(r.category, r.name);
+    if (days < 2 || d > FETCH_MAX_M || !allowed(recCat)) continue;
+    out.push({
+      key: `mine:${k}`, name: r.name, recCat, category: r.category, lat: r.lat!, lng: r.lng!, distance: d,
+      placeUrl: list.find((x) => x.place_url)?.place_url ?? null, stat: null, wish: null,
+      reasons: [`${days}번 다녀온 곳이에요`], score: 0,
+    });
+  }
+  for (const w of wishes) {
+    if (w.lat == null || w.lng == null || wishKind(w) === "cafe") continue;
+    const d = near(w.lat, w.lng);
+    const recCat = recCategoryOf(w.category, w.name);
+    if (d > FETCH_MAX_M || !allowed(recCat)) continue;
+    out.push({
+      key: `wish:${w.id}`, name: w.name, recCat, category: w.category, lat: w.lat, lng: w.lng, distance: d,
+      placeUrl: null, stat: null, wish: w, reasons: [wishLine(w)], score: 0,
+    });
+  }
+  // 점수가 없으니 가까운 순 — 정렬은 pickNow 가 score 다음 distance 로 합니다.
+  return out;
 }
 
 /* ───────────── 「둘러보기」 (§6) ───────────── */

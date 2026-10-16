@@ -4,7 +4,7 @@ import { ActivityIndicator, Animated, PanResponder, Pressable, ScrollView, Text,
 import { PaperMap } from "@/components/PaperMap";
 import { setState, type RecHere } from "@/data/store";
 import { formatDistance } from "@/lib/distance";
-import { NEAR_MAX_M, pickNow, type Pick, type PlaceStat, type RecCategory, type RecFilter } from "@/lib/recommend";
+import { FETCH_MAX_M, pickNow, type Pick, type PlaceStat, type RecCategory, type RecFilter, type Relax } from "@/lib/recommend";
 import type { Restaurant, Wish } from "@/lib/types";
 import { C, F } from "@/theme";
 import { openDirections } from "./api";
@@ -23,7 +23,7 @@ function regionAround(lat: number, lng: number, radius: number) {
 
 /**
  * 「지금 뭐 먹지」(§5, 시안 5a) — 필터 줄 + 카드 한 장(위 지도 · 아래 가게 설명 가로 슬라이드).
- * 후보는 2km 안, 가까운 곳 위주로 — 최근 4주 같은 요일 · 시간대에 인증이 있는 곳 — 5곳이 안 차면 요일 조건을 빼고, 그래도 없으면 빈 상태.
+ * 후보는 2km 안, 가까운 곳 위주로(모자라면 조건을 풀고 10km · 내 위시까지, recommend.ts pickNow) — 최근 4주 같은 요일 · 시간대에 인증이 있는 곳 — 5곳이 안 차면 요일 조건을 빼고, 그래도 없으면 빈 상태.
  */
 export function NowMode({
   here, stats, loading, wishes, rows, filter, yesterday, couple, onOpenFilter, onChangeFilter,
@@ -32,8 +32,8 @@ export function NowMode({
   filter: RecFilter; yesterday: RecCategory[]; couple: boolean;
   onOpenFilter: () => void; onChangeFilter: (f: RecFilter) => void;
 }) {
-  const { picks, anyDay } = useMemo(
-    () => (here ? pickNow({ stats, wishes, rows, filter, yesterday, couple }) : { picks: [] as Pick[], anyDay: false }),
+  const { picks, relax } = useMemo(
+    () => (here ? pickNow({ stats, wishes, rows, filter, yesterday, couple, here }) : { picks: [] as Pick[], relax: { kind: "strict" } as Relax }),
     [here, stats, wishes, rows, filter, yesterday, couple]
   );
 
@@ -75,7 +75,7 @@ export function NowMode({
         ) : picks.length === 0 ? (
           <Empty>
             <Text style={emptyText}>
-              {`${formatDistance(NEAR_MAX_M)} 안에서 최근 4주 이 시간대에 인증된 곳을 아직 못 찾았어요.\n인증 기록이 쌓이면 이 동네도 추천해 드릴게요.`}
+              {`${formatDistance(FETCH_MAX_M)} 안에서 추천할 만한 곳을 아직 못 찾았어요.\n인증 기록이 쌓이거나 위시리스트에 담아 두면 여기서 골라 드릴게요.`}
             </Text>
             <Pressable onPress={onOpenFilter} style={{ marginTop: 10 }}>
               <Text style={{ fontFamily: F.sans, fontSize: 12.5, color: C.brick }}>필터 바꾸기</Text>
@@ -84,8 +84,8 @@ export function NowMode({
         ) : (
           <>
             <PickMap here={here} picks={picks} index={index} onPick={setIndex} />
-            {anyDay && (
-              <Text style={{ marginTop: 8, marginHorizontal: 18, fontFamily: F.sans, fontSize: 11, color: C.faint }}>같은 요일 기록이 적어 요일 상관없이 이 시간대로 골랐어요</Text>
+            {relax.kind !== "strict" && (
+              <Text style={{ marginTop: 8, marginHorizontal: 18, fontFamily: F.sans, fontSize: 11, color: C.faint }}>{relaxLine(relax)}</Text>
             )}
             <Pager picks={picks} index={index} onIndex={setIndex} />
           </>
@@ -94,6 +94,14 @@ export function NowMode({
     </View>
   );
 }
+
+/** 푼 조건 안내 한 줄. */
+const relaxLine = (r: Relax) =>
+  r.kind === "anyDay" ? "같은 요일 기록이 적어 요일 상관없이 이 시간대로 골랐어요"
+  : r.kind === "anyTime" ? "이 시간대 기록이 적어 요일·시간 상관없이 골랐어요"
+  : r.kind === "wider" ? `가까운 곳이 적어 ${formatDistance(r.radius)}까지 넓혀 찾았어요`
+  : r.kind === "mine" ? "근처 인증 기록이 적어 내 위시리스트 · 다시 간 곳으로 채웠어요"
+  : "";
 
 const emptyText = { fontFamily: F.sans, fontSize: 12.5, lineHeight: 20, color: C.faint, textAlign: "center" } as const;
 const Empty = ({ children }: { children: React.ReactNode }) => (

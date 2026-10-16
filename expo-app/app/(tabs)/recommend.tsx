@@ -12,15 +12,15 @@ import { FilterSheet } from "@/features/recommend/FilterSheet";
 import { NowMode } from "@/features/recommend/NowMode";
 import { REC } from "@/features/recommend/ui";
 import { todayIso } from "@/lib/anniversary";
-import { defaultFilter, NEAR_MAX_M, recentExclude, REC_MODE_LABEL, type RecFilter, type RecMode } from "@/lib/recommend";
+import { defaultFilter, FETCH_MAX_M, recentExclude, REC_MODE_LABEL, type RecFilter, type RecMode } from "@/lib/recommend";
 import { C, F, TAB_BAR_H } from "@/theme";
 
 const DAYS = ["일", "월", "화", "수", "목", "금", "토"];
 const pad = (n: number) => String(n).padStart(2, "0");
 const nowLabel = (d: Date) => `${DAYS[d.getDay()]} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 
-/** 「지금 뭐 먹지」는 2km 안을 받아 두고 가까운 곳 위주로 고릅니다. */
-const NOW_FETCH_M = NEAR_MAX_M;
+/** 「지금 뭐 먹지」는 10km 안을 한 번에 받아 두고, 2km 안 가까운 곳부터 고르며 모자라면 넓힙니다. */
+const NOW_FETCH_M = FETCH_MAX_M;
 /** 「다시 가는 사람이 많은 곳」 둘레. */
 const BROWSE_M = 3000;
 
