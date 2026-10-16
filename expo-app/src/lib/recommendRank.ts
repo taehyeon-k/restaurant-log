@@ -63,7 +63,7 @@ export function rankRestaurants(
     const weight = confidence * recency;
     // 평점을 주지 않은 기록은 약한 중립 신호. 평점 2 이하의 반복 추천을 피합니다.
     const positive = r.rating == null ? 0.53 : clamp(Number(r.rating) / 5);
-    stats.positive += weight * (r.revisit ? Math.max(positive, 0.80) : positive);
+    stats.positive += weight * (r.revisit && (r.rating == null || r.rating >= 3.5) ? Math.max(positive, 0.80) : positive);
     stats.weight += weight;
     stats.count += 1;
     if (r.verified_at) {
