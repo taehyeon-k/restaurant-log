@@ -304,7 +304,7 @@ export default function RecommendTab() {
                       if (saved) {
                         router.push({ pathname: "/wish/[id]", params: { id: saved.id } });
                       } else {
-                        void logRecommendationEvents(batchId, useActiveBookId, recommendations, recommendationContext, "save", r.id);
+                        void logRecommendationEvents(batchId, useActiveBookId, recommendations, recommendationContext, "wish_start", r.id);
                         router.push({ pathname: "/wish/new", params: {
                           name: r.name, where_text: r.address, category: r.category ?? "",
                           lat: String(r.lat), lng: String(r.lng),
