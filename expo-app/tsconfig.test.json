@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "lib": ["ES2023"],
+    "types": ["node"],
+    "strict": true,
+    "skipLibCheck": true,
+    "rootDir": "src",
+    "outDir": "node_modules/.cache/rec-test"
+  },
+  "include": ["src/lib/rec/**/*.ts"]
+}

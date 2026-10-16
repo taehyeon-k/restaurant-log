@@ -3,7 +3,10 @@ import * as Location from "expo-location";
 import { useEffect, useState } from "react";
 import { Linking } from "react-native";
 import { getState, setState, useAppState, type RecHere } from "@/data/store";
+import { apiFetch } from "@/lib/api";
 import { reverseGeocode } from "@/lib/geocode";
+import type { KakaoPlace } from "@/lib/rec/candidates";
+import type { Weather } from "@/lib/rec/score";
 import { areaOf, frequentSpot, type Course, type PlaceStat } from "@/lib/recommend";
 import { supabase } from "@/lib/supabase";
 import type { Restaurant } from "@/lib/types";
@@ -29,6 +32,41 @@ export const useRecPlaces = (here: { lat: number; lng: number } | null, radius: 
       const { data, error } = await supabase.rpc("rec_places", { p_lat: here!.lat, p_lng: here!.lng, p_radius_m: radius, ...atParam(at) });
       if (error) throw new Error(error.message);
       return (data ?? []) as PlaceStat[];
+    },
+  });
+
+/**
+ * 「지금 뭐 먹지」 카카오 후보(서버 /api/recommend/candidates — 카카오 키는 서버에만).
+ * 서버가 아직 배포 전(404)이거나 실패하면 에러 — 추천은 Dinary 기록 · 위시만으로 이어 갑니다.
+ */
+export const useRecCandidates = (here: { lat: number; lng: number } | null, radius: number, enabled = true) =>
+  useQuery({
+    queryKey: ["rec", "kakao", here && cell(here.lat), here && cell(here.lng), radius],
+    enabled: !!here && enabled,
+    staleTime: 10 * 60 * 1000,
+    retry: 1,
+    queryFn: async ({ signal }) => {
+      const params = new URLSearchParams({ lat: String(cell(here!.lat)), lng: String(cell(here!.lng)), radius: String(radius) });
+      const res = await apiFetch(`/api/recommend/candidates?${params}`, { signal });
+      if (!res.ok) throw new Error(`candidates ${res.status}`);
+      const json = (await res.json()) as { candidates?: KakaoPlace[]; radius?: number; partial?: boolean };
+      return { candidates: json.candidates ?? [], radius, partial: !!json.partial };
+    },
+  });
+
+/** 기상청 초단기실황(서버 /api/weather). 못 받으면 null — 날씨 성분은 중립. 실패해도 에러를 내지 않습니다. */
+export const useRecWeather = (here: { lat: number; lng: number } | null) =>
+  useQuery({
+    queryKey: ["rec", "weather", here && Math.round(here.lat * 50) / 50, here && Math.round(here.lng * 50) / 50],
+    enabled: !!here,
+    staleTime: 20 * 60 * 1000,
+    retry: 0,
+    queryFn: async ({ signal }): Promise<Weather | null> => {
+      const params = new URLSearchParams({ lat: String(Math.round(here!.lat * 100) / 100), lng: String(Math.round(here!.lng * 100) / 100) });
+      const res = await apiFetch(`/api/weather?${params}`, { signal }).catch(() => null);
+      if (!res?.ok) return null;
+      const json = (await res.json().catch(() => null)) as { weather?: Weather | null } | null;
+      return json?.weather ?? null;
     },
   });
 

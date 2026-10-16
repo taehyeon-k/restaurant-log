@@ -1,6 +1,7 @@
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { logRec } from "@/features/recommend/log";
 import { useEffect, useRef, useState } from "react";
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Switch, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -20,7 +21,11 @@ const isoOf = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.
 
 /** 가고 싶은 곳 담기/고치기. params.id 가 있으면 고치기 — name·where_text·category·lat·lng·plan_date 로 미리 채웁니다. */
 export default function WishForm() {
-  const p = useLocalSearchParams<{ id?: string; name?: string; where_text?: string; category?: string; lat?: string; lng?: string; plan_date?: string }>();
+  const p = useLocalSearchParams<{
+    id?: string; name?: string; where_text?: string; category?: string; lat?: string; lng?: string; plan_date?: string;
+    /** 추천 카드의 「+ 위시에 담기」에서 왔으면 — 저장이 끝난 순간에만 wish_saved 로그(폼을 연 것은 wish_start). */
+    rec_session?: string; rec_key?: string; rec_pos?: string;
+  }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const qc = useQueryClient();
@@ -123,7 +128,12 @@ export default function WishForm() {
     if (isNew) {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { setSaving(false); return setError("로그인이 필요합니다"); }
-      ({ error: err } = await supabase.from("wishes").insert({ ...payload, user_id: user.id, ...(bookId ? { book_id: bookId } : {}) }));
+      const { data: saved, error: insertErr } = await supabase
+        .from("wishes").insert({ ...payload, user_id: user.id, ...(bookId ? { book_id: bookId } : {}) }).select("id").single();
+      err = insertErr;
+      if (!insertErr && p.rec_session) {
+        void logRec({ id: p.rec_session }, "wish_saved", { key: p.rec_key, position: p.rec_pos ? Number(p.rec_pos) : undefined, wishId: saved?.id as string | undefined });
+      }
     } else {
       ({ error: err } = await supabase.from("wishes").update(payload).eq("id", wish!.id));
     }

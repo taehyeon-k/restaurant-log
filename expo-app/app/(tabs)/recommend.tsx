@@ -4,17 +4,21 @@ import { Animated, Easing, Linking, Pressable, ScrollView, Text, View } from "re
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
 import { MapPinIcon } from "@/components/icons";
-import { useActiveBook } from "@/data/books";
+import { useActiveBook, useRecordNotes } from "@/data/books";
 import { useRows, useWishes } from "@/data/queries";
 import { setState, useAppState } from "@/data/store";
-import { useMyTours, useRecCourses, useRecHere, useRecPlaces } from "@/features/recommend/api";
+import { useMyTours, useRecCandidates, useRecCourses, useRecHere, useRecPlaces, useRecWeather } from "@/features/recommend/api";
 import { BrowseMode } from "@/features/recommend/BrowseMode";
 import { FilterSheet } from "@/features/recommend/FilterSheet";
+import { uuid, type RecSession } from "@/features/recommend/log";
 import { NowMode } from "@/features/recommend/NowMode";
 import { PointSheet } from "@/features/recommend/PointSheet";
 import { REC } from "@/features/recommend/ui";
 import { todayIso } from "@/lib/anniversary";
-import { defaultFilter, FETCH_MAX_M, recentExclude, REC_MODE_LABEL, type RecFilter, type RecMode } from "@/lib/recommend";
+import { REC_CONFIG } from "@/lib/rec/config";
+import { recommend } from "@/lib/rec/pipeline";
+import { mealSlotOf, seoulClock } from "@/lib/rec/time";
+import { defaultFilter, FETCH_MAX_M, REC_MODE_LABEL, type RecFilter, type RecMode } from "@/lib/recommend";
 import { C, F, TAB_BAR_H } from "@/theme";
 
 const DAYS = ["일", "월", "화", "수", "목", "금", "토"];
@@ -23,7 +27,7 @@ const pad = (n: number) => String(n).padStart(2, "0");
 const whenLabel = (d: Date, today: Date) =>
   `${DAYS[d.getDay()]}${d.toDateString() === today.toDateString() ? "" : ` ${d.getMonth() + 1}.${d.getDate()}`} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 
-/** 「지금 뭐 먹지」는 10km 안을 한 번에 받아 두고, 2km 안 가까운 곳부터 고르며 모자라면 넓힙니다. */
+/** 「지금 뭐 먹지」 — Dinary 인증 숫자는 10km 안을 한 번에 받아 두고(내 위시 · 단골 대체까지), 카카오 후보는 1.5km → 3km. */
 const NOW_FETCH_M = FETCH_MAX_M;
 /** 「다시 가는 사람이 많은 곳」 둘레. */
 const BROWSE_M = 3000;
@@ -34,7 +38,8 @@ const BROWSE_M = 3000;
  */
 export default function RecommendTab() {
   const insets = useSafeAreaInsets();
-  const { isCouple } = useActiveBook();
+  const { isCouple, id: bookId } = useActiveBook();
+  const { data: notes } = useRecordNotes();
   const { data: rows = [] } = useRows();
   const { data: wishes = [] } = useWishes();
   const { recFilter, recPlace, recAt } = useAppState();
@@ -61,9 +66,8 @@ export default function RecommendTab() {
   const { data: courses = [] } = useRecCourses(mode === "browse" ? here : null, at);
   const { data: tours = [] } = useMyTours();
 
-  // 필터 — 기본은 최근 3일 먹은 종류 빼기. 바꾼 값은 그 날만.
-  const defaults = useMemo(() => defaultFilter(rows, today), [rows, today]);
-  const yesterday = useMemo(() => recentExclude(rows, today).yesterday, [rows, today]);
+  // 필터 — 기본은 비어 있습니다(사용자가 고른 강한 조건만). 바꾼 값은 그 날만.
+  const defaults = useMemo(() => defaultFilter(), []);
   const filter: RecFilter = useMemo(
     () => (recFilter?.date === today ? { inc: recFilter.inc, exc: recFilter.exc } : defaults),
     [recFilter, today, defaults]
@@ -71,6 +75,57 @@ export default function RecommendTab() {
   const applyFilter = (f: RecFilter) => {
     setState({ recFilter: { ...f, date: today } });
     setSheet(false);
+  };
+
+  // 카카오 후보 1.5km, 모자라다고 하면 3km. 날씨는 없으면 중립.
+  const [near, wide] = REC_CONFIG.radii;
+  const kakaoNear = useRecCandidates(mode === "now" ? here : null, near);
+  const [wantWide, setWantWide] = useState(false);
+  const kakaoWide = useRecCandidates(mode === "now" ? here : null, wide, wantWide);
+  const { data: weather = null } = useRecWeather(mode === "now" ? here : null);
+
+  // 「다시 추천」 — 앞서 보여 준 5곳들. 기준(자리 · 시각 · 필터 · 기록장)이 바뀌면 처음부터.
+  const [shown, setShown] = useState<string[][]>([]);
+  const basis = `${here?.lat.toFixed(3)},${here?.lng.toFixed(3)}|${at ?? "now"}|${JSON.stringify(filter)}|${bookId}`;
+  useEffect(() => { setShown([]); setWantWide(false); }, [basis]);
+
+  const when = useMemo(() => (at ? new Date(at) : clock), [at, clock]);
+  // 3km 결과는 칸이 커서 가까운 곳이 성기니 1.5km 결과와 합칩니다(같은 가게는 buildPool 이 하나로).
+  const kakaoData = useMemo(() => {
+    const parts = [kakaoNear.data, kakaoWide.data].filter((d): d is NonNullable<typeof d> => !!d);
+    if (!parts.length) return null;
+    return { candidates: parts.flatMap((d) => d.candidates), radius: Math.max(...parts.map((d) => d.radius)), partial: parts.some((d) => d.partial) };
+  }, [kakaoNear.data, kakaoWide.data]);
+  const kakaoState: "ok" | "partial" | "unavailable" | "loading" =
+    kakaoData ? (kakaoData.partial ? "partial" : "ok") : kakaoNear.isError ? "unavailable" : "loading";
+  const result = useMemo(() => {
+    if (!here) return null;
+    return recommend({
+      here, at: when, filter, couple: isCouple, bookId,
+      kakao: kakaoData?.candidates ?? [], kakaoRadius: kakaoData?.radius ?? null,
+      stats: nowQ.data ?? [], rows, wishes, notes: isCouple ? notes : undefined, weather, avoid: shown.flat(),
+    });
+    // 시계(30초)마다 다시 고르지 않게 분 단위가 아닌 기준 시각만 봅니다.
+  }, [here, at, filter, isCouple, bookId, kakaoData, nowQ.data, rows, wishes, notes, weather, shown]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (result?.wantRadius === wide) setWantWide(true); }, [result?.wantRadius, wide]);
+
+  // 고른 5곳이 바뀔 때마다 새 로그 세션(화면에 보일 때 서버에 씁니다).
+  const pickSig = result?.picks.map((p) => p.c.key).join(",") ?? "";
+  const session: RecSession | null = useMemo(
+    () => (result && pickSig ? {
+      id: uuid(), bookId, result,
+      meta: { area: here?.name ?? null, customPoint: !!recPlace, customTime: !!recAt, refresh: shown.length, kakao: kakaoState === "loading" ? "unavailable" : kakaoState },
+    } : null),
+    [pickSig] // eslint-disable-line react-hooks/exhaustive-deps
+  );
+
+  // 점심 · 저녁 — 오늘 그 끼니 시각(12:00 · 18:30)으로 기준 시각을 옮깁니다. 지금이 그 끼니면 지금으로.
+  const slotNow = mealSlotOf(seoulClock(clock).minutes);
+  const setMeal = (m: "lunch" | "dinner") => {
+    if (m === slotNow) return setState({ recAt: null });
+    const d = new Date(clock);
+    d.setHours(m === "lunch" ? 12 : 18, m === "lunch" ? 0 : 30, 0, 0);
+    setState({ recAt: d.getTime() });
   };
 
   const revisits = useMemo(() => (browseQ.data ?? []).filter((s) => s.kind === "restaurant").slice(0, 10), [browseQ.data]);
@@ -126,18 +181,20 @@ export default function RecommendTab() {
         {mode === "now" ? (
           <NowMode
             here={here}
-            stats={nowQ.data ?? []}
-            loading={nowQ.isLoading}
-            wishes={wishes}
-            rows={rows}
+            result={result}
+            session={session}
+            loading={nowQ.isLoading || kakaoState === "loading" || (wantWide && kakaoWide.isLoading)}
+            error={nowQ.isError && kakaoState === "unavailable"}
+            kakao={kakaoState}
             filter={filter}
-            yesterday={yesterday}
-            couple={isCouple}
-            at={at}
+            slot={result?.ctx.slot ?? slotNow}
             pointLabel={recPlace ? "고른 위치" : "내 위치"}
             onMapTouch={setMapTouch}
             onOpenFilter={() => setSheet(true)}
             onChangeFilter={(f) => setState({ recFilter: { ...f, date: today } })}
+            onRefresh={() => result && setShown((s) => [...s, result.picks.map((p) => p.c.key)])}
+            onMeal={setMeal}
+            onRetry={() => { void nowQ.refetch(); void kakaoNear.refetch(); }}
           />
         ) : (
           <BrowseMode courses={courses} tours={tours} revisits={revisits} />

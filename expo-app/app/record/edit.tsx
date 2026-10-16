@@ -23,6 +23,7 @@ import {
   CATEGORIES, findMatchingWish, KEYWORDS, verifiedDateTime, wishMetInfo, WISH_AUTO_M, type Kind, type MenuItem,
 } from "@/lib/types";
 import { C, F, SHADOW } from "@/theme";
+import { linkVisit } from "@/features/recommend/log";
 
 const pad = (n: number) => String(n).padStart(2, "0");
 const isoOf = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -248,6 +249,7 @@ export default function EditRoute() {
       }).select("id").single();
       if (error) throw new Error(error.message);
       if (isCouple && (shared.rating != null || shared.review)) await saveNote(user.id, inserted.id as number, shared.rating, shared.review, false);
+      if (kind === "restaurant") linkVisit({ recordId: inserted.id as number, name: cleanName, lat, lng, verified: false });
       if (matchedWish) await supabase.from("wishes").delete().eq("id", matchedWish.id);
 
       await refreshAll(qc);

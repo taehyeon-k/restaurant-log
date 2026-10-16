@@ -28,6 +28,7 @@ import { nearbyPlaces, searchFoodPlaces, type FoodPlace } from "@/lib/geocode";
 import { drainQueue } from "@/features/queue/process";
 import { AfterCapture } from "@/features/recommend/AfterCapture";
 import { enqueue, persistPhoto } from "@/features/queue/db";
+import { linkVisit } from "@/features/recommend/log";
 import { MAX_PHOTOS, pickAlbumUris } from "@/lib/photos";
 import { supabase } from "@/lib/supabase";
 import {
@@ -329,6 +330,8 @@ export default function Capture() {
       const newId = await drainQueue(qc, queueId);
 
       if (newId != null) {
+        // 최근 보인 추천 카드의 가게면 그 추천 세션과 잇습니다(visit_confirmed).
+        linkVisit({ recordId: newId, name: picked.name, lat: payload.lat ?? null, lng: payload.lng ?? null, verified: true });
         if (writeNow) router.replace({ pathname: "/record/edit", params: { id: String(newId) } });
         else router.back();
         return;
