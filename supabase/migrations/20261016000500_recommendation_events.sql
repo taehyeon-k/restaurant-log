@@ -1,4 +1,4 @@
--- "지금 뭐 먹지?" (hybrid-v1) — 표시/탭/위시 담기 행동을 기록합니다.
+-- "지금 뭐 먹지?" (hybrid-v1) — 표시/탭/위시 작성 시작 행동을 기록합니다.
 -- 원시 GPS 좌표, 사용자의 음식 일기나 프로필 원문은 저장하지 않습니다.
 create table if not exists public.recommendation_events (
   id bigint generated always as identity primary key,
@@ -6,7 +6,7 @@ create table if not exists public.recommendation_events (
   book_id uuid references public.books(id) on delete set null,
   batch_id text not null check (char_length(batch_id) between 1 and 120),
   candidate_id text not null check (char_length(candidate_id) between 1 and 120),
-  event_type text not null check (event_type in ('impression','open','save')),
+  event_type text not null check (event_type in ('impression','open','wish_start')),
   position smallint not null check (position between 1 and 5),
   context jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now()
