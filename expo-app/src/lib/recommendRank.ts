@@ -123,5 +123,10 @@ export function rankRestaurants(
     }
     chosen.push(pool.splice(bestIndex, 1)[0]);
   }
+  // '다시 추천'은 마지막 한 자리를 다른 발견형 식당으로 바꿉니다.
+  if ((context.variant ?? 0) > 0 && chosen.length === 5) {
+    const remaining = scored.filter((r) => !chosen.some((x) => x.id === r.id)).slice(0, 15);
+    if (remaining.length) chosen[4] = remaining[((context.variant ?? 1) - 1) % remaining.length];
+  }
   return chosen;
 }
