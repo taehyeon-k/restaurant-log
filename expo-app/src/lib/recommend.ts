@@ -39,12 +39,11 @@ export function recCategoryOf(category: string | null | undefined, name?: string
 
 /**
  * 거리 — 직선거리(m)만 씁니다(HANDOFF-recommend-fix-distance-hours). 도보 시간은 실제 길과 달라 쓰지 않습니다.
+ * 거리 필터는 없애고 이 반경 안에서 가까울수록 점수를 더 줍니다.
  */
-export const DISTS = [500, 1000, 2000] as const;
-export type Dist = (typeof DISTS)[number];
-export const DEFAULT_DIST: Dist = 1000;
-/** 옛 분 단위 값(5 · 10 · 15)이나 모르는 값은 기본 1km 로. */
-export const normalizeDist = (v: unknown): Dist => ((DISTS as readonly number[]).includes(v as number) ? (v as Dist) : DEFAULT_DIST);
+export const NEAR_MAX_M = 2000;
+/** 가까움 점수 — 0m 에서 60, NEAR_MAX_M 에서 0. 재방문율(최대 100)과 함께 「가까운 곳 위주」가 되도록 큰 편입니다. */
+const NEAR_WEIGHT = 60;
 
 const pad = (n: number) => String(n).padStart(2, "0");
 export const hhmmOf = (iso: string) => {
@@ -57,7 +56,7 @@ const DAY_NAMES = ["일요일", "월요일", "화요일", "수요일", "목요�
 
 /* ───────────── 필터 (§5-2) ───────────── */
 
-export type RecFilter = { inc: RecCategory[]; exc: RecCategory[]; dist: Dist };
+export type RecFilter = { inc: RecCategory[]; exc: RecCategory[] };
 
 /**
  * 기본 「빼고 싶은 것」 — 최근 3일 인증 기록에서 어제 먹은 종류 + 3일 안 2번 이상 먹은 종류.
@@ -80,7 +79,7 @@ export function recentExclude(rows: Restaurant[], today = todayIso()) {
 }
 
 export const defaultFilter = (rows: Restaurant[], today = todayIso()): RecFilter => ({
-  inc: [], exc: recentExclude(rows, today).exc, dist: DEFAULT_DIST,
+  inc: [], exc: recentExclude(rows, today).exc,
 });
 
 /* ───────────── 「지금 뭐 먹지」 5곳 (§5-5) ───────────── */
@@ -105,9 +104,9 @@ const visitedIn = (rows: Restaurant[], name: string, lat: number, lng: number) =
 
 /**
  * 「지금 뭐 먹지」 5곳(§5-5, 수정 §2-5).
- *   1. 필터 거리 안 + 최근 4주 같은 요일 지금 ±1시간에 인증 1건 이상 — 5곳이 안 차면 요일 조건을 빼고 다시, 그래도 모자라면 있는 만큼.
+ *   1. 2km 안 + 최근 4주 같은 요일 지금 ±1시간에 인증 1건 이상 — 5곳이 안 차면 요일 조건을 빼고 다시, 그래도 모자라면 있는 만큼.
  *   2. 먹고 싶은 것이 있으면 그 종류만, 빼고 싶은 것은 뺌.
- *   3. 점수 = 재방문율 + 오늘 인증 수 가중 + 시간대 인증 + 위시리스트 보너스 + 아직 안 간 곳 보너스.
+ *   3. 점수 = 가까움 + 재방문율 + 오늘 인증 수 가중 + 시간대 인증 + 위시리스트 보너스 + 아직 안 간 곳 보너스.
  * 까닭 문장은 기여가 큰 순으로 3개 — 인증 기록 · 위시 · 걸러낸 종류에서만 씁니다(영업시간 · 도보 시간 없음).
  */
 export function pickNow(opts: {
@@ -116,7 +115,7 @@ export function pickNow(opts: {
 }): { picks: Pick[]; anyDay: boolean } {
   const { stats, wishes, rows, filter, yesterday, couple, today = todayIso(), now = new Date() } = opts;
   const allowed = (c: RecCategory | null) => (filter.inc.length ? !!c && filter.inc.includes(c) : !c || !filter.exc.includes(c));
-  const base = stats.filter((s) => s.kind === "restaurant" && s.distance_m <= filter.dist && allowed(recCategoryOf(s.category, s.name)));
+  const base = stats.filter((s) => s.kind === "restaurant" && s.distance_m <= NEAR_MAX_M && allowed(recCategoryOf(s.category, s.name)));
   const byDow = base.filter((s) => s.slot_dow > 0);
   const anyDay = byDow.length < 5;
   const pool = anyDay ? base.filter((s) => s.slot_any > 0) : byDow;
@@ -129,7 +128,9 @@ export function pickNow(opts: {
       const wish = wishes.find((w) => wishKind(w) !== "cafe" && norm(w.name) === norm(s.name) && (w.lat == null || w.lng == null || metersBetweenLL(s.lat, s.lng, w.lat, w.lng) <= 100)) ?? null;
       const fresh = s.mine === 0 && !visitedIn(rows, s.name, s.lat, s.lng);
       const slot = anyDay ? s.slot_any : s.slot_dow;
-      const parts: { v: number; text?: string }[] = [];
+      const parts: { v: number; text?: string }[] = [
+        { v: Math.round(NEAR_WEIGHT * Math.max(0, 1 - s.distance_m / NEAR_MAX_M)) }, // 점수만 — 거리는 보조줄에 있습니다.
+      ];
       if (pctOf(s.revisit_rate) > 0) parts.push({ v: pctOf(s.revisit_rate), text: `인증한 사람의 ${pctOf(s.revisit_rate)}%가 다시 갔어요` });
       if (s.today_count > 0) parts.push({ v: Math.min(s.today_count, 10) * 4, text: `오늘 인증 ${s.today_count}건${s.last_at ? ` · 마지막 ${hhmmOf(s.last_at)}` : ""}` });
       parts.push({ v: Math.min(slot, 10) * 3, text: anyDay ? `지난 4주 이 시간대에 인증 ${slot}건` : `지난 4주 ${dayName} 이 시간대에 인증 ${slot}건` });

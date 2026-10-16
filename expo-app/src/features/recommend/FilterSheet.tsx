@@ -2,14 +2,13 @@ import * as Haptics from "expo-haptics";
 import { useEffect, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { BottomSheetModal } from "@/components/ui";
-import { formatDistance } from "@/lib/distance";
-import { DISTS, REC_CATEGORIES, type RecCategory, type RecFilter } from "@/lib/recommend";
+import { REC_CATEGORIES, type RecCategory, type RecFilter } from "@/lib/recommend";
 import { C, F } from "@/theme";
 import { REC } from "./ui";
 
 /**
- * 필터 시트(§5-2) — 먹고 싶은 것 · 빼고 싶은 것 · 거리. 한 종류는 둘 중 한쪽에만.
- * 「초기화」는 기본값(최근 3일 먹은 종류 빼기 · 1km)으로 되돌립니다.
+ * 필터 시트(§5-2) — 먹고 싶은 것 · 빼고 싶은 것. 한 종류는 둘 중 한쪽에만. 거리는 고르지 않고 가까운 곳 위주로 고릅니다.
+ * 「초기화」는 기본값(최근 3일 먹은 종류 빼기)으로 되돌립니다.
  */
 export function FilterSheet({
   visible, value, defaults, onClose, onApply,
@@ -65,24 +64,6 @@ export function FilterSheet({
 
       {section("inc", "먹고 싶은 것", "고르면 이 종류만 찾아요")}
       {section("exc", "빼고 싶은 것", "최근 3일 먹은 종류는 미리 들어가요")}
-
-      <Text style={{ marginTop: 18, fontFamily: F.sansBd, fontSize: 14, color: C.ink }}>거리</Text>
-      <View style={{ marginTop: 10, flexDirection: "row", borderRadius: 18, borderWidth: 1, borderColor: C.lineSoft, backgroundColor: C.card, padding: 3 }}>
-        {DISTS.map((m) => {
-          const on = draft.dist === m;
-          return (
-            <Pressable
-              key={m}
-              onPress={() => setDraft((d) => ({ ...d, dist: m }))}
-              accessibilityRole="button"
-              accessibilityState={{ selected: on }}
-              style={{ flex: 1, minHeight: 36, borderRadius: 15, alignItems: "center", justifyContent: "center", backgroundColor: on ? C.ink : "transparent" }}
-            >
-              <Text style={{ fontFamily: F.sansMd, fontSize: 12.5, color: on ? C.card : C.muted }}>{formatDistance(m)}</Text>
-            </Pressable>
-          );
-        })}
-      </View>
 
       <Pressable
         onPress={() => onApply(draft)}

@@ -1,15 +1,14 @@
-import { NaverMapCircleOverlay } from "@mj-studio/react-native-naver-map";
 import * as Haptics from "expo-haptics";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Animated, PanResponder, Pressable, ScrollView, Text, View } from "react-native";
 import { PaperMap } from "@/components/PaperMap";
 import { setState, type RecHere } from "@/data/store";
 import { formatDistance } from "@/lib/distance";
-import { DEFAULT_DIST, pickNow, type Pick, type PlaceStat, type RecCategory, type RecFilter } from "@/lib/recommend";
+import { NEAR_MAX_M, pickNow, type Pick, type PlaceStat, type RecCategory, type RecFilter } from "@/lib/recommend";
 import type { Restaurant, Wish } from "@/lib/types";
 import { C, F } from "@/theme";
 import { openDirections } from "./api";
-import { HereLegend, HereMarker, KakaoLink, NumberMarker, REC, RingLabelMarker } from "./ui";
+import { HereLegend, HereMarker, KakaoLink, NumberMarker, REC } from "./ui";
 
 const MAP_H = 270;
 /** 이만큼 끌면 다음 장(§5-3). */
@@ -24,7 +23,7 @@ function regionAround(lat: number, lng: number, radius: number) {
 
 /**
  * 「지금 뭐 먹지」(§5, 시안 5a) — 필터 줄 + 카드 한 장(위 지도 · 아래 가게 설명 가로 슬라이드).
- * 후보는 필터 거리 안에서 최근 4주 같은 요일 · 시간대에 인증이 있는 곳 — 5곳이 안 차면 요일 조건을 빼고, 그래도 없으면 빈 상태.
+ * 후보는 2km 안, 가까운 곳 위주로 — 최근 4주 같은 요일 · 시간대에 인증이 있는 곳 — 5곳이 안 차면 요일 조건을 빼고, 그래도 없으면 빈 상태.
  */
 export function NowMode({
   here, stats, loading, wishes, rows, filter, yesterday, couple, onOpenFilter, onChangeFilter,
@@ -41,20 +40,20 @@ export function NowMode({
   const [index, setIndex] = useState(0);
   useEffect(() => { setIndex(0); }, [picks]);
 
-  const count = filter.inc.length + filter.exc.length + (filter.dist !== DEFAULT_DIST ? 1 : 0);
-  const chip = (key: string, text: string, kind: "inc" | "exc" | "dist", onRemove: () => void) => (
+  const count = filter.inc.length + filter.exc.length;
+  const chip = (key: string, text: string, kind: "inc" | "exc", onRemove: () => void) => (
     <Pressable
       key={key}
       onPress={onRemove}
       accessibilityLabel={`${text} 해제`}
       style={{
         height: 36, borderRadius: 18, paddingHorizontal: 13, flexDirection: "row", alignItems: "center", gap: 6,
-        borderWidth: 1, borderColor: kind === "inc" ? REC.ink : kind === "exc" ? REC.excBg : C.lineSoft,
+        borderWidth: 1, borderColor: kind === "inc" ? REC.ink : REC.excBg,
         backgroundColor: kind === "exc" ? REC.excBg : REC.paper,
       }}
     >
       <Text style={{ fontFamily: F.sansMd, fontSize: 12.5, color: kind === "exc" ? REC.excInk : C.ink }}>{text}</Text>
-      {kind !== "dist" && <Text style={{ fontSize: 11, color: kind === "exc" ? REC.excInk : C.faint }}>✕</Text>}
+      <Text style={{ fontSize: 11, color: kind === "exc" ? REC.excInk : C.faint }}>✕</Text>
     </Pressable>
   );
 
@@ -68,7 +67,6 @@ export function NowMode({
         </Pressable>
         {filter.inc.map((c) => chip(`i${c}`, c, "inc", () => onChangeFilter({ ...filter, inc: filter.inc.filter((x) => x !== c) })))}
         {filter.exc.map((c) => chip(`e${c}`, `${c} 빼기`, "exc", () => onChangeFilter({ ...filter, exc: filter.exc.filter((x) => x !== c) })))}
-        {chip("dist", `${formatDistance(filter.dist)} 안`, "dist", onOpenFilter)}
       </ScrollView>
 
       <View style={{ flex: 1, marginTop: 12, minHeight: MAP_H + 190, borderRadius: 24, borderWidth: 1.5, borderColor: C.brick, backgroundColor: REC.paper, overflow: "hidden" }}>
@@ -77,7 +75,7 @@ export function NowMode({
         ) : picks.length === 0 ? (
           <Empty>
             <Text style={emptyText}>
-              {`${formatDistance(filter.dist)} 안에서 최근 4주 이 시간대에 인증된 곳을 아직 못 찾았어요.\n인증 기록이 쌓이면 이 동네도 추천해 드릴게요.`}
+              {`${formatDistance(NEAR_MAX_M)} 안에서 최근 4주 이 시간대에 인증된 곳을 아직 못 찾았어요.\n인증 기록이 쌓이면 이 동네도 추천해 드릴게요.`}
             </Text>
             <Pressable onPress={onOpenFilter} style={{ marginTop: 10 }}>
               <Text style={{ fontFamily: F.sans, fontSize: 12.5, color: C.brick }}>필터 바꾸기</Text>
@@ -85,7 +83,7 @@ export function NowMode({
           </Empty>
         ) : (
           <>
-            <PickMap here={here} picks={picks} index={index} dist={filter.dist} onPick={setIndex} />
+            <PickMap here={here} picks={picks} index={index} onPick={setIndex} />
             {anyDay && (
               <Text style={{ marginTop: 8, marginHorizontal: 18, fontFamily: F.sans, fontSize: 11, color: C.faint }}>같은 요일 기록이 적어 요일 상관없이 이 시간대로 골랐어요</Text>
             )}
@@ -102,9 +100,9 @@ const Empty = ({ children }: { children: React.ReactNode }) => (
   <View style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: 24 }}>{children}</View>
 );
 
-/** 위: 지도(높이 270) — 내 위치 · 거리 범위 원 · 번호 마커. 상호작용은 끕니다. */
-function PickMap({ here, picks, index, dist, onPick }: { here: RecHere; picks: Pick[]; index: number; dist: number; onPick: (i: number) => void }) {
-  const radius = dist;
+/** 위: 지도(높이 270) — 내 위치 · 번호 마커. 가장 먼 후보까지 담고, 상호작용은 끕니다. */
+function PickMap({ here, picks, index, onPick }: { here: RecHere; picks: Pick[]; index: number; onPick: (i: number) => void }) {
+  const radius = Math.max(250, ...picks.map((p) => p.distance)) * 1.1;
   const region = useMemo(() => regionAround(here.lat, here.lng, radius), [here.lat, here.lng, radius]);
   return (
     <View style={{ height: MAP_H, borderBottomWidth: 1, borderColor: C.lineSoft }}>
@@ -116,8 +114,6 @@ function PickMap({ here, picks, index, dist, onPick }: { here: RecHere; picks: P
         isTiltGesturesEnabled={false}
         isShowIndoorLevelPicker={false}
       >
-        <NaverMapCircleOverlay latitude={here.lat} longitude={here.lng} radius={radius} color="rgba(201,165,147,0.08)" outlineWidth={1.2} outlineColor={REC.ring} />
-        <RingLabelMarker lat={here.lat + radius / 111320} lng={here.lng} text={formatDistance(dist)} />
         <HereMarker lat={here.lat} lng={here.lng} />
         {picks.map((p, i) => (
           <NumberMarker key={p.key} lat={p.lat} lng={p.lng} n={i + 1} name={p.name} active={i === index} onTap={() => onPick(i)} />
