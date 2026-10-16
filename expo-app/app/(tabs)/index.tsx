@@ -53,8 +53,8 @@ const MAP_PAD_BOTTOM = 320;
 /** 웹 MobileShell 과 같은 네 단계 — peek 96 · 35% · 75% · full(화면 − 84). 처음엔 75% 로 엽니다. */
 /** 시트가 이보다 낮으면 머리를 한 줄(맛집 기록 · 가게 N · 기록 M)로 줄입니다 — 웹 COMPACT_BELOW. */
 const COMPACT_BELOW = 200;
-/** 지도 위 단추들이 시트 윗변에서 띄우는 간격. 마커 필터는 웹(14)보다 24 높게 — 왼쪽 아래 네이버 로고를 가리면 약관 위반입니다. */
-const GAP_FILTER = 38;
+/** 지도 위 단추들이 시트 윗변에서 띄우는 간격. 마커 필터(둘 다 / 기록만 / 위시리스트만)는 시트 머리 바로 위 — 네이버 로고는 왼쪽 위라 가리지 않습니다. */
+const GAP_FILTER = 14;
 const GAP_DRAFTS = 14;
 const GAP_PLUS = 16;
 const FILTER_H = 38;
