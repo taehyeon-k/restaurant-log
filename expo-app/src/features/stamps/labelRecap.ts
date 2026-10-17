@@ -1,0 +1,142 @@
+import { ieosseoyo, nativeCount } from "@/features/recap/seasons";
+import { eulReul } from "@/lib/josa";
+import { BOWL_TIERS, earnedBy, LABELS, labelById, nextBowl, recordTime, stampRows, type LabelDef } from "@/lib/labels";
+import type { Restaurant } from "@/lib/types";
+
+/** 강조어만 벽돌색으로 그리는 한 줄. */
+export type Line = { t: string; em?: boolean }[];
+
+export type LabelRecap = {
+  def: LabelDef;
+  /** 받은 기록과 그 날(YYYY-MM-DD) */
+  earnedOn: string;
+  /** 「열 번의 인증이 여기까지 왔어요」 */
+  journeyTitle: string;
+  /** 이 라벨에 들어간 기록, 오래된 순 · 번호는 1부터 */
+  journey: { no: number; row: Restaurant }[];
+  days: number;
+  places: number;
+  topCategory: string | null;
+  next: { name: string; left: number; have: number; need: number; from: number } | null;
+  discovery: Line;
+};
+
+/** 낱말 뒤에 붙는 조사만 — 강조어와 조사를 따로 그리려고. */
+const josa = (word: string, f: (w: string) => string) => f(word).slice(word.length);
+const dateOf = (r: Restaurant) => recordTime(r).slice(0, 10);
+const dayDiff = (a: string, b: string) => Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 86400000);
+const placeKey = (r: Restaurant) => r.place_key ?? `${r.name}|${r.address ?? ""}`.toLowerCase();
+
+/** 「다섯이」 「하나가」 — 수 대명사 + 주격. 1~99 밖이면 숫자. */
+function nativeSubject(n: number) {
+  const special: Record<number, string> = { 1: "하나가", 2: "둘이", 3: "셋이", 4: "넷이", 20: "스물이" };
+  if (special[n]) return special[n];
+  const det = nativeCount(n);
+  if (det === String(n)) return `${n}개가`;
+  // 끝자리가 한·두·세·네이면 대명사 꼴로.
+  const fix: Record<string, string> = { 한: "하나가", 두: "둘이", 세: "셋이", 네: "넷이" };
+  const last = det.slice(-1);
+  if (fix[last]) return det.slice(0, -1) + fix[last];
+  return `${det}이`;
+}
+
+/** 좋았던 메뉴 이름으로 묶는 종류 — 이름에 든 말로만 봅니다. */
+const MENU_KINDS: [string, RegExp][] = [
+  ["국물", /(국밥|국수|떡국|국$|탕(?!수)|찌개|전골|라멘|라면|우동|짬뽕|수제비|샤브|훠궈|쌀국수|곰국|수프|스프)/],
+  ["면", /(면|국수|파스타|스파게티|소바|우동|라멘|짜장|짬뽕)/],
+  ["고기", /(고기|갈비|삼겹|목살|스테이크|불고기|돈까스|돈카츠|치킨|닭|족발|보쌈|곱창|막창)/],
+  ["빵", /(빵|베이글|크루아상|크로와상|스콘|케이크|타르트|휘낭시에|마들렌|도넛)/],
+  ["커피", /(커피|라떼|아메리카노|에스프레소|카푸치노|플랫화이트)/],
+  ["밥", /(밥|덮밥|비빔|리조또|오므라이스|초밥|김밥)/],
+];
+
+type Candidate = { ratio: number; line: Line };
+
+/**
+ * 발견 한 줄 — 후보 중 비율이 가장 높은 하나. 요일 · 시간대로 만든 문장은 쓰지 않고,
+ * 남과 견주지 않고 내 기록 안의 값만 씁니다. 「따봉」 대신 「좋았던 / 아쉬웠던」.
+ */
+function discoveryOf(def: LabelDef, journey: Restaurant[], all: Restaurant[]): Line {
+  const out: Candidate[] = [];
+
+  // 좋았던 메뉴의 공통 종류
+  const liked = journey.flatMap((r) => (r.menus ?? []).filter((m) => m.vote === 1 && m.name.trim()).map((m) => m.name.trim()));
+  if (liked.length >= 3) {
+    const best = MENU_KINDS.map(([k, re]) => [k, liked.filter((n) => re.test(n)).length] as const).sort((a, b) => b[1] - a[1])[0];
+    if (best && best[1] >= 2) {
+      out.push({ ratio: best[1] / liked.length, line: [{ t: `좋았던 메뉴 ${nativeCount(liked.length)} 개 중 ${nativeSubject(best[1])} ` }, { t: best[0], em: true }, { t: josa(best[0], ieosseoyo) }] });
+    }
+  }
+
+  // 5점 준 곳에 다시 갔는지
+  const visits = new Map<string, number>();
+  for (const r of all) visits.set(placeKey(r), (visits.get(placeKey(r)) ?? 0) + 1);
+  const fives = [...new Set(journey.filter((r) => r.rating === 5).map(placeKey))];
+  if (fives.length >= 2) {
+    const again = fives.filter((k) => (visits.get(k) ?? 0) >= 2).length;
+    if (again) out.push({ ratio: again / fives.length, line: [{ t: `5점 준 곳 ${nativeCount(fives.length)} 곳 중 ${nativeCount(again)} 곳에 ` }, { t: "다시", em: true }, { t: " 갔어요" }] });
+  }
+
+  // 같은 메뉴를 여러 곳에서
+  const menuPlaces = new Map<string, Set<string>>();
+  for (const r of journey) for (const m of r.menus ?? []) {
+    const n = m.name.trim().replace(/\s+/g, "");
+    if (!n) continue;
+    if (!menuPlaces.has(n)) menuPlaces.set(n, new Set());
+    menuPlaces.get(n)!.add(placeKey(r));
+  }
+  const repeat = [...menuPlaces.entries()].sort((a, b) => b[1].size - a[1].size)[0];
+  const journeyPlaces = new Set(journey.map(placeKey)).size;
+  if (repeat && repeat[1].size >= 2 && journeyPlaces) {
+    out.push({ ratio: repeat[1].size / journeyPlaces, line: [{ t: repeat[0], em: true }, { t: `${josa(repeat[0], eulReul)} ${nativeCount(repeat[1].size)} 곳에서 먹었어요` }] });
+  }
+
+  // 위시에서 실제로 다녀온 수
+  const fromWish = journey.filter((r) => r.from_wish).length;
+  if (fromWish) out.push({ ratio: fromWish / journey.length, line: [{ t: `담아둔 곳 중 ${nativeCount(fromWish)} 곳을 ` }, { t: "실제로", em: true }, { t: " 다녀왔어요" }] });
+
+  out.sort((a, b) => b.ratio - a.ratio);
+  if (out[0]) return out[0].line;
+  return [{ t: `${nativeCount(journeyPlaces || 1)} 곳을 다녀오며 ` }, { t: def.name, em: true }, { t: `${josa(def.name, eulReul)} 받았어요` }];
+}
+
+/** 다음 라벨 — 그릇 수면 다음 단계, 이야기면 가장 가까운 것(없으면 다음 그릇 수). */
+function nextOf(def: LabelDef, rows: Restaurant[]): LabelRecap["next"] {
+  const stamps = stampRows(rows).length;
+  const bowl = nextBowl(stamps);
+  const bowlNext = bowl ? { name: bowl.tier.name, left: bowl.left, have: stamps, need: bowl.tier.need, from: bowl.from } : null;
+  if (def.group === "bowl") return bowlNext;
+  const story = LABELS.filter((l) => l.group === "story")
+    .map((l) => ({ l, have: l.count(rows) }))
+    .filter((x) => x.have < x.l.need)
+    .sort((a, b) => b.have / b.l.need - a.have / a.l.need)[0];
+  return story ? { name: story.l.name, left: story.l.need - story.have, have: story.have, need: story.l.need, from: 0 } : bowlNext;
+}
+
+export function computeLabelRecap(id: string, rows: Restaurant[]): LabelRecap | null {
+  const def = labelById(id);
+  if (!def) return null;
+  const by = earnedBy(def, rows);
+  if (!by) return null;
+  const contrib = def.contrib(rows);
+  const stamps = stampRows(rows);
+  // 그릇 수는 도장 번호 그대로, 이야기는 1부터.
+  const journey = contrib.map((row, i) => ({ no: def.group === "bowl" ? stamps.indexOf(row) + 1 : i + 1, row }));
+  const dates = contrib.map(dateOf).sort();
+  const cats = new Map<string, number>();
+  for (const r of contrib) if (r.category) cats.set(r.category, (cats.get(r.category) ?? 0) + 1);
+  const tier = BOWL_TIERS.find((t) => t.id === def.id);
+  return {
+    def,
+    earnedOn: dateOf(by),
+    journeyTitle: tier
+      ? tier.need === 1 ? "첫 인증이 여기까지 왔어요" : `${tier.word} 번의 인증이 여기까지 왔어요`
+      : `${nativeCount(contrib.length)} 번의 기록이 여기까지 왔어요`,
+    journey,
+    days: dates.length ? dayDiff(dates[0], dates[dates.length - 1]) + 1 : 1,
+    places: new Set(contrib.map(placeKey)).size,
+    topCategory: [...cats.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null,
+    next: nextOf(def, rows),
+    discovery: discoveryOf(def, contrib, rows.filter((r) => !r.pending)),
+  };
+}

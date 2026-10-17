@@ -115,6 +115,7 @@ function Gate({ fontsLoaded }: { fontsLoaded: boolean }) {
       <Stack.Screen name="couple/new" options={{ presentation: "modal" }} />
       <Stack.Screen name="couple/join" options={{ presentation: "modal" }} />
       <Stack.Screen name="recap/[quarter]" options={{ presentation: "fullScreenModal", animation: "fade", gestureEnabled: false }} />
+      <Stack.Screen name="label-recap" options={{ presentation: "fullScreenModal", animation: "fade", gestureEnabled: false }} />
       <Stack.Screen name="auth" />
       <Stack.Screen name="login" />
       <Stack.Screen name="welcome" />

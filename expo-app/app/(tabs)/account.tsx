@@ -15,7 +15,9 @@ import { usePersonalRows, usePersonalWishes } from "@/data/queries";
 import CoupleAccount from "@/features/couple/CoupleAccount";
 import { apiFetch } from "@/lib/api";
 import { CHARACTERS } from "@/lib/characters";
-import { earnedLabels } from "@/lib/labels";
+import { StampBoard } from "@/features/stamps/Stamp";
+import { useSeenLabels } from "@/lib/labelSeen";
+import { currentBoard, earnedLabels, nextBowl, stampRows, STAMPS_PER_BOARD } from "@/lib/labels";
 import { uploadPhoto } from "@/lib/photos";
 import { supabase } from "@/lib/supabase";
 import type { Restaurant } from "@/lib/types";
@@ -44,15 +46,21 @@ export function MyAccount() {
   const router = useRouter();
   const qc = useQueryClient();
   const { data: account } = useAccount();
-  const { data: rows = [] } = usePersonalRows();
+  const { data: rows = [], isSuccess: rowsReady } = usePersonalRows();
   const { data: wishes = [] } = usePersonalWishes();
   const [avatarBusy, setAvatarBusy] = useState(false);
   const [labelBusy, setLabelBusy] = useState(false);
   const { data: owned = [] } = useOwnedCharacters();
-  const { tickets, untilNext } = useTickets();
+  const { tickets } = useTickets();
   const setCharacter = useSetCharacter();
   const setLeaderboardOptIn = useSetLeaderboardOptIn();
   const [error, setError] = useState("");
+
+  const stamps = stampRows(rows).length;
+  const board = currentBoard(stamps);
+  const bowl = nextBowl(stamps);
+  const earnedIds = earnedLabels(rows).filter((l) => l.earned).map((l) => l.id);
+  const seen = useSeenLabels(account?.userId, earnedIds, rowsReady);
 
   if (!account) return <View style={{ flex: 1, backgroundColor: C.paper }} />;
 
@@ -185,6 +193,36 @@ export function MyAccount() {
         <Stat value={places} label="식당" border />
       </View>
 
+      {/* 도장판 — 인증 1건 = 도장 1개, 10칸을 채울 때마다 뽑기권 1장 */}
+      <View style={{ marginTop: 14, borderRadius: 20, borderWidth: 1, borderColor: C.lineSoft, backgroundColor: C.card, paddingVertical: 16, paddingHorizontal: 16 }}>
+        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "baseline" }}>
+          <Text style={{ fontFamily: F.serif, fontSize: 15, color: C.ink }}>도장판</Text>
+          <Text style={{ fontFamily: F.mono, fontSize: 11, color: C.faint }}>{board.board}장째 · {board.filled} / {STAMPS_PER_BOARD}</Text>
+        </View>
+        <View style={{ marginTop: 14, alignItems: "center" }}>
+          <StampBoard filled={board.filled} firstNo={(board.board - 1) * STAMPS_PER_BOARD + 1} size={42} gap={11} numberEmpty />
+        </View>
+        <View style={{ marginTop: 14, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+          <Text style={{ fontFamily: F.mono, fontSize: 10.5, color: C.faint }}>채운 판 {board.done}장 · 뽑기권 {tickets}</Text>
+          <Pressable onPress={() => router.push("/draw")} disabled={tickets < 1} style={{ minHeight: 36, borderRadius: 13, backgroundColor: C.ink, paddingHorizontal: 13, justifyContent: "center", opacity: tickets < 1 ? 0.4 : 1 }}>
+            <Text style={{ fontFamily: F.sansMd, fontSize: 12, color: C.card }}>밥솥 열러 가기</Text>
+          </Pressable>
+        </View>
+      </View>
+
+      {bowl && (
+        <View style={{ marginTop: 10, borderRadius: 20, borderWidth: 1, borderColor: C.lineSoft, backgroundColor: C.card, paddingVertical: 14, paddingHorizontal: 16 }}>
+          <Text style={{ fontFamily: F.serif, fontSize: 15, color: C.ink }}>{bowl.tier.name}까지 <Text style={{ color: C.brick }}>{bowl.left}</Text></Text>
+          <View style={{ marginTop: 12, flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <Text style={{ fontFamily: F.mono, fontSize: 10.5, color: C.faint }}>{bowl.from}</Text>
+            <View style={{ flex: 1, height: 5, borderRadius: 3, backgroundColor: "#ece7dc", overflow: "hidden" }}>
+              <View style={{ width: `${((stamps - bowl.from) / (bowl.tier.need - bowl.from)) * 100}%`, height: 5, borderRadius: 3, backgroundColor: C.brick }} />
+            </View>
+            <Text style={{ fontFamily: F.mono, fontSize: 10.5, color: C.faint }}>{bowl.tier.need}</Text>
+          </View>
+        </View>
+      )}
+
       <View style={{ marginTop: 20, flexDirection: "row", justifyContent: "space-between", alignItems: "baseline" }}>
         <Text style={{ fontFamily: F.serif, fontSize: 15, color: C.ink }}>내 캐릭터</Text>
         <Pressable onPress={() => router.push("/characters")} hitSlop={8}><Text style={{ fontFamily: F.mono, fontSize: 10.5, color: C.faint }}>{owned.length} / {CHARACTERS.length} ›</Text></Pressable>
@@ -210,16 +248,6 @@ export function MyAccount() {
           </Pressable>
         )}
       </View>
-      <View style={{ marginTop: 12, flexDirection: "row", alignItems: "center", gap: 10, borderRadius: 18, borderWidth: 1, borderColor: "#e0c3b1", backgroundColor: "#f9f0e9", paddingVertical: 12, paddingHorizontal: 14 }}>
-        <View style={{ flex: 1 }}>
-          <Text style={{ fontFamily: F.serif, fontSize: 15, color: C.ink }}>뽑기권 {tickets}장</Text>
-          <Text style={{ marginTop: 3, fontFamily: F.mono, fontSize: 10, color: C.faint }}>다음 장까지 인증 기록 {untilNext}건</Text>
-        </View>
-        <Pressable onPress={() => router.push("/draw")} disabled={tickets < 1} style={{ minHeight: 40, borderRadius: 14, backgroundColor: C.ink, paddingHorizontal: 14, justifyContent: "center", opacity: tickets < 1 ? 0.4 : 1 }}>
-          <Text style={{ fontFamily: F.sansMd, fontSize: 12.5, color: C.card }}>밥솥 열러 가기</Text>
-        </Pressable>
-      </View>
-
       {got.length > 0 && (
         <>
           <View style={{ marginTop: 20, flexDirection: "row", justifyContent: "space-between", alignItems: "baseline" }}>
@@ -228,11 +256,12 @@ export function MyAccount() {
           </View>
           <Text style={{ marginTop: 4, fontFamily: F.sans, fontSize: 10.5, color: C.faint }}>탭하면 닉네임 옆 대표 라벨로 붙습니다</Text>
           <View style={{ marginTop: 10, flexDirection: "row", flexWrap: "wrap", gap: 7 }}>
-            {[...got].sort((a, b) => Number(b.id === titleLabelId) - Number(a.id === titleLabelId)).slice(0, 3).map((l) => {
+            {[...got].sort((a, b) => Number(b.id === titleLabelId) - Number(a.id === titleLabelId) || Number(seen.isNew(b.id)) - Number(seen.isNew(a.id))).slice(0, 3).map((l) => {
               const on = l.id === titleLabelId;
+              const fresh = seen.isNew(l.id);
               return (
-                <Pressable key={l.id} onPress={() => selectTitleLabel(l.id)} disabled={labelBusy} style={{ borderRadius: 13, borderWidth: 1, borderColor: on ? C.brick : "rgba(180,85,45,.2)", backgroundColor: on ? C.brick : C.brickSoft, paddingHorizontal: 11, paddingVertical: 5, opacity: labelBusy ? 0.6 : 1 }}>
-                  <Text style={{ fontFamily: F.sans, fontSize: 11.5, color: on ? "#fdf9f3" : C.brick }}>{on ? "✓ " : ""}{l.name}</Text>
+                <Pressable key={l.id} onPress={() => selectTitleLabel(l.id)} disabled={labelBusy} style={{ borderRadius: 13, borderWidth: 1, borderColor: on || fresh ? C.brick : "rgba(180,85,45,.2)", backgroundColor: on ? C.brick : C.brickSoft, paddingHorizontal: 11, paddingVertical: 5, opacity: labelBusy ? 0.6 : 1 }}>
+                  <Text style={{ fontFamily: F.sans, fontSize: 11.5, color: on ? "#fdf9f3" : C.brick }}>{on ? "✓ " : ""}{l.name}{fresh ? " · 새로" : ""}</Text>
                 </Pressable>
               );
             })}

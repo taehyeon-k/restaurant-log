@@ -9,7 +9,7 @@ import { useNetInfo } from "@react-native-community/netinfo";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  ActivityIndicator, Alert, BackHandler, FlatList, Image, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
+  ActivityIndicator, Alert, BackHandler, FlatList, Image, Linking, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
@@ -17,7 +17,7 @@ import {
   BellIcon, BookmarkIcon, CameraIcon, DownloadIcon, FlashIcon, FlipIcon, MapPinIcon, RefreshIcon, VerifiedMark,
 } from "@/components/icons";
 import { useActiveBook } from "@/data/books";
-import { useRows, useWishes } from "@/data/queries";
+import { usePersonalRows, useRows, useWishes } from "@/data/queries";
 import { useAppState } from "@/data/store";
 import {
   buildCandidates, buildMine, formatDistance, hhmm, isoDate, metersBetween, nearToCandidate, noneNear, pickCandidates,
@@ -27,12 +27,14 @@ import { samePlace } from "@/lib/geo";
 import { nearbyPlaces, searchFoodPlaces, type FoodPlace } from "@/lib/geocode";
 import { drainQueue } from "@/features/queue/process";
 import { AfterCapture } from "@/features/recommend/AfterCapture";
+import { StampBoard } from "@/features/stamps/Stamp";
+import { earnedLabels, stampRows, stampSlot, STAMPS_PER_BOARD } from "@/lib/labels";
 import { enqueue, persistPhoto } from "@/features/queue/db";
 import { linkVisit } from "@/features/recommend/log";
 import { MAX_PHOTOS, pickAlbumUris } from "@/lib/photos";
 import { supabase } from "@/lib/supabase";
 import {
-  findMatchingWish, wishKind, wishMetInfo, WISH_AUTO_M, type Kind, type Wish,
+  findMatchingWish, wishKind, wishMetInfo, WISH_AUTO_M, type Kind, type Restaurant, type Wish,
 } from "@/lib/types";
 import { C, F, SHADOW } from "@/theme";
 
@@ -61,7 +63,10 @@ export default function Capture() {
   const { data: rows = [] } = useRows();
   const { data: wishes = [] } = useWishes();
   // 저장 위치 = 지금 고른 기록장(HANDOFF-couple §3-6). 연인 기록이면 찍은 사람이 인증합니다.
-  const { id: bookId } = useActiveBook();
+  const { id: bookId, isCouple } = useActiveBook();
+  // 도장 · 라벨은 개인 기록장만 셉니다(뽑기권과 같은 기준).
+  const { data: personalRows = [] } = usePersonalRows();
+  const [stampOpen, setStampOpen] = useState(true);
 
   const verifyWish = useMemo(
     () => (params.verifyWishId ? (wishes.find((w) => w.id === params.verifyWishId) ?? null) : null),
@@ -583,6 +588,21 @@ export default function Capture() {
   const stamp = `${isoDate(at).replaceAll("-", ".")} ${hhmm(at)}`;
   const twinDone = picked ? rows.find((r) => r.kind === picked.kind && samePlace(r, picked)) : null;
   const pickedKey = picked ? `${picked.name}|${twinDone?.address ?? picked.address ?? ""}`.toLowerCase() : null;
+  // 이번 인증이 몇 번째 도장인지, 새로 받는 라벨이 있는지 — 아직 저장 전이라 이 기록을 더해 셉니다.
+  const stampInfo = (() => {
+    if (isCouple || !picked) return null;
+    const next = {
+      id: -1, created_at: at.toISOString(), user_id: "", kind: picked.kind, name: picked.name, category: twinDone?.category ?? picked.category,
+      region: twinDone?.region ?? picked.region, address: twinDone?.address ?? picked.address ?? null, rating: null, menu: null, menus: [],
+      price_level: null, price_range: null, review: null, revisit: Boolean(twinDone), visited_at: isoDate(at), keywords: [], lat: picked.lat, lng: picked.lng,
+      photo_url: null, photo_urls: [], cover_index: 0, place_key: pickedKey, verified: true, acc: null, verified_at: at.toISOString(),
+      source_record_id: null, copied_at: null, pending: false, from_wish: picked.wish ? wishMetInfo(picked.wish, isoDate(at)) : null,
+    } satisfies Restaurant;
+    const n = stampRows(personalRows).length + 1;
+    const had = new Set(earnedLabels(personalRows).filter((l) => l.earned).map((l) => l.id));
+    const label = earnedLabels([...personalRows, next]).find((l) => l.earned && !had.has(l.id)) ?? null;
+    return { n, ...stampSlot(n), label, row: next };
+  })();
   return (
     <View style={[s.light, { paddingHorizontal: 20, paddingTop: insets.top + 12 }]}>
       <ScrollView showsVerticalScrollIndicator={false}>
@@ -600,7 +620,27 @@ export default function Capture() {
               <Text style={s.wishMetText}>담아둔 지 {days}일 만에 다녀왔습니다</Text>
             </View>
           )}
+          {stampInfo && (
+            <Pressable onPress={() => setStampOpen(true)} accessibilityLabel={`${stampInfo.n}번째 도장 보기`} style={[s.wishMet, { marginTop: 8 }]}>
+              <Text style={s.wishMetText}>◎ {stampInfo.n}번째 도장</Text>
+            </Pressable>
+          )}
         </View>
+        {stampInfo?.label && (
+          <View style={s.labelBand}>
+            <View style={s.labelNo}><Text style={{ fontFamily: F.mono, fontSize: 12, color: C.card }}>{stampInfo.label.group === "bowl" ? stampInfo.label.need : "◎"}</Text></View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontFamily: F.sansMd, fontSize: 13, color: C.ink }}>{stampInfo.label.name} 라벨을 받았어요</Text>
+              <Text style={{ marginTop: 2, fontFamily: F.sans, fontSize: 11.5, color: C.muted }}>뽑기권 1장도 함께 드려요</Text>
+            </View>
+            <Pressable
+              onPress={() => router.push({ pathname: "/label-recap", params: { id: stampInfo.label!.id, extra: JSON.stringify(stampInfo.row) } })}
+              hitSlop={8}
+            >
+              <Text style={{ fontFamily: F.sans, fontSize: 12, color: C.brick }}>리캡 보기 ›</Text>
+            </Pressable>
+          </View>
+        )}
         {picked && pickedKey && picked.kind === "restaurant" && (
           <AfterCapture placeKey={pickedKey} name={picked.name} lat={twinDone?.lat ?? picked.lat} lng={twinDone?.lng ?? picked.lng} rows={rows} />
         )}
@@ -623,6 +663,27 @@ export default function Capture() {
           <Text style={s.ghost}>나중에 쓸게요</Text>
         </Pressable>
       </View>
+
+      {/* 도장 팝업 — 완료 화면에 들어오면 위에 뜹니다(§E-3). */}
+      {stampInfo && (
+        <Modal visible={stampOpen} transparent animationType="fade" onRequestClose={() => setStampOpen(false)} statusBarTranslucent>
+          <View style={{ flex: 1, backgroundColor: "rgba(28,26,23,.5)", alignItems: "center", justifyContent: "center", padding: 28 }}>
+            <View style={s.stampCard}>
+              <Text style={{ fontFamily: F.mono, fontSize: 10.5, letterSpacing: 1.2, color: C.faint }}>도장판 {stampInfo.board} · {stampInfo.slot} / {STAMPS_PER_BOARD}</Text>
+              <Text style={{ marginTop: 8, fontFamily: F.serif, fontSize: 22, color: C.ink }}>{stampInfo.n}번째 도장</Text>
+              <View style={{ marginTop: 20 }}>
+                <StampBoard key={stampOpen ? "on" : "off"} filled={stampInfo.slot} fresh={stampInfo.slot} firstNo={(stampInfo.board - 1) * STAMPS_PER_BOARD + 1} size={42} gap={10} />
+              </View>
+              {stampInfo.slot === STAMPS_PER_BOARD && (
+                <Text style={{ marginTop: 18, fontFamily: F.sansMd, fontSize: 13, color: C.brick }}>한 장을 채웠어요 · 뽑기권 1장</Text>
+              )}
+              <Pressable onPress={() => setStampOpen(false)} style={[s.dark, { marginTop: 22, alignSelf: "stretch", paddingVertical: 15 }]}>
+                <Text style={s.darkText}>확인</Text>
+              </Pressable>
+            </View>
+          </View>
+        </Modal>
+      )}
     </View>
   );
 }
@@ -800,6 +861,12 @@ const s = StyleSheet.create({
     borderWidth: 1, borderColor: "#e0c3b1", backgroundColor: "#f9f0e9", paddingVertical: 7, paddingHorizontal: 12,
   },
   wishMetText: { fontFamily: F.sans, fontSize: 11, color: C.brick },
+  labelBand: {
+    marginTop: 12, flexDirection: "row", alignItems: "center", gap: 12, borderRadius: 18, borderWidth: 1, borderColor: "#e0c3b1",
+    backgroundColor: "#f9f0e9", paddingVertical: 12, paddingHorizontal: 14,
+  },
+  labelNo: { width: 34, height: 34, borderRadius: 17, backgroundColor: C.brick, alignItems: "center", justifyContent: "center" },
+  stampCard: { width: "100%", maxWidth: 340, borderRadius: 28, backgroundColor: C.card, paddingTop: 24, paddingBottom: 20, paddingHorizontal: 22, alignItems: "center" },
   upload: {
     marginTop: 16, flexDirection: "row", gap: 11, alignItems: "center", borderRadius: 18, borderWidth: 1,
     borderColor: "#e4dfd3", backgroundColor: C.card, paddingVertical: 14, paddingHorizontal: 16,

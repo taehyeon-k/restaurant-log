@@ -34,8 +34,8 @@ export const RARITY: Record<Rarity, { name: string; percent: number; ink: string
 /** 도감에 묶는 순서 — 전설 → 레어 → 보통. */
 export const RARITY_ORDER: Rarity[] = ["legend", "rare", "common"];
 
-/** 인증 기록 몇 건마다 뽑기권 1장. */
-export const VERIFIED_PER_TICKET = 5;
+/** 인증 기록 몇 건마다 뽑기권 1장 — 도장판 한 장(10칸). DB available_tickets 와 같은 값. */
+export const VERIFIED_PER_TICKET = 10;
 
 export const isCharacterId = (v: unknown): v is CharacterId =>
   typeof v === "string" && (CHARACTER_IDS as readonly string[]).includes(v);
