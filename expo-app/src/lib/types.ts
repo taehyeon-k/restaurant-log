@@ -68,6 +68,8 @@ export type Wish = {
   /** 링크로 담은 위시의 원본(릴스 · 쇼츠 …). 옛 위시는 메모의 URL 만 있습니다. */
   source_url?: string | null;
   source_kind?: SourceKind | null;
+  /** 앨범에서 고른 캡처 한 장(버킷 경로) — 담은 사람만 봅니다. 공유 · 커뮤니티에 내보내지 않습니다. */
+  capture_path?: string | null;
 };
 
 export const CATEGORIES: Record<Kind, string[]> = {

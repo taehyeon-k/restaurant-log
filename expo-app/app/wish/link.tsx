@@ -43,7 +43,7 @@ export default function WishLinkRoute() {
   useEffect(() => {
     if (query.trim().length < 2) { setHits([]); return; }
     const ctrl = new AbortController();
-    const t = setTimeout(async () => { try { setHits((await searchFoodPlaces(query, ctrl.signal)).slice(0, 6)); } catch { /* 취소·오프라인 */ } }, 250);
+    const t = setTimeout(async () => { try { setHits((await searchFoodPlaces(query, ctrl.signal)).slice(0, 3)); } catch { /* 취소·오프라인 */ } }, 250);
     return () => { clearTimeout(t); ctrl.abort(); };
   }, [query]);
 

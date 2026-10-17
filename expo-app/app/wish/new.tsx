@@ -5,16 +5,18 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { logRec } from "@/features/recommend/log";
 import { useEffect, useRef, useState } from "react";
-import { Animated, KeyboardAvoidingView, Platform, Pressable, ScrollView, Switch, Text, TextInput, View } from "react-native";
+import { Animated, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { LinkIcon } from "@/components/icons";
+import { LinkIcon, PhotoIcon } from "@/components/icons";
 import { Button, Chip, Eyebrow, fieldStyle } from "@/components/ui";
 import { refreshAll } from "@/data/invalidate";
 import { useActiveBook } from "@/data/books";
 import { useWishes } from "@/data/queries";
 import { setState, useAppState } from "@/data/store";
 import { askWishPermissions } from "@/features/notify/geofence";
-import { forwardGeocode, searchFoodPlaces, type FoodPlace, type Place } from "@/lib/geocode";
+import { forwardGeocode, searchFoodPlaces, type FoodPlace } from "@/lib/geocode";
+import { pickAlbumUris, removePhotoObjects, uploadAlbumPhoto } from "@/lib/photos";
+import { SignedImage } from "@/lib/signedPhoto";
 import { isSourceKind, parseSourceLink, shortUrl, SOURCE_LABEL, sourceGlyph, type SourceKind } from "@/lib/sourceLink";
 import { supabase } from "@/lib/supabase";
 import { ALL_CATEGORIES, matchWish } from "@/lib/types";
@@ -36,11 +38,13 @@ export default function WishForm() {
   const insets = useSafeAreaInsets();
   const qc = useQueryClient();
   const { data: wishes = [] } = useWishes();
-  const { id: bookId } = useActiveBook();
-  const { spotPick, linkPick } = useAppState();
+  const { id: bookId, isCouple, me } = useActiveBook();
+  const { linkPick } = useAppState();
 
   const wish = p.id ? wishes.find((w) => w.id === p.id) ?? null : null;
   const isNew = !p.id;
+  // 캡처는 담은 사람에게만 — 연인 기록장에서 상대의 위시를 고칠 때는 사진 칸을 그리지 않습니다.
+  const isOwner = isNew || !isCouple || (!!me && wish?.user_id === me.userId);
 
   const [name, setName] = useState(wish?.name ?? p.name ?? "");
   const [whereText, setWhereText] = useState(wish?.where_text ?? p.where_text ?? "");
@@ -55,6 +59,8 @@ export default function WishForm() {
   const [source, setSource] = useState<{ url: string; kind: SourceKind } | null>(
     isNew && p.source_url ? { url: p.source_url, kind: isSourceKind(p.source_kind) ? p.source_kind : "link" } : null
   );
+  // 캡처 한 장 — 담은 사람만 봅니다. 고른 직후엔 로컬 주소(local), 저장된 것은 버킷 경로(path).
+  const [capture, setCapture] = useState<{ path?: string; local?: string } | null>(wish?.capture_path ? { path: wish.capture_path } : null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -67,6 +73,7 @@ export default function WishForm() {
     setName(wish.name); setWhereText(wish.where_text ?? ""); setCategory(wish.category ?? ""); setNote(wish.note ?? "");
     setPlanDate(wish.plan_date ?? ""); setNotify(wish.notify);
     if (wish.lat != null && wish.lng != null) setSpot({ lat: wish.lat, lng: wish.lng });
+    if (wish.capture_path) setCapture({ path: wish.capture_path });
   }, [wish]);
 
   // 새 위시는 「가게」 칸에 적는 대로 음식점·카페를 찾아 고르면 자리·종류까지 채웁니다.
@@ -91,28 +98,12 @@ export default function WishForm() {
     if (r.category && ALL_CATEGORIES.includes(r.category)) setCategory(r.category);
   }
 
-  // 「자리」 칸에서 바로 가게를 찾아 위치를 잡습니다.
-  const [results, setResults] = useState<Place[]>([]);
-  const [open, setOpen] = useState(false);
-  const skip = useRef(false);
-  useEffect(() => {
-    if (skip.current) { skip.current = false; return; }
-    if (!open || whereText.trim().length < 2) { setResults([]); return; }
-    const ctrl = new AbortController();
-    const t = setTimeout(async () => { try { setResults(await forwardGeocode(whereText, ctrl.signal)); } catch { /* 취소·오프라인 */ } }, 250);
-    return () => { clearTimeout(t); ctrl.abort(); };
-  }, [whereText, open]);
+  async function pickCapture() {
+    const [uri] = await pickAlbumUris(1);
+    if (uri) setCapture({ local: uri });
+  }
 
-  // 지도에서 고르기(wish/spot)가 돌려준 자리.
-  useEffect(() => {
-    if (!spotPick) return;
-    setSpot({ lat: spotPick.lat, lng: spotPick.lng });
-    if (!whereText.trim()) setWhereText(spotPick.found ? spotPick.found.name || spotPick.found.address : "지도에서 고른 자리");
-    if (spotPick.found?.name && !name.trim()) setName(spotPick.found.name);
-    setState({ spotPick: null });
-  }, [spotPick]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // 「링크 붙여넣기」 — 누를 때만 클립보드를 읽습니다(앱이 켜질 때 자동으로 읽지 않음: iOS 붙여넣기 알림).
+  // 「링크」 — 누를 때만 클립보드를 읽습니다(앱이 켜질 때 자동으로 읽지 않음: iOS 붙여넣기 알림).
   const shake = useRef(new Animated.Value(0)).current;
   async function pasteLink() {
     const link = parseSourceLink(await Clipboard.getStringAsync().catch(() => ""));
@@ -157,9 +148,20 @@ export default function WishForm() {
       }
     }
 
+    // 가게 검색으로 고르지 않고 위치를 손으로 적었으면 그 주소(없으면 가게 이름)로 자리를 찾아 둡니다 — 기록 쓰기와 같음.
+    const cleanWhere = whereText.trim();
+    const at = spot ?? (
+      (cleanWhere ? (await forwardGeocode(cleanWhere).catch(() => []))[0] : null) ??
+      (await forwardGeocode(cleanName).catch(() => []))[0] ?? null
+    );
+    let capturePath = capture?.path ?? null;
+    if (capture?.local) {
+      try { capturePath = await uploadAlbumPhoto(capture.local); }
+      catch (e) { setSaving(false); return setError(e instanceof Error ? e.message : "캡처를 올리지 못했습니다"); }
+    }
     const payload = {
-      name: cleanName, where_text: whereText.trim() || null, category: category || null, note: note.trim() || null,
-      plan_date: planDate || null, notify, lat: spot?.lat ?? null, lng: spot?.lng ?? null,
+      name: cleanName, where_text: cleanWhere || null, category: category || null, note: note.trim() || null,
+      plan_date: planDate || null, notify, lat: at?.lat ?? null, lng: at?.lng ?? null, capture_path: capturePath,
       ...(isNew ? { source_url: source?.url ?? null, source_kind: source?.kind ?? null } : {}),
     };
     let err;
@@ -177,6 +179,8 @@ export default function WishForm() {
     }
     setSaving(false);
     if (err) return setError(err.message);
+    // 바꾸거나 지운 옛 캡처 파일은 버킷에서도 지웁니다.
+    if (wish?.capture_path && wish.capture_path !== capturePath) void removePhotoObjects([wish.capture_path]);
     await refreshAll(qc);
     router.back();
     // 첫 위시를 저장하는 순간 알림·위치 권한을 여쭙니다(핸드오프 §7).
@@ -187,6 +191,7 @@ export default function WishForm() {
     if (!wish) return;
     const { error: err } = await supabase.from("wishes").delete().eq("id", wish.id);
     if (err) return setError(err.message);
+    if (wish.capture_path) void removePhotoObjects([wish.capture_path]);
     await refreshAll(qc);
     router.back();
   }
@@ -204,11 +209,11 @@ export default function WishForm() {
             <Animated.View style={{ transform: [{ translateX: shake }] }}>
               <Pressable
                 onPress={pasteLink}
-                accessibilityLabel="링크 붙여넣기"
-                style={{ height: 56, borderRadius: 16, borderWidth: 1.5, borderStyle: "dashed", borderColor: "#c9a593", backgroundColor: C.card, paddingHorizontal: 16, flexDirection: "row", alignItems: "center", gap: 10 }}
+                accessibilityLabel="링크"
+                style={s.dashed}
               >
                 <LinkIcon size={20} stroke={C.brick} strokeWidth={1.8} />
-                <Text style={{ flex: 1, fontFamily: F.sansMd, fontSize: 13.5, color: C.ink }}>링크 붙여넣기</Text>
+                <Text style={{ flex: 1, fontFamily: F.sansMd, fontSize: 13.5, color: C.ink }}>링크</Text>
                 <Text style={{ fontFamily: F.mono, fontSize: 10.5, color: C.faint }}>릴스 · 쇼츠</Text>
               </Pressable>
             </Animated.View>
@@ -226,6 +231,23 @@ export default function WishForm() {
               </Pressable>
             </View>
           )}
+          {isOwner && (capture ? (
+            <View style={{ borderRadius: 14, borderWidth: 1, borderColor: "#e0c3b1", backgroundColor: "#f9efe8", paddingVertical: 8, paddingHorizontal: 14, flexDirection: "row", alignItems: "center", gap: 12 }}>
+              {capture.local
+                ? <Image source={{ uri: capture.local }} style={s.thumb} />
+                : <View style={[s.thumb, { backgroundColor: "#eadfd3" }]}><SignedImage uri={capture.path} style={s.thumb} /></View>}
+              <Text numberOfLines={1} style={{ flex: 1, fontFamily: F.sans, fontSize: 12, color: "#8f4323" }}>캡처 1장 · 나만 보여요</Text>
+              <Pressable onPress={() => setCapture(null)} accessibilityLabel="캡처 지우기" hitSlop={10}>
+                <Text style={{ fontSize: 11, color: "#a29a8c" }}>✕</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <Pressable onPress={pickCapture} accessibilityLabel="사진" style={s.dashed}>
+              <PhotoIcon size={20} stroke={C.brick} strokeWidth={1.8} />
+              <Text style={{ flex: 1, fontFamily: F.sansMd, fontSize: 13.5, color: C.ink }}>사진</Text>
+              <Text style={{ fontFamily: F.mono, fontSize: 10.5, color: C.faint }}>앨범</Text>
+            </Pressable>
+          ))}
           <View>
             <Eyebrow>가게</Eyebrow>
             <TextInput
@@ -250,39 +272,14 @@ export default function WishForm() {
             )}
           </View>
 
-          <View style={{ zIndex: 5 }}>
-            <Eyebrow>자리</Eyebrow>
-            <View style={{ marginTop: 7, flexDirection: "row", alignItems: "center", gap: 7 }}>
-              <View style={{ flex: 1 }}>
-                <TextInput
-                  value={whereText}
-                  onChangeText={(t) => { setWhereText(t); setOpen(true); if (spot) setSpot(null); }}
-                  onFocus={() => setOpen(true)}
-                  onBlur={() => setTimeout(() => setOpen(false), 150)}
-                  placeholder="가게 이름으로 찾기, 또는 동네나 주소"
-                  placeholderTextColor="#b3ada1"
-                  style={[fieldStyle, { marginTop: 0, borderRadius: 14, minHeight: 46 }]}
-                />
-                {open && results.length > 0 && (
-                  <View style={[{ position: "absolute", left: 0, right: 0, top: 50, borderRadius: 14, borderWidth: 1, borderColor: C.line, backgroundColor: C.card, overflow: "hidden", zIndex: 10 }, SHADOW.card]}>
-                    {results.map((r, i) => (
-                      <Pressable key={`${r.lat}-${r.lng}-${i}`} onPress={() => { skip.current = true; setWhereText(r.name || r.address); setSpot({ lat: r.lat, lng: r.lng }); setOpen(false); setResults([]); if (!name.trim()) setName(r.name); }}
-                        style={{ paddingHorizontal: 14, paddingVertical: 10, gap: 2, borderBottomWidth: i === results.length - 1 ? 0 : 1, borderBottomColor: C.line }}>
-                        <Text style={{ fontFamily: F.sansMd, fontSize: 13, color: C.ink }}>{r.name || r.address}</Text>
-                        <Text style={{ fontFamily: F.sans, fontSize: 11, color: C.muted }}>{r.address}</Text>
-                      </Pressable>
-                    ))}
-                  </View>
-                )}
-              </View>
-              <Pressable
-                onPress={() => router.push({ pathname: "/wish/spot", params: spot ? { lat: String(spot.lat), lng: String(spot.lng) } : {} })}
-                style={{ minHeight: 46, borderRadius: 14, borderWidth: 1, borderColor: spot ? C.brick : "#ded8cb", paddingHorizontal: 12, justifyContent: "center" }}
-              >
-                <Text style={{ fontFamily: F.sans, fontSize: 12, color: spot ? C.brick : C.muted }}>{spot ? "자리 정해짐 · 다시 고르기" : "지도에서 고르기"}</Text>
-              </Pressable>
-            </View>
-            {spot && <Text style={{ marginTop: 6, fontFamily: F.sans, fontSize: 11, color: C.brick }}>검색으로 찾은 자리가 정확히 잡혔습니다.</Text>}
+          <View>
+            <Eyebrow>위치</Eyebrow>
+            <TextInput
+              value={whereText}
+              onChangeText={(t) => { setWhereText(t); if (spot) setSpot(null); }}
+              placeholder="주소나 동네" placeholderTextColor="#b3ada1"
+              style={[fieldStyle, { borderRadius: 14, minHeight: 46 }]}
+            />
           </View>
 
           <View>
@@ -296,13 +293,13 @@ export default function WishForm() {
             <Eyebrow>어떤 장소인가요?</Eyebrow>
             <TextInput
               value={note} onChangeText={setNote} multiline numberOfLines={6} textAlignVertical="top"
-              placeholder="마음껏 적어두세요." placeholderTextColor="#b3ada1"
+              placeholder="어디서 봤는지, 왜 가보고 싶은지 적어 두면 좋아요" placeholderTextColor="#b3ada1"
               style={[fieldStyle, { borderRadius: 14, minHeight: 150, paddingTop: 12, fontFamily: F.serif, fontSize: 14, lineHeight: 25 }]}
             />
           </View>
 
           <View>
-            <Eyebrow>언제 갈지 (비워도 됩니다)</Eyebrow>
+            <Eyebrow>언제 갈 건가요?</Eyebrow>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
               <Pressable onPress={() => setPickDate(true)} style={[fieldStyle, { flex: 1, justifyContent: "center", borderRadius: 14, minHeight: 46 }]}>
                 <Text style={{ fontFamily: F.mono, fontSize: 13, color: planDate ? C.ink : "#b3ada1" }}>{planDate || "날짜 고르기"}</Text>
@@ -361,3 +358,8 @@ export default function WishForm() {
     </KeyboardAvoidingView>
   );
 }
+
+const s = StyleSheet.create({
+  dashed: { height: 56, borderRadius: 16, borderWidth: 1.5, borderStyle: "dashed", borderColor: "#c9a593", backgroundColor: C.card, paddingHorizontal: 16, flexDirection: "row", alignItems: "center", gap: 10 },
+  thumb: { width: 44, height: 58, borderRadius: 8, overflow: "hidden" },
+});

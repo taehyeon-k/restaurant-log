@@ -228,3 +228,12 @@ export const ExternalIcon = ({ size = 13, stroke = "#4d4842", strokeWidth = 1.7 
     <Path d="M18 14v4.5a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 4 18.5v-11A1.5 1.5 0 0 1 5.5 6H10" />
   </Svg>
 );
+
+/** 앨범 사진 — 액자 + 산 + 해. */
+export const PhotoIcon = ({ size = 20, stroke = "#b4552d", strokeWidth = 1.8 }: P) => (
+  <Svg {...base(size, stroke, strokeWidth)}>
+    <Rect x="3.5" y="4.5" width="17" height="15" rx="2.5" />
+    <Circle cx="9" cy="9.5" r="1.6" />
+    <Path d="M20.5 15.5l-4.6-4.6a1.2 1.2 0 0 0-1.7 0L6.5 18.6" />
+  </Svg>
+);

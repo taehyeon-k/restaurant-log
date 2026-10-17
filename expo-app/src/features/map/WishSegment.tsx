@@ -48,7 +48,7 @@ export type WishItem =
   | { t: "wish"; key: string; wish: Wish; dated: boolean }
   | { t: "empty"; key: string };
 
-/** 날짜를 정한 곳 · N / 언젠가 · N 두 묶음으로 펼친 목록. 불러온 뒤 한 번, 지난 예정은 조용히 「언젠가」로 되돌립니다. */
+/** 예정 · N / 언젠가 · N 두 묶음으로 펼친 목록. 불러온 뒤 한 번, 지난 예정은 조용히 「언젠가」로 되돌립니다. */
 export function useWishItems(wishes: Wish[]) {
   const qc = useQueryClient();
   const swept = useRef(false);
@@ -63,7 +63,7 @@ export function useWishItems(wishes: Wish[]) {
     const someday = wishes.filter((w) => !w.plan_date);
     const items: WishItem[] = [];
     if (dated.length) {
-      items.push({ t: "head", key: "h-dated", title: `날짜를 정한 곳 · ${dated.length}`, first: true });
+      items.push({ t: "head", key: "h-dated", title: `예정 · ${dated.length}`, first: true });
       dated.forEach((w) => items.push({ t: "wish", key: w.id, wish: w, dated: true }));
     }
     if (someday.length) {

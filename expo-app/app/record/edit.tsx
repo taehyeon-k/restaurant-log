@@ -246,7 +246,10 @@ export default function EditRoute() {
       if (error) throw new Error(error.message);
       if (isCouple && (shared.rating != null || shared.review)) await saveNote(user.id, inserted.id as number, shared.rating, shared.review, false);
       if (kind === "restaurant") linkVisit({ recordId: inserted.id as number, name: cleanName, lat, lng, verified: false });
-      if (matchedWish) await supabase.from("wishes").delete().eq("id", matchedWish.id);
+      if (matchedWish) {
+        await supabase.from("wishes").delete().eq("id", matchedWish.id);
+        if (matchedWish.capture_path) void removePhotoObjects([matchedWish.capture_path]);
+      }
 
       await refreshAll(qc);
       router.dismissAll();

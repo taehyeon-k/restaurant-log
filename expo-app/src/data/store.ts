@@ -13,15 +13,13 @@ export type MapSegment = "records" | "wish";
 /** 커뮤니티 탭 — 마지막에 본 곳을 기억합니다(§4). */
 export type CommunityTab = "friends" | "recs" | "ranking" | "board";
 
-/** 위시 자리 고르기 화면(wish/spot)이 돌려주는 값 — 폼이 읽고 비웁니다. */
-export type SpotPick = { lat: number; lng: number; found?: { name: string; address: string } } | null;
 /** 링크로 담기(wish/link)를 위시 폼에서 열었을 때 고른 가게 + 출처 — 폼이 읽고 비웁니다. */
 export type LinkPick = {
   name: string; address: string; category: string | null; lat: number; lng: number; url: string; kind: SourceKind;
 } | null;
 
 type State = {
-  kind: Kind; ghost: Ghost; spotPick: SpotPick; linkPick: LinkPick;
+  kind: Kind; ghost: Ghost; linkPick: LinkPick;
   /** 로그인 전에 공유 시트로 받은 링크 — 로그인이 끝나면 wish/link 로 이어갑니다. */
   pendingShare: { url: string; kind: SourceKind } | null;
   mapSegment: MapSegment; communityTab: CommunityTab;
@@ -47,7 +45,7 @@ export type RecShown = { sessionId: string; key: string; position: number; name:
 export type RecCourse = { id: string; date: string; places: { placeKey: string; name: string }[] };
 export type RecHere = { lat: number; lng: number; name: string | null; fallback: boolean };
 let state: State = {
-  kind: "restaurant", ghost: null, spotPick: null, linkPick: null, pendingShare: null,
+  kind: "restaurant", ghost: null, linkPick: null, pendingShare: null,
   mapSegment: "records", communityTab: "friends", communitySeenSince: null,
   recFilter: null, recHeading: null, recCourse: null, recHere: null, recPlace: null, recAt: null, recShown: [],
 };

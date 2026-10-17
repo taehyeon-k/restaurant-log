@@ -7,8 +7,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BellIcon, BookmarkIcon, CameraIcon, ExternalIcon } from "@/components/icons";
 import { Button } from "@/components/ui";
 import { refreshAll } from "@/data/invalidate";
+import { useActiveBook } from "@/data/books";
 import { useWishes } from "@/data/queries";
 import { setState } from "@/data/store";
+import { removePhotoObjects } from "@/lib/photos";
+import { SignedImage } from "@/lib/signedPhoto";
 import { supabase } from "@/lib/supabase";
 import { SOURCE_LABEL } from "@/lib/sourceLink";
 import { dottedDate, wishKind } from "@/lib/types";
@@ -24,6 +27,7 @@ export default function WishSheetRoute() {
   const { data: wishes = [] } = useWishes();
   const wish = wishes.find((w) => w.id === id);
   const [busy, setBusy] = useState(false);
+  const { isCouple, me } = useActiveBook();
 
   if (!wish) return <Pressable style={{ flex: 1 }} onPress={() => router.back()} />;
 
@@ -32,6 +36,8 @@ export default function WishSheetRoute() {
   const body = noteWithoutUrl(wish.note, noteUrl);
   // 출처 종류를 아는 위시만 태그 — 메모 URL 만 있는 옛 위시는 태그 없이 「원본 보기」.
   const sourceLabel = wish.source_url && wish.source_kind ? SOURCE_LABEL[wish.source_kind] : null;
+  // 캡처는 담은 사람에게만 보입니다.
+  const capture = wish.capture_path && (!isCouple || wish.user_id === me?.userId) ? wish.capture_path : null;
 
   async function toggleNotify() {
     setBusy(true);
@@ -43,7 +49,7 @@ export default function WishSheetRoute() {
   function remove() {
     Alert.alert(`"${wish!.name}" 을(를) 위시리스트에서 삭제할까요?`, undefined, [
       { text: "취소", style: "cancel" },
-      { text: "삭제", style: "destructive", onPress: async () => { setBusy(true); await supabase.from("wishes").delete().eq("id", wish!.id); setBusy(false); await refreshAll(qc); router.back(); } },
+      { text: "삭제", style: "destructive", onPress: async () => { setBusy(true); await supabase.from("wishes").delete().eq("id", wish!.id); if (wish!.capture_path) void removePhotoObjects([wish!.capture_path]); setBusy(false); await refreshAll(qc); router.back(); } },
     ]);
   }
 
@@ -67,7 +73,14 @@ export default function WishSheetRoute() {
             {dottedDate(wish.plan_date)} 갈 예정
           </Text>
         )}
-        <Text style={{ marginTop: 12, fontFamily: F.serif, fontSize: 14, lineHeight: 26, color: "#2e2a25" }}>{body || "적어둔 말이 없습니다."}</Text>
+        <View style={{ marginTop: 12, flexDirection: "row", alignItems: "flex-start", gap: 12 }}>
+          <Text style={{ flex: 1, fontFamily: F.serif, fontSize: 14, lineHeight: 26, color: "#2e2a25" }}>{body || "적어둔 말이 없습니다."}</Text>
+          {capture && (
+            <View style={{ width: 44, height: 58, borderRadius: 8, overflow: "hidden", backgroundColor: "#eadfd3" }}>
+              <SignedImage uri={capture} style={{ width: 44, height: 58 }} accessibilityLabel="캡처 · 나만 보여요" />
+            </View>
+          )}
+        </View>
 
         <View style={{ marginTop: 16, flexDirection: "row", alignItems: "center", gap: 8 }}>
           <Button
