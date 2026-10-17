@@ -13,9 +13,10 @@ import { closeBook, setActiveBook, updateStartedOn, useActiveBook, type Book } f
 import { useAccount } from "@/data/profile";
 import { useBookRows } from "@/data/queries";
 import { dayCount, todayIso } from "@/lib/anniversary";
-import { dottedDate, type Restaurant } from "@/lib/types";
+import type { Restaurant } from "@/lib/types";
 import { C, F } from "@/theme";
 import { Pair } from "./Avatars";
+import { SinceDays } from "./Since";
 import { SignedImage } from "@/lib/signedPhoto";
 
 const DRAWER_W = 308;
@@ -84,6 +85,8 @@ export default function BookDrawer({ visible, onClose }: { visible: boolean; onC
   const open = couple && !couple.closedAt;
   const partner = couple?.members.find((m) => m.userId !== me?.userId) ?? null;
   const waiting = !!open && !partner;
+  // 사귄 날 · 연결 끊기는 연인 기록을 골랐을 때만.
+  const coupleActive = !!open && active?.id === couple?.id;
 
   const pick = (b: Book) => {
     Haptics.selectionAsync();
@@ -206,7 +209,7 @@ export default function BookDrawer({ visible, onClose }: { visible: boolean; onC
                 </Pressable>
               )}
 
-              {open && (
+              {coupleActive && (
                 <View style={{ marginTop: 4, borderTopWidth: 1, borderTopColor: C.lineSoft }}>
                   {waiting && (
                     <Pressable onPress={() => go("/couple/new", { book: couple.id })} style={rowStyle}>
@@ -215,7 +218,7 @@ export default function BookDrawer({ visible, onClose }: { visible: boolean; onC
                     </Pressable>
                   )}
                   <Pressable onPress={() => setEditDate((v) => !v)} style={rowStyle}>
-                    <Text style={rowLabel}>사귄 날 <Text style={{ fontFamily: F.mono, color: C.ink }}>{dottedDate(couple.startedOn)}</Text></Text>
+                    {couple.startedOn ? <SinceDays startedOn={couple.startedOn} size={12.5} /> : <Text style={rowLabel}>사귄 날</Text>}
                     <Text style={{ fontFamily: F.sans, fontSize: 12, color: C.brick }}>{editDate ? "닫기" : "수정"}</Text>
                   </Pressable>
                   {editDate && (
@@ -237,9 +240,6 @@ export default function BookDrawer({ visible, onClose }: { visible: boolean; onC
                 </View>
               )}
 
-              <Text style={{ marginTop: 14, fontFamily: F.sans, fontSize: 11, lineHeight: 18, color: C.faint }}>
-                두 기록장은 따로 저장됩니다. 개인 기록은 상대에게 보이지 않습니다.
-              </Text>
             </ScrollView>
             {/* 머리 오른쪽 위 내 계정 사진 — 서랍을 닫고 내계정을 엽니다. 연인 기록 중에도 내 계정. */}
             <Pressable
