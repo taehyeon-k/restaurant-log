@@ -19,6 +19,8 @@ import { earnedCoupleLabels, filledAnniversaries, visitsByPlace } from "@/lib/co
 import { dottedDate } from "@/lib/types";
 import { C, F, TAB_BAR_H } from "@/theme";
 import { Pair } from "./Avatars";
+import { OurStamps, wroteLine } from "./OurStamps";
+import { SinceDays } from "./Since";
 
 const pad = (n: number) => String(n).padStart(2, "0");
 const isoOf = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -98,7 +100,9 @@ export default function CoupleAccount() {
   const filled = filledAnniversaries(startedOn, picks, rows, today);
   const latestYear = [...past].reverse().find((m) => m.key.endsWith("y"))?.key ?? null;
 
-  const labels = earnedCoupleLabels({ rows, startedOn, picks, sharedNotes, meId, partnerId, today });
+  // 연인 그릇 수 라벨은 둘 다 한 줄을 쓴 인증 기록만 셉니다.
+  const bothWrote = rows.filter((r) => r.verified && wroteLine(r, meId, notes) && wroteLine(r, partnerId, notes)).length;
+  const labels = earnedCoupleLabels({ rows, startedOn, picks, sharedNotes, bothWrote, meId, partnerId, today });
   const got = labels.filter((l) => l.earned);
   // 진행 중 하나 — 목표에 가장 가까운 것.
   const progress = labels.filter((l) => !l.earned).sort((a, b) => b.have / b.need - a.have / a.need)[0] ?? null;
@@ -164,10 +168,13 @@ export default function CoupleAccount() {
               <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: C.brick }} />
               <Text style={{ fontFamily: F.sans, fontSize: 10.5, color: C.muted }}>{statusChip}</Text>
             </View>
-            <Text style={{ fontFamily: F.mono, fontSize: 10, color: C.faint }}>SINCE {startedOn.slice(0, 4)}.{startedOn.slice(5, 7)}</Text>
           </View>
+          <View style={{ marginTop: 6 }}><SinceDays startedOn={startedOn} size={11} on={today} /></View>
         </View>
       </View>
+
+      {/* 우리 도장 — 하트 반쪽씩, 둘 다 한 줄을 쓰면 다 찹니다 */}
+      <OurStamps rows={rows} notes={notes} me={me} partner={partner} bookId={book.id} readOnly={readOnly} />
 
       {/* 만난 지 */}
       <View style={{ marginTop: 18, flexDirection: "row", alignItems: "center", borderRadius: 22, borderWidth: 1, borderColor: C.lineSoft, backgroundColor: C.card, padding: 18 }}>

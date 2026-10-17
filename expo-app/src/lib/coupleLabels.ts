@@ -1,4 +1,5 @@
 import { dayCount, mealFor, milestonesUntil, todayIso, type AnniversaryPick } from "@/lib/anniversary";
+import { BOWL_TIERS } from "@/lib/labels";
 import type { Restaurant } from "@/lib/types";
 
 /**
@@ -12,6 +13,8 @@ export type CoupleContext = {
   picks: AnniversaryPick[];
   /** 두 사람 모두 한 줄을 남긴 기록 수 */
   sharedNotes: number;
+  /** 둘 다 한 줄을 쓴 인증 기록 수 — 연인 그릇 수 라벨 */
+  bothWrote: number;
   meId: string;
   partnerId: string | null;
   today?: string;
@@ -85,6 +88,12 @@ export const COUPLE_LABELS: CoupleLabelDef[] = [
     },
   },
 ];
+
+/** 함께 그릇 수 — 개인 그릇 수 8단계와 같은 단계, 둘 다 한 줄을 쓴 인증 기록만. */
+COUPLE_LABELS.push(...BOWL_TIERS.map((t) => ({
+  id: `together_${t.id}`, color: "#b4552d", name: `함께 ${t.name}`, desc: `둘 다 한 줄을 쓴 인증 기록 ${t.need}건`, need: t.need,
+  count: ({ bothWrote }: CoupleContext) => bothWrote,
+})));
 
 export type EarnedCoupleLabel = CoupleLabelDef & { have: number; earned: boolean };
 

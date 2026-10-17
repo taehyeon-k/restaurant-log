@@ -1,7 +1,10 @@
 import { Tabs } from "expo-router";
 import TabBar from "@/components/TabBar";
+import { usePokeInbox } from "@/features/couple/pokes";
 
 export default function TabsLayout() {
+  // 연인이 보낸 「콕 찌르기」를 앱을 열 때 알려 줍니다.
+  usePokeInbox();
   return (
     <Tabs tabBar={(props) => <TabBar {...props} />} screenOptions={{ headerShown: false }} initialRouteName="index">
       <Tabs.Screen name="calendar" />
