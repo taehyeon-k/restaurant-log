@@ -1,18 +1,19 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { SearchIcon } from "@/components/icons";
 import { Eyebrow, fieldStyle } from "@/components/ui";
 import { setState } from "@/data/store";
 import { searchFoodPlaces, type FoodPlace } from "@/lib/geocode";
-import { fetchYoutubeTitle, isSourceKind, queryFromTitle, shortUrl, SOURCE_HEAD, sourceGlyph } from "@/lib/sourceLink";
+import { isSourceKind, SOURCE_HEAD, sourceGlyph } from "@/lib/sourceLink";
 import { C, F, SHADOW } from "@/theme";
 
 /**
  * 링크로 위시 담기 — 「어느 가게인가요」(HANDOFF-wish-link §A-3).
  * 위시 폼의 「링크 붙여넣기」(from=form)와 공유 시트(_layout)가 같은 화면으로 옵니다.
  * 폼에서 왔으면 고른 가게를 store.linkPick 으로 돌려주고 닫고, 공유 시트에서 왔으면 위시 폼으로 바꿉니다.
+ * 검색칸은 비워서 시작합니다 — 영상 제목은 가져오지 않습니다(위시 링크 붙여넣기 지시서).
  */
 export default function WishLinkRoute() {
   const p = useLocalSearchParams<{ url: string; kind?: string; from?: string }>();
@@ -20,25 +21,10 @@ export default function WishLinkRoute() {
   const insets = useSafeAreaInsets();
   const url = p.url ?? "";
   const kind = isSourceKind(p.kind) ? p.kind : "link";
-  const youtube = kind === "shorts" || kind === "youtube";
 
-  const [title, setTitle] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [focused, setFocused] = useState(true);
   const [hits, setHits] = useState<FoodPlace[]>([]);
-  const typed = useRef(false);
-
-  // 유튜브만 oEmbed 제목을 받아 검색어를 미리 넣습니다. 인스타 · 틱톡은 가져오지 않습니다(공식 경로 없음).
-  useEffect(() => {
-    if (!youtube || !url) return;
-    const ctrl = new AbortController();
-    fetchYoutubeTitle(url, ctrl.signal).then((r) => {
-      if (!r) return;
-      setTitle(r.title);
-      if (!typed.current) setQuery(queryFromTitle(r.title));
-    });
-    return () => ctrl.abort();
-  }, [url, youtube]);
 
   useEffect(() => {
     if (query.trim().length < 2) { setHits([]); return; }
@@ -76,7 +62,7 @@ export default function WishLinkRoute() {
           </View>
           <View style={{ flex: 1, gap: 3 }}>
             <Text style={{ fontFamily: F.mono, fontSize: 10, letterSpacing: 1, color: C.faint }}>{SOURCE_HEAD[kind]}</Text>
-            <Text numberOfLines={1} style={{ fontFamily: F.sans, fontSize: 13, color: C.ink }}>{title ?? shortUrl(url)}</Text>
+            <Text numberOfLines={1} style={{ fontFamily: F.sans, fontSize: 13, color: C.ink }}>{url.replace(/^https?:\/\/(www\.|m\.)?/i, "")}</Text>
           </View>
         </View>
 
@@ -86,7 +72,7 @@ export default function WishLinkRoute() {
             <TextInput
               autoFocus
               value={query}
-              onChangeText={(t) => { typed.current = true; setQuery(t); }}
+              onChangeText={setQuery}
               onFocus={() => setFocused(true)}
               onBlur={() => setFocused(false)}
               placeholder="가게 이름" placeholderTextColor="#b3ada1" returnKeyType="search"

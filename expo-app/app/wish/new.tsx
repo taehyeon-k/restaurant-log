@@ -5,7 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { logRec } from "@/features/recommend/log";
 import { useEffect, useRef, useState } from "react";
-import { Animated, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
+import { Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinkIcon, PhotoIcon } from "@/components/icons";
 import { Button, Chip, Eyebrow, fieldStyle } from "@/components/ui";
@@ -17,7 +17,7 @@ import { askWishPermissions } from "@/features/notify/geofence";
 import { forwardGeocode, searchFoodPlaces, type FoodPlace } from "@/lib/geocode";
 import { pickAlbumUris, removePhotoObjects, uploadAlbumPhoto } from "@/lib/photos";
 import { SignedImage } from "@/lib/signedPhoto";
-import { isSourceKind, parseSourceLink, shortUrl, SOURCE_LABEL, sourceGlyph, type SourceKind } from "@/lib/sourceLink";
+import { isSourceKind, isVideoKind, parseSourceLink, shortUrl, SOURCE_LABEL, sourceGlyph, type SourceKind } from "@/lib/sourceLink";
 import { supabase } from "@/lib/supabase";
 import { ALL_CATEGORIES, matchWish } from "@/lib/types";
 import { C, F, SHADOW } from "@/theme";
@@ -103,15 +103,42 @@ export default function WishForm() {
     if (uri) setCapture({ local: uri });
   }
 
-  // 「링크」 — 누를 때만 클립보드를 읽습니다(앱이 켜질 때 자동으로 읽지 않음: iOS 붙여넣기 알림).
-  const shake = useRef(new Animated.Value(0)).current;
+  // 「링크」 — 그 자리에 입력창을 열어 복사해 온 링크를 붙여넣습니다. 올바른 링크가 들어오는 순간 「어느 가게인가요」로 넘어갑니다.
+  // 클립보드는 「붙여넣기」를 누를 때만 읽습니다(앱이 켜질 때 자동으로 읽지 않음: iOS 붙여넣기 알림).
+  const [linkOpen, setLinkOpen] = useState(false);
+  const [linkText, setLinkText] = useState("");
+  const [linkError, setLinkError] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 2400);
+    return () => clearTimeout(t);
+  }, [toast]);
+
+  function takeLink(text: string) {
+    setLinkText(text);
+    if (!text.trim()) return setLinkError(false);
+    const link = parseSourceLink(text);
+    if (!link || !isVideoKind(link.kind)) {
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      return setLinkError(true);
+    }
+    setLinkError(false);
+    setLinkOpen(false);
+    setLinkText("");
+    router.push({ pathname: "/wish/link", params: { url: link.url, kind: link.kind, from: "form" } });
+  }
+
   async function pasteLink() {
-    const link = parseSourceLink(await Clipboard.getStringAsync().catch(() => ""));
-    if (link) return router.push({ pathname: "/wish/link", params: { url: link.url, kind: link.kind, from: "form" } });
-    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-    Animated.sequence(
-      [6, -6, 4, -4, 0].map((x) => Animated.timing(shake, { toValue: x, duration: 55, useNativeDriver: true }))
-    ).start();
+    const text = await Clipboard.getStringAsync().catch(() => "");
+    if (!text.trim()) return setToast("복사한 링크가 없어요");
+    takeLink(text);
+  }
+
+  function closeLink() {
+    setLinkOpen(false);
+    setLinkText("");
+    setLinkError(false);
   }
 
   // 폼에서 연 「어느 가게인가요」(wish/link)가 돌려준 가게와 출처.
@@ -205,18 +232,35 @@ export default function WishForm() {
         </View>
 
         <View style={{ marginTop: 11, gap: 11 }}>
-          {isNew && !source && (
-            <Animated.View style={{ transform: [{ translateX: shake }] }}>
-              <Pressable
-                onPress={pasteLink}
-                accessibilityLabel="링크"
-                style={s.dashed}
-              >
-                <LinkIcon size={20} stroke={C.brick} strokeWidth={1.8} />
-                <Text style={{ flex: 1, fontFamily: F.sansMd, fontSize: 13.5, color: C.ink }}>링크</Text>
-                <Text style={{ fontFamily: F.mono, fontSize: 10.5, color: C.faint }}>릴스 · 쇼츠</Text>
-              </Pressable>
-            </Animated.View>
+          {isNew && !source && !linkOpen && (
+            <Pressable onPress={() => setLinkOpen(true)} accessibilityLabel="링크" style={s.dashed}>
+              <LinkIcon size={20} stroke={C.brick} strokeWidth={1.8} />
+              <Text style={{ flex: 1, fontFamily: F.sansMd, fontSize: 13.5, color: C.ink }}>링크</Text>
+              <Text style={{ fontFamily: F.mono, fontSize: 10.5, color: C.faint }}>릴스 · 쇼츠</Text>
+            </Pressable>
+          )}
+          {isNew && !source && linkOpen && (
+            <View>
+              <View style={s.linkBox}>
+                <TextInput
+                  autoFocus
+                  value={linkText}
+                  onChangeText={takeLink}
+                  placeholder="복사한 링크를 붙여넣으세요" placeholderTextColor="#b3ada1"
+                  autoCapitalize="none" autoCorrect={false} keyboardType="url" returnKeyType="done"
+                  style={{ flex: 1, height: "100%", fontFamily: F.sans, fontSize: 13.5, color: C.ink }}
+                />
+                <Pressable onPress={pasteLink} accessibilityLabel="붙여넣기" hitSlop={2} style={s.pasteBtn}>
+                  <Text style={{ fontFamily: F.sansMd, fontSize: 12, color: C.card }}>붙여넣기</Text>
+                </Pressable>
+                <Pressable onPress={closeLink} accessibilityLabel="링크 닫기" style={{ width: 44, height: 44, marginRight: -8, alignItems: "center", justifyContent: "center" }}>
+                  <Text style={{ fontSize: 13, color: "#a29a8c" }}>✕</Text>
+                </Pressable>
+              </View>
+              {linkError && (
+                <Text style={{ marginTop: 6, marginLeft: 4, fontFamily: F.sans, fontSize: 11.5, color: C.brick }}>유튜브나 인스타그램 링크를 넣어주세요</Text>
+              )}
+            </View>
           )}
           {isNew && source && (
             <View style={{ borderRadius: 14, borderWidth: 1, borderColor: "#e0c3b1", backgroundColor: "#f9efe8", paddingVertical: 10, paddingHorizontal: 14, flexDirection: "row", alignItems: "center", gap: 10 }}>
@@ -226,7 +270,7 @@ export default function WishForm() {
               <Text numberOfLines={1} style={{ flex: 1, fontFamily: F.sans, fontSize: 12, color: "#8f4323" }}>
                 {SOURCE_LABEL[source.kind]}에서 담음 · {shortUrl(source.url)}
               </Text>
-              <Pressable onPress={() => setSource(null)} accessibilityLabel="출처 지우기" hitSlop={10}>
+              <Pressable onPress={() => setSource(null)} accessibilityLabel="출처 지우기" hitSlop={14}>
                 <Text style={{ fontSize: 11, color: "#a29a8c" }}>✕</Text>
               </Pressable>
             </View>
@@ -355,6 +399,11 @@ export default function WishForm() {
           </Pressable>
         ))}
       </ScrollView>
+      {toast && (
+        <View pointerEvents="none" style={[s.toast, { bottom: insets.bottom + 40 }]}>
+          <Text style={{ fontFamily: F.sans, fontSize: 12.5, color: C.card }}>{toast}</Text>
+        </View>
+      )}
     </KeyboardAvoidingView>
   );
 }
@@ -362,4 +411,7 @@ export default function WishForm() {
 const s = StyleSheet.create({
   dashed: { height: 56, borderRadius: 16, borderWidth: 1.5, borderStyle: "dashed", borderColor: "#c9a593", backgroundColor: C.card, paddingHorizontal: 16, flexDirection: "row", alignItems: "center", gap: 10 },
   thumb: { width: 44, height: 58, borderRadius: 8, overflow: "hidden" },
+  linkBox: { height: 56, borderRadius: 16, borderWidth: 1.5, borderColor: C.brick, backgroundColor: C.card, paddingLeft: 16, paddingRight: 8, flexDirection: "row", alignItems: "center", gap: 8 },
+  pasteBtn: { height: 40, minWidth: 44, borderRadius: 12, backgroundColor: C.ink, paddingHorizontal: 12, alignItems: "center", justifyContent: "center" },
+  toast: { position: "absolute", alignSelf: "center", borderRadius: 16, backgroundColor: "rgba(23,22,20,.85)", paddingVertical: 10, paddingHorizontal: 16 },
 });

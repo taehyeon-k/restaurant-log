@@ -29,10 +29,17 @@ function kindOf(u: URL): SourceKind {
   return "link";
 }
 
-/** 텍스트에서 첫 URL 을 찾아 종류를 붙입니다. URL 이 없으면 null. 추적용 쿼리(?si=, ?igsh=, utm_*)는 지웁니다. */
+/** 위시 폼의 「링크」가 받는 종류 — 유튜브 · 인스타만. */
+export const isVideoKind = (k: SourceKind) => k === "shorts" || k === "youtube" || k === "reels" || k === "instagram";
+
+/**
+ * 텍스트에서 첫 URL 을 찾아 종류를 붙입니다. URL 이 없으면 null. 추적용 쿼리(?si=, ?igsh=, utm_*)는 지웁니다.
+ * 공유 문구에 섞인 링크(「이 영상 봐 https://youtu.be/…」)와 http 없이 복사된 유튜브 · 인스타 주소도 받습니다.
+ */
 export function parseSourceLink(text: string): { url: string; kind: SourceKind } | null {
-  const raw = text.match(/https?:\/\/[^\s<>"']+/i)?.[0];
+  let raw = text.match(/https?:\/\/[^\s<>"']+|(?:(?:www|m)\.)?(?:youtube\.com|youtu\.be|instagram\.com)\/[^\s<>"']+/i)?.[0];
   if (!raw) return null;
+  if (!/^https?:/i.test(raw)) raw = "https://" + raw;
   let u: URL;
   try { u = new URL(raw); } catch { return null; }
   for (const k of [...u.searchParams.keys()]) if (TRACKING.test(k)) u.searchParams.delete(k);
