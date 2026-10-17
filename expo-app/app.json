@@ -93,10 +93,15 @@
       [
         "expo-share-intent",
         {
+          "iosActivationRules": {
+            "NSExtensionActivationSupportsWebURLWithMaxCount": 1,
+            "NSExtensionActivationSupportsText": true
+          },
           "androidIntentFilters": [
             "text/*"
           ],
-          "disableIOS": true
+          "iosAppGroupIdentifier": "group.app.dinary",
+          "iosShareExtensionName": "DINARY"
         }
       ],
       "./plugins/withNaverMaven"

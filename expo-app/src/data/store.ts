@@ -20,8 +20,8 @@ export type LinkPick = {
 
 type State = {
   kind: Kind; ghost: Ghost; linkPick: LinkPick;
-  /** 로그인 전에 공유 시트로 받은 링크 — 로그인이 끝나면 wish/link 로 이어갑니다. */
-  pendingShare: { url: string; kind: SourceKind } | null;
+  /** 공유 시트로 받은 글(링크가 섞여 있을 수 있음) — 로그인이 끝나면 위시 폼(wish/new?share=)으로 이어갑니다. */
+  pendingShare: string | null;
   mapSegment: MapSegment; communityTab: CommunityTab;
   /** 이번에 커뮤니티에 들어오기 직전의 last_seen_community_at — 친구 줄의 「새 기록」 테두리 기준. */
   communitySeenSince: string | null;

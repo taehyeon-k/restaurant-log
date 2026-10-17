@@ -19,7 +19,6 @@ import CommunityTransition from "@/features/community/Transition";
 import { startQueueTriggers } from "@/features/queue/process";
 // 이 import 가 백그라운드 지오펜스 태스크를 정의합니다 — 반드시 앱 진입점에서 불러야 합니다.
 import { syncWishGeofences } from "@/features/notify/geofence";
-import { parseSourceLink } from "@/lib/sourceLink";
 import { supabase } from "@/lib/supabase";
 import { C } from "@/theme";
 
@@ -83,20 +82,21 @@ function Gate({ fontsLoaded }: { fontsLoaded: boolean }) {
     if (ready && session && wishId) router.push({ pathname: "/capture", params: { verifyWishId: wishId } });
   }, [last, ready, session, router]);
 
-  // 공유 시트(릴스 · 쇼츠 …)로 받은 링크 — 링크면 담아두고, 로그인 · 닉네임까지 끝난 뒤 「어느 가게인가요」로 보냅니다.
+  // 공유 시트(릴스 · 쇼츠 …)로 받은 글 — 담아두고, 로그인 · 닉네임까지 끝난 뒤 위시 폼으로 넘깁니다.
+  // 폼이 받은 글을 판별해 유튜브 · 인스타 링크면 「어느 가게인가요」를 위에 띄우고, 아니면 링크 입력창에 오류와 함께 둡니다.
   const { hasShareIntent, shareIntent, resetShareIntent } = useShareIntent();
   const { pendingShare } = useAppState();
   useEffect(() => {
     if (!hasShareIntent) return;
-    const link = parseSourceLink(`${shareIntent.webUrl ?? ""} ${shareIntent.text ?? ""}`);
+    const text = [shareIntent.webUrl, shareIntent.text].filter(Boolean).join(" ").trim();
     resetShareIntent();
-    if (link) setState({ pendingShare: link });
+    if (text) setState({ pendingShare: text });
   }, [hasShareIntent, shareIntent, resetShareIntent]);
   const signedIn = ready && !!session && !!account?.nickname && first !== "login" && first !== "welcome" && first !== "auth";
   useEffect(() => {
     if (!signedIn || !pendingShare) return;
     setState({ pendingShare: null });
-    router.push({ pathname: "/wish/link", params: { url: pendingShare.url, kind: pendingShare.kind } });
+    router.push({ pathname: "/wish/new", params: { share: pendingShare } });
   }, [signedIn, pendingShare, router]);
 
   if (!ready) return null;

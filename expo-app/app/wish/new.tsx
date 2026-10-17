@@ -33,6 +33,8 @@ export default function WishForm() {
     rec_session?: string; rec_key?: string; rec_pos?: string;
     /** 링크로 담기(wish/link)에서 고른 가게면 — 출처 띠로 받습니다. */
     source_url?: string; source_kind?: string;
+    /** 공유 시트로 받은 글(_layout) — 폼이 열리자마자 링크 붙여넣기처럼 처리합니다. */
+    share?: string;
   }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -134,6 +136,15 @@ export default function WishForm() {
     if (!text.trim()) return setToast("복사한 링크가 없어요");
     takeLink(text);
   }
+
+  // 공유 시트로 열렸으면 받은 글을 입력창에 넣은 것처럼 처리합니다 — 올바른 링크면 「어느 가게인가요」가 폼 위에 뜨고, 아니면 입력창에 오류와 함께 남습니다.
+  const shared = useRef(false);
+  useEffect(() => {
+    if (shared.current || !isNew || !p.share) return;
+    shared.current = true;
+    setLinkOpen(true);
+    takeLink(p.share);
+  }, [p.share]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function closeLink() {
     setLinkOpen(false);
