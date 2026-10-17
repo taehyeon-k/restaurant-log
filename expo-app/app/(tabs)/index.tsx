@@ -15,7 +15,7 @@ import { PaperMap } from "@/components/PaperMap";
 import { DraftsBoxIcon } from "@/components/DraftsBoxIcon";
 import { useActiveBook, useAnniversaryPicks, useRecordNotes, type BookMember } from "@/data/books";
 import { useRows, useWishes } from "@/data/queries";
-import { setState, useAppState, type MarkerFilter } from "@/data/store";
+import { setState, useAppState } from "@/data/store";
 
 import { BuildingTagMarker, GhostMarker, NumberPin, RecordMarker, TapPointMarker, WishMarker } from "@/features/map/Markers";
 import { revealZooms } from "@/features/map/labelZoom";
@@ -42,22 +42,14 @@ const SORTS: { value: Sort; label: string }[] = [
   { value: "price", label: "가격순" },
 ];
 
-const FILTERS: { id: MarkerFilter; label: string }[] = [
-  { id: "all", label: "둘 다" },
-  { id: "visited", label: "기록만" },
-  { id: "wish", label: "위시리스트만" },
-];
-
 /** 지도 콘텐츠 패딩(아래) — 카메라 중심을 시트 위로 올려둡니다. */
 const MAP_PAD_BOTTOM = 320;
 /** 웹 MobileShell 과 같은 네 단계 — peek 96 · 35% · 75% · full(화면 − 84). 처음엔 75% 로 엽니다. */
 /** 시트가 이보다 낮으면 머리를 한 줄(맛집 기록 · 가게 N · 기록 M)로 줄입니다 — 웹 COMPACT_BELOW. */
 const COMPACT_BELOW = 200;
-/** 지도 위 단추들이 시트 윗변에서 띄우는 간격. 마커 필터(둘 다 / 기록만 / 위시리스트만)는 시트 머리 바로 위 — 네이버 로고는 왼쪽 위라 가리지 않습니다. */
-const GAP_FILTER = 14;
+/** 지도 위 단추들이 시트 윗변에서 띄우는 간격. */
 const GAP_DRAFTS = 14;
 const GAP_PLUS = 16;
-const FILTER_H = 38;
 const DRAFTS_H = 56;
 const PLUS_H = 52;
 const LOCATE_H = 44;
@@ -75,9 +67,9 @@ export default function MapTab() {
   const router = useRouter();
   const { data: allRows = [] } = useRows();
   const { data: wishes = [] } = useWishes();
-  const { kind, markerFilter: pickedFilter, ghost, mapSegment } = useAppState();
-  // 위시리스트를 보는 동안 핀은 「위시리스트만」과 같게 — 기록으로 돌리면 고른 필터로 돌아옵니다.
-  const markerFilter: MarkerFilter = mapSegment === "wish" ? "wish" : pickedFilter;
+  const { kind, ghost, mapSegment } = useAppState();
+  // 핀은 시트의 세그먼트만 따릅니다 — 맛집 기록이면 기록 핀, 위시리스트면 위시 핀.
+  const markerFilter = mapSegment === "wish" ? "wish" : "visited";
   const wishItems = useWishItems(wishes);
 
   // 다른 화면의 「위시에 담기」 등이 지도를 segment=wish 로 열 수 있습니다.
@@ -126,9 +118,9 @@ export default function MapTab() {
 
   // 지도 위 단추들은 시트 윗변을 따라 오르내립니다. 검색줄 위로는 올라가지 않습니다.
   const minTop = insets.top + 8 + 46 + 12;
-  const filterStyle = useAnimatedStyle(() => ({ top: Math.max(minTop, sheetTop.value - GAP_FILTER - FILTER_H) }));
   const draftsStyle = useAnimatedStyle(() => ({ top: Math.max(minTop, sheetTop.value - GAP_DRAFTS - DRAFTS_H) }));
-  const locateStyle = useAnimatedStyle(() => ({ top: Math.max(minTop, sheetTop.value - GAP_DRAFTS - DRAFTS_H - 10 - LOCATE_H) }));
+  // 내 위치는 + 단추 왼쪽, 세로 가운데를 + 에 맞춤.
+  const locateStyle = useAnimatedStyle(() => ({ top: Math.max(minTop, sheetTop.value - GAP_PLUS - PLUS_H) + (PLUS_H - LOCATE_H) / 2 }));
   const plusStyle = useAnimatedStyle(() => ({ top: Math.max(minTop, sheetTop.value - GAP_PLUS - PLUS_H) }));
   // + 메뉴는 위로 펼칩니다 — 아랫변이 + 단추 아랫변보다 60 위(웹과 같음).
   const plusMenuStyle = useAnimatedStyle(() => ({ bottom: screenH.value - Math.max(minTop, sheetTop.value - GAP_PLUS - PLUS_H) - PLUS_H + 60 }));
@@ -584,17 +576,8 @@ export default function MapTab() {
         </View>
       )}
 
-      {/* 마커 필터 — 지도 왼쪽 아래, 시트를 따라 오르내립니다 */}
-      <Animated.View style={[s.chips, filterStyle]}>
-        {FILTERS.map((f) => (
-          <Pressable key={f.id} onPress={() => { Haptics.selectionAsync(); setState({ markerFilter: f.id, ...(mapSegment === "wish" && f.id !== "wish" ? { mapSegment: "records" as const } : {}) }); }} style={[s.chip, markerFilter === f.id && { backgroundColor: C.brick }]}>
-            <Text style={{ fontFamily: F.sans, fontSize: 11.5, color: markerFilter === f.id ? C.card : C.muted }}>{f.label}</Text>
-          </Pressable>
-        ))}
-      </Animated.View>
-
-      {/* 현재 위치 — 웹에는 없지만 앱에서는 보관함 위에 남겨 둡니다 */}
-      <Animated.View style={[s.floatRight, locateStyle]}>
+      {/* 현재 위치 — + 단추 왼쪽, 같은 높이로 시트를 따라 오르내립니다 */}
+      <Animated.View style={[s.floatLocate, locateStyle]}>
         <Pressable onPress={locate} accessibilityLabel="현재 위치" style={[s.round, SHADOW.card]}>
           <LocateIcon size={22} stroke={C.brick} />
         </Pressable>
@@ -756,16 +739,13 @@ const s = StyleSheet.create({
   bookBtn: { width: 46, height: 46, borderRadius: 23, borderWidth: 1, borderColor: C.line, backgroundColor: C.card, alignItems: "center", justifyContent: "center" },
   bookBtnLines: { position: "absolute", right: -2, bottom: -2, width: 18, height: 18, borderRadius: 9, borderWidth: 1, borderColor: C.line, backgroundColor: C.card, alignItems: "center", justifyContent: "center" },
   round: { width: 44, height: 44, borderRadius: 22, borderWidth: 1, borderColor: C.line, backgroundColor: C.card, alignItems: "center", justifyContent: "center" },
-  chips: {
-    position: "absolute", left: 16, flexDirection: "row", padding: 3, borderRadius: 18, borderWidth: 1, borderColor: C.line, backgroundColor: "rgba(251,250,246,.95)",
-  },
-  chip: { height: 30, borderRadius: 15, paddingHorizontal: 12, justifyContent: "center" },
   regionBand: {
     position: "absolute", left: 16, right: 16, flexDirection: "row", alignItems: "center", gap: 11, borderRadius: 18, borderWidth: 1, borderColor: C.line,
     backgroundColor: "rgba(251,250,246,.96)", paddingHorizontal: 13, paddingVertical: 11,
   },
   floatRight: { position: "absolute", right: 16 },
   floatPlus: { position: "absolute", right: 84 },
+  floatLocate: { position: "absolute", right: 148 },
   drafts: { width: DRAFTS_H, height: DRAFTS_H, borderRadius: DRAFTS_H / 2, borderWidth: 1, borderColor: C.line, backgroundColor: C.card, alignItems: "center", justifyContent: "center" },
   plus: { width: PLUS_H, height: PLUS_H, borderRadius: PLUS_H / 2, borderWidth: 1, borderColor: C.line, backgroundColor: C.card, alignItems: "center", justifyContent: "center" },
   plusMenu: { position: "absolute", right: 16, alignItems: "flex-end", gap: 8 },
