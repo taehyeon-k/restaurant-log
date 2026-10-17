@@ -5,7 +5,7 @@ import type { Restaurant } from "@/lib/types";
  *
  *  · 도장 — 인증된 기록(verified, 보관함 아님) 1건 = 도장 1개. 10칸 = 도장판 1장, 판을 채울 때마다 뽑기권 1장.
  *  · 그릇 수 라벨 — 인증 기록 수 8단계(1 · 5 · 10 · 30 · 50 · 100 · 200 · 300).
- *  · 이야기 라벨 — 5개.
+ *  · 이야기 라벨 — 원래 있던 라벨 14개(첫 한 끼 · 백 그릇은 그릇 수 단계로).
  *  · 동네 칭호(동 · 은 · 금)는 아래 REGION_TIERS 그대로.
  */
 export type LabelGroup = "bowl" | "story";
@@ -103,64 +103,54 @@ const firstOf = (rows: Restaurant[], key: (r: Restaurant) => string | null | und
   });
 };
 
-const decemberRows = (rows: Restaurant[]) => stampRows(rows).filter((r) => (r.visited_at ?? "").slice(5, 7) === "12");
+/** 기록이 있는 해가 몇 해까지 이어졌는지 — 그 연속한 해들의 첫 기록. */
+const streakRows = (rows: Restaurant[]) => {
+  const firsts = firstOf(rows, (r) => r.visited_at?.slice(0, 4));
+  let best: Restaurant[] = [];
+  let run: Restaurant[] = [];
+  for (const r of firsts) {
+    const y = Number(r.visited_at!.slice(0, 4));
+    const prev = run.length ? Number(run[run.length - 1].visited_at!.slice(0, 4)) : null;
+    run = prev !== null && y === prev + 1 ? [...run, r] : [r];
+    if (run.length > best.length) best = run;
+  }
+  return best;
+};
 
+const goldRows = (rows: Restaurant[]) => firstOf(rows.filter((r) => r.rating === 5), (r) => r.name);
+const midnightRows = (rows: Restaurant[]) => live(rows).filter((r) => new Date(r.created_at).getHours() < 5);
+const weekendRows = (rows: Restaurant[]) =>
+  live(rows).filter((r) => r.visited_at && [0, 6].includes(new Date(`${r.visited_at}T00:00:00`).getDay()));
+const albumRows = (rows: Restaurant[]) => live(rows).filter((r) => (r.photo_urls?.length ?? (r.photo_url ? 1 : 0)) >= 3);
+const longformRows = (rows: Restaurant[]) => live(rows).filter((r) => (r.review ?? "").length > 100);
+const morningRows = (rows: Restaurant[]) => stampRows(rows).filter((r) => r.verified_at && new Date(r.verified_at).getHours() < 11);
+const thriftRows = (rows: Restaurant[]) => live(rows).filter((r) => r.price_range != null && r.price_range < 10000);
+const decemberRows = (rows: Restaurant[]) => live(rows).filter((r) => (r.visited_at ?? "").slice(5, 7) === "12");
+
+/** 그 목록의 길이를 세고, 앞에서 need 개를 리캡 목록으로. */
+const story = (d: Omit<LabelDef, "group" | "count" | "contrib">, list: (rows: Restaurant[]) => Restaurant[]): LabelDef => ({
+  ...d,
+  group: "story",
+  count: (rows) => list(rows).length,
+  contrib: (rows) => list(rows).slice(0, d.need),
+});
+
+/** 이야기 라벨 — 그릇 수 라벨이 생기기 전부터 있던 라벨(첫 한 끼 · 백 그릇은 그릇 수로 옮겨 감). */
 const STORIES: LabelDef[] = [
-  {
-    id: "regular",
-    group: "story",
-    icon: "M12 19.5s-7-4.3-7-9.6a3.9 3.9 0 0 1 7-2.4 3.9 3.9 0 0 1 7 2.4c0 5.3-7 9.6-7 9.6Z",
-    color: "#a8412a",
-    name: "레드 라벨",
-    desc: "한 가게에 다섯 번",
-    need: 5,
-    count: (rows) => topPlace(rows).length,
-    contrib: (rows) => topPlace(rows).slice(0, 5),
-  },
-  {
-    id: "revisit",
-    group: "story",
-    icon: "M18.5 12a6.5 6.5 0 1 1-1.9-4.6 M18.5 4.5v3.5H15",
-    color: "#b4552d",
-    name: "다시 그 집",
-    desc: "재방문 표시한 가게 세 곳",
-    need: 3,
-    count: (rows) => distinct(live(rows).filter((r) => r.revisit).map(placeKeyOf)).size,
-    contrib: (rows) => firstOf(rows.filter((r) => r.revisit), placeKeyOf).slice(0, 3),
-  },
-  {
-    id: "regions",
-    group: "story",
-    icon: "M12 20.5s-6-6-6-10.8a6 6 0 0 1 12 0c0 4.8-6 10.8-6 10.8Z M12 7.7a2 2 0 1 0 .01 0",
-    color: "#7a5c42",
-    name: "열 동네",
-    desc: "서로 다른 동네 열 곳",
-    need: 10,
-    count: (rows) => distinct(live(rows).map((r) => r.region)).size,
-    contrib: (rows) => firstOf(rows, (r) => r.region).slice(0, 10),
-  },
-  {
-    id: "palate",
-    group: "story",
-    icon: "M7.5 4v5.5a2 2 0 0 0 4 0V4 M9.5 4v16 M16.5 20V4c1.8 1 2.8 3.6 2.8 7.5h-2.8",
-    color: "#6f8455",
-    name: "고루 먹는 입",
-    desc: "종류 여섯 가지",
-    need: 6,
-    count: (rows) => distinct(live(rows).map((r) => r.category)).size,
-    contrib: (rows) => firstOf(rows, (r) => r.category).slice(0, 6),
-  },
-  {
-    id: "december",
-    group: "story",
-    icon: "M12 3.5v17 M4.6 7.75l14.8 8.5 M4.6 16.25l14.8-8.5",
-    color: "#a8412a",
-    name: "연말의 식탁",
-    desc: "12월 인증 세 건",
-    need: 3,
-    count: (rows) => decemberRows(rows).length,
-    contrib: (rows) => decemberRows(rows).slice(0, 3),
-  },
+  story({ id: "verified", icon: "M6.5 12.5l3.5 3.5 7.5-8", color: "#b4552d", name: "인증 기록자", desc: "인증 기록 40개", need: 40 }, stampRows),
+  story({ id: "gold", icon: "M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.9L12 17l-5.2 2.7 1-5.9-4.3-4.1 5.9-.8Z", color: "#b58a2b", name: "골드 라벨", desc: "5.0을 준 집 열 곳", need: 10 }, goldRows),
+  story({ id: "regular", icon: "M12 19.5s-7-4.3-7-9.6a3.9 3.9 0 0 1 7-2.4 3.9 3.9 0 0 1 7 2.4c0 5.3-7 9.6-7 9.6Z", color: "#a8412a", name: "레드 라벨", desc: "한 가게에 다섯 번", need: 5 }, topPlace),
+  story({ id: "midnight", icon: "M18.5 14.5A7 7 0 1 1 9.5 5.5a5.6 5.6 0 0 0 9 9Z", color: "#3d4a6b", name: "한밤의 기록", desc: "자정 이후 10개", need: 10 }, midnightRows),
+  story({ id: "regions", icon: "M12 20.5s-6-6-6-10.8a6 6 0 0 1 12 0c0 4.8-6 10.8-6 10.8Z M12 7.7a2 2 0 1 0 .01 0", color: "#7a5c42", name: "열 동네", desc: "지역 10곳", need: 10 }, (rows) => firstOf(rows, (r) => r.region)),
+  story({ id: "years", icon: "M5 6.5h14v13H5Z M5 10.5h14 M9 4.5v4 M15 4.5v4", color: "#4f7a6a", name: "세 해의 기록", desc: "3년 연속", need: 3 }, streakRows),
+  story({ id: "revisit", icon: "M18.5 12a6.5 6.5 0 1 1-1.9-4.6 M18.5 4.5v3.5H15", color: "#b4552d", name: "다시 그 집", desc: "재방문 20곳", need: 20 }, (rows) => firstOf(rows.filter((r) => r.revisit), placeKeyOf)),
+  story({ id: "palate", icon: "M7.5 4v5.5a2 2 0 0 0 4 0V4 M9.5 4v16 M16.5 20V4c1.8 1 2.8 3.6 2.8 7.5h-2.8", color: "#6f8455", name: "고루 먹는 입", desc: "분류 8가지", need: 8 }, (rows) => firstOf(rows, (r) => r.category)),
+  story({ id: "weekend", icon: "M8 4h8c0 4.8-1.6 7.5-4 7.5S8 8.8 8 4Z M12 11.5v8 M8.5 19.5h7", color: "#7a6a9a", name: "주말의 식탁", desc: "토·일 기록 20개", need: 20 }, weekendRows),
+  story({ id: "album", icon: "M4.5 6h15v12.5h-15Z M4.5 15.5l4.5-4.5 4 4 2-2 4.5 4.5 M15 8.6a1.3 1.3 0 1 0 .01 0", color: "#5f7a8a", name: "사진첩", desc: "사진 세 장 이상 10개", need: 10 }, albumRows),
+  story({ id: "longform", icon: "M5.5 18.5l1-3.8 9.6-9.6 2.8 2.8-9.6 9.6Z M14 7.2l2.8 2.8", color: "#7a5c42", name: "긴 이야기", desc: "100자 넘는 메모 5개", need: 5 }, longformRows),
+  story({ id: "morning", icon: "M12 8a4 4 0 1 0 .01 0 M12 3v2 M12 19v2 M3 12h2 M19 12h2 M5.7 5.7l1.4 1.4 M16.9 16.9l1.4 1.4 M5.7 18.3l1.4-1.4 M16.9 7.1l1.4-1.4", color: "#c07a2e", name: "아침의 사람", desc: "오전 기록 10개", need: 10 }, morningRows),
+  story({ id: "thrift", icon: "M12 4a8 8 0 1 0 .01 0 M8.6 9l1.6 6 1.8-4.6 1.8 4.6 1.6-6 M8 12h8", color: "#6f7350", name: "만원의 행복", desc: "만원 아래 20그릇", need: 20 }, thriftRows),
+  story({ id: "december", icon: "M12 3.5v17 M4.6 7.75l14.8 8.5 M4.6 16.25l14.8-8.5", color: "#a8412a", name: "연말의 식탁", desc: "12월 기록 10개", need: 10 }, decemberRows),
 ];
 
 export const LABELS: LabelDef[] = [...BOWLS, ...STORIES];
