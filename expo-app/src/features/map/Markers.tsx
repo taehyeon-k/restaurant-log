@@ -1,6 +1,6 @@
 import { NaverMapMarkerOverlay } from "@mj-studio/react-native-naver-map";
-import { memo, type ReactNode } from "react";
-import { Text, View } from "react-native";
+import { memo, useEffect, useState, type ReactNode } from "react";
+import { Platform, Text, View } from "react-native";
 import Svg, { Path } from "react-native-svg";
 import { BOOKMARK_PATH } from "@/components/icons";
 import { pinColor } from "@/lib/types";
@@ -71,6 +71,20 @@ const anchorAt = (h: number, a: number) => ({ x: 0.5, y: (h - a) / h });
  */
 const markerKey = (...deps: unknown[]) => deps.join("/");
 
+/**
+ * iOS 는 Text 를 마운트 다음 프레임에 그려서, 마커 첫 스냅샷에 글자가 빠집니다.
+ * 생김새(sig)가 바뀐 뒤 잠깐 기다렸다가 key 를 한 번 더 바꿔 다시 찍게 합니다.
+ */
+export function useResnap(sig: string, delay = 80) {
+  const [n, setN] = useState(0);
+  useEffect(() => {
+    if (Platform.OS !== "ios") return;
+    const t = setTimeout(() => setN((v) => v + 1), delay);
+    return () => clearTimeout(t);
+  }, [sig, delay]);
+  return `${sig}/${n}`;
+}
+
 export const tagWidth = (name: string) => Math.min(220, Math.max(64, name.length * 13 + 26));
 
 type Base = { lat: number; lng: number; onTap?: () => void; zIndex?: number };
@@ -96,9 +110,10 @@ export const RecordMarker = memo(function RecordMarker(p: RecordProps) {
   // 웹: 회전 전 정사각형 바닥이 bottom:8 → 원 중심은 8 + size/2, 꼭짓점은 그 아래 size/2·√2.
   const center = 8 + size / 2;
 
+  const snapKey = useResnap(markerKey(w, h, size, fill, stroke, p.planned, p.showLabel && p.name, p.showLabel && p.rating, p.showLabel && p.badge));
   return (
     <NaverMapMarkerOverlay latitude={p.lat} longitude={p.lng} width={w} height={h} anchor={anchorAt(h, 6)} onTap={p.onTap} zIndex={p.zIndex ?? (p.active ? 1000 : 0)}>
-      <View key={markerKey(w, h, size, fill, stroke, p.planned, p.showLabel && p.name, p.showLabel && p.rating, p.showLabel && p.badge)} collapsable={false} style={{ width: w, height: h }}>
+      <View key={snapKey} collapsable={false} style={{ width: w, height: h }}>
         <GroundShadow w={p.active ? 12 : 9} h={p.active ? 4 : 3} opacity={0.16} />
         <Svg width={size} height={dropH(size)} style={{ position: "absolute", alignSelf: "center", bottom: center - (size / 2) * Math.SQRT2 }}>
           <Path d={dropPath(size, sw)} fill={fill} stroke={stroke} strokeWidth={sw} />
@@ -122,9 +137,10 @@ export const WishMarker = memo(function WishMarker(p: WishProps) {
   const labelW = p.showLabel ? tagWidth(p.name) : 0;
   const w = Math.max(36, labelW);
   const h = p.showLabel ? LABEL_BOTTOM + tagHeight("none") : 8 + 26 + 2;
+  const snapKey = useResnap(markerKey(w, h, p.category, p.showLabel && p.name));
   return (
     <NaverMapMarkerOverlay latitude={p.lat} longitude={p.lng} width={w} height={h} anchor={anchorAt(h, 10)} onTap={p.onTap} zIndex={500}>
-      <View key={markerKey(w, h, p.category, p.showLabel && p.name)} collapsable={false} style={{ width: w, height: h }}>
+      <View key={snapKey} collapsable={false} style={{ width: w, height: h }}>
         <GroundShadow w={8} h={2.5} opacity={0.16} />
         <Svg width={26} height={26} viewBox="0 0 24 24" fill={pinColor(p.category)} stroke={C.card} strokeWidth={1.6} strokeLinejoin="round" style={{ position: "absolute", alignSelf: "center", bottom: 8 }}>
           <Path d={BOOKMARK_PATH} />
@@ -152,9 +168,10 @@ export const TapPointMarker = memo(function TapPointMarker(p: Base) {
 export const NumberPin = memo(function NumberPin(p: Base & { n: number; filled: boolean }) {
   const d = 24;
   const box = d + 6;
+  const snapKey = useResnap(markerKey(p.n, p.filled));
   return (
     <NaverMapMarkerOverlay latitude={p.lat} longitude={p.lng} width={box} height={box} anchor={{ x: 0.5, y: 0.5 }} onTap={p.onTap} zIndex={1400 - p.n}>
-      <View key={markerKey(p.n, p.filled)} collapsable={false} style={{ width: box, height: box, alignItems: "center", justifyContent: "center" }}>
+      <View key={snapKey} collapsable={false} style={{ width: box, height: box, alignItems: "center", justifyContent: "center" }}>
         <View
           style={{
             width: d, height: d, borderRadius: d / 2, borderWidth: 1.5, borderColor: p.filled ? C.card : C.brick,
@@ -172,9 +189,10 @@ export const NumberPin = memo(function NumberPin(p: Base & { n: number; filled: 
 export const BuildingTagMarker = memo(function BuildingTagMarker(p: Base & { name: string }) {
   const w = tagWidth(p.name) + 8;
   const h = tagHeight("none") + 10;
+  const snapKey = useResnap(markerKey(w, h, p.name));
   return (
     <NaverMapMarkerOverlay latitude={p.lat} longitude={p.lng} width={w} height={h} anchor={{ x: 0.5, y: 1 }} zIndex={1300}>
-      <View key={markerKey(w, h, p.name)} collapsable={false} style={{ width: w, height: h, alignItems: "center" }}>
+      <View key={snapKey} collapsable={false} style={{ width: w, height: h, alignItems: "center" }}>
         <Tag name={p.name} />
         <View style={{ width: 2, height: 8, backgroundColor: C.brick, borderRadius: 1 }} />
       </View>
@@ -187,9 +205,10 @@ export const GhostMarker = memo(function GhostMarker(p: Base & { name: string })
   const w = tagWidth(p.name) + 30;
   const h = LABEL_BOTTOM + tagHeight("cta");
   const center = 8 + 12;
+  const snapKey = useResnap(markerKey(w, h, p.name));
   return (
     <NaverMapMarkerOverlay latitude={p.lat} longitude={p.lng} width={w} height={h} anchor={anchorAt(h, 8)} onTap={p.onTap} zIndex={1200}>
-      <View key={markerKey(w, h, p.name)} collapsable={false} style={{ width: w, height: h }}>
+      <View key={snapKey} collapsable={false} style={{ width: w, height: h }}>
         <GroundShadow w={9} h={3} opacity={0.1} />
         <Svg width={24} height={dropH(24)} style={{ position: "absolute", alignSelf: "center", bottom: center - 12 * Math.SQRT2 }}>
           <Path d={dropPath(24, 1.5)} fill="rgba(138,131,119,.15)" stroke={C.faint} strokeWidth={1.5} strokeDasharray="3 2.5" />
@@ -231,9 +250,10 @@ export const FriendMarker = memo(function FriendMarker(p: FriendProps) {
   const w = Math.max(size + 30, labelW);
   const h = p.showLabel ? labelBottom + tagHeight("none") : size + 17;
   const font = Math.round(size * 0.46);
+  const snapKey = useResnap(markerKey(w, h, size, p.letter, p.count, p.stale, p.inWish, p.showLabel && p.label, p.showLabel && p.time));
   return (
     <NaverMapMarkerOverlay latitude={p.lat} longitude={p.lng} width={w} height={h} anchor={anchorAt(h, 6)} onTap={p.onTap} zIndex={p.zIndex ?? p.count}>
-      <View key={markerKey(w, h, size, p.letter, p.count, p.stale, p.inWish, p.showLabel && p.label, p.showLabel && p.time)} collapsable={false} style={{ width: w, height: h, opacity: p.stale ? 0.6 : 1 }}>
+      <View key={snapKey} collapsable={false} style={{ width: w, height: h, opacity: p.stale ? 0.6 : 1 }}>
         <GroundShadow w={size >= 28 ? 12 : 9} h={size >= 28 ? 4 : 3} opacity={0.16} />
         <Svg width={size} height={dropH(size)} style={{ position: "absolute", alignSelf: "center", bottom: center - (size / 2) * Math.SQRT2 }}>
           <Path d={dropPath(size, sw)} fill={C.brick} stroke={C.card} strokeWidth={sw} />

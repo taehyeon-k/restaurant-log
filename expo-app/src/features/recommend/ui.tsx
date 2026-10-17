@@ -2,6 +2,7 @@ import { NaverMapMarkerOverlay } from "@mj-studio/react-native-naver-map";
 import { memo } from "react";
 import { Linking, Pressable, Text, View } from "react-native";
 import Svg, { Circle, Path } from "react-native-svg";
+import { useResnap } from "@/features/map/Markers";
 import { C, F } from "@/theme";
 
 /**
@@ -47,9 +48,10 @@ export const NumberMarker = memo(function NumberMarker(p: {
   const showName = p.active || p.label;
   const w = showName ? Math.max(d + 12, bubbleW(p.name)) : d + 12;
   const h = showName ? d + 12 + 30 : d + 12;
+  const snapKey = useResnap(`${p.n}/${p.active}/${showName}/${p.name}`);
   return (
     <NaverMapMarkerOverlay latitude={p.lat} longitude={p.lng} width={w} height={h} anchor={{ x: 0.5, y: 1 - (d / 2 + 6) / h }} onTap={p.onTap} zIndex={p.active ? 2000 : 1000 - p.n}>
-      <View key={`${p.n}/${p.active}/${showName}/${p.name}`} collapsable={false} style={{ width: w, height: h, alignItems: "center", justifyContent: "flex-end" }}>
+      <View key={snapKey} collapsable={false} style={{ width: w, height: h, alignItems: "center", justifyContent: "flex-end" }}>
         {showName && (
           <View style={{ marginBottom: 4, maxWidth: w, borderRadius: 8, backgroundColor: p.active ? REC.ink : "rgba(28,26,23,.78)", paddingHorizontal: 8, paddingVertical: 4 }}>
             <Text numberOfLines={1} style={[textBase, { fontFamily: F.sansMd, fontSize: 11, lineHeight: 14, color: "#ffffff" }]}>{p.name}</Text>
@@ -86,9 +88,10 @@ export const HereMarker = memo(function HereMarker({ lat, lng }: { lat: number; 
 /** 거리 범위 라벨(「1km」) — 원 위 꼭대기에 붙입니다. */
 export const RingLabelMarker = memo(function RingLabelMarker({ lat, lng, text }: { lat: number; lng: number; text: string }) {
   const w = text.length * 10 + 16;
+  const snapKey = useResnap(text);
   return (
     <NaverMapMarkerOverlay latitude={lat} longitude={lng} width={w} height={22} anchor={{ x: 0.5, y: 0.5 }} zIndex={100}>
-      <View key={text} collapsable={false} style={{ width: w, height: 22, alignItems: "center", justifyContent: "center" }}>
+      <View key={snapKey} collapsable={false} style={{ width: w, height: 22, alignItems: "center", justifyContent: "center" }}>
         <View style={{ borderRadius: 9, backgroundColor: "rgba(251,250,246,.92)", paddingHorizontal: 6, paddingVertical: 2 }}>
           <Text style={[textBase, { fontFamily: F.mono, fontSize: 9.5, lineHeight: 12, color: REC.excInk }]}>{text}</Text>
         </View>
