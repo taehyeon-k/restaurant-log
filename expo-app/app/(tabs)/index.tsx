@@ -119,8 +119,7 @@ export default function MapTab() {
   // 지도 위 단추들은 시트 윗변을 따라 오르내립니다. 검색줄 위로는 올라가지 않습니다.
   const minTop = insets.top + 8 + 46 + 12;
   const draftsStyle = useAnimatedStyle(() => ({ top: Math.max(minTop, sheetTop.value - GAP_DRAFTS - DRAFTS_H) }));
-  // 내 위치는 + 단추 왼쪽, 세로 가운데를 + 에 맞춤.
-  const locateStyle = useAnimatedStyle(() => ({ top: Math.max(minTop, sheetTop.value - GAP_PLUS - PLUS_H) + (PLUS_H - LOCATE_H) / 2 }));
+  const locateStyle = useAnimatedStyle(() => ({ top: Math.max(minTop, sheetTop.value - GAP_DRAFTS - DRAFTS_H - 10 - LOCATE_H) }));
   const plusStyle = useAnimatedStyle(() => ({ top: Math.max(minTop, sheetTop.value - GAP_PLUS - PLUS_H) }));
   // + 메뉴는 위로 펼칩니다 — 아랫변이 + 단추 아랫변보다 60 위(웹과 같음).
   const plusMenuStyle = useAnimatedStyle(() => ({ bottom: screenH.value - Math.max(minTop, sheetTop.value - GAP_PLUS - PLUS_H) - PLUS_H + 60 }));
@@ -576,7 +575,7 @@ export default function MapTab() {
         </View>
       )}
 
-      {/* 현재 위치 — + 단추 왼쪽, 같은 높이로 시트를 따라 오르내립니다 */}
+      {/* 현재 위치 — 웹에는 없지만 앱에서는 보관함 위에 남겨 둡니다 */}
       <Animated.View style={[s.floatLocate, locateStyle]}>
         <Pressable onPress={locate} accessibilityLabel="현재 위치" style={[s.round, SHADOW.card]}>
           <LocateIcon size={22} stroke={C.brick} />
@@ -745,7 +744,8 @@ const s = StyleSheet.create({
   },
   floatRight: { position: "absolute", right: 16 },
   floatPlus: { position: "absolute", right: 84 },
-  floatLocate: { position: "absolute", right: 148 },
+  /** 내 위치(44) 가운데를 보관함(56) 가운데에 맞춤 — 16 + (56 − 44) / 2. */
+  floatLocate: { position: "absolute", right: 16 + (DRAFTS_H - LOCATE_H) / 2 },
   drafts: { width: DRAFTS_H, height: DRAFTS_H, borderRadius: DRAFTS_H / 2, borderWidth: 1, borderColor: C.line, backgroundColor: C.card, alignItems: "center", justifyContent: "center" },
   plus: { width: PLUS_H, height: PLUS_H, borderRadius: PLUS_H / 2, borderWidth: 1, borderColor: C.line, backgroundColor: C.card, alignItems: "center", justifyContent: "center" },
   plusMenu: { position: "absolute", right: 16, alignItems: "flex-end", gap: 8 },
