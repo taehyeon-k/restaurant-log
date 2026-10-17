@@ -1,5 +1,9 @@
 # 「지금 뭐 먹지」 hybrid-v3 — non-AI recommendation pipeline
 
+Historical implementation. The active ranker is now documented in
+[recommendation-hybrid-v4.md](recommendation-hybrid-v4.md); the settings and test
+counts below describe v3 rather than the current code.
+
 Spec: `expo-app/recommendation-non-ai-pipeline.md`. Config version: `REC_CONFIG.version` = **hybrid-v3.1** (`src/lib/rec/config.ts`).
 This version replaces v2 `pickNow`, a staged filter plus a hand-tuned point sum in `src/lib/recommend.ts`.
 PR #6 (`feature/what-to-eat-v1`) was never merged and was written against the pre-v2 tab. This work keeps its useful parts: the Kakao FD6 server route, the Bayesian/MMR idea, and the analytics design.

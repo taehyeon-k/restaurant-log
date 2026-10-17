@@ -3,10 +3,12 @@ import type { Restaurant, Wish } from "../types";
 import { buildPool, mealRows, type Candidate, type KakaoPlace, type Source } from "./candidates";
 import { recordCategory } from "./categories";
 import { REC_CONFIG } from "./config";
+import { rankingDiagnostics, compareRankers } from "./eval";
+import { exploreLastSlot, type ExplorationPolicy } from "./exploration";
 import { byScore, mmr } from "./mmr";
 import { score, type RecContext, type Scored, type Weather } from "./score";
 import { bookScoped, buildTaste } from "./taste";
-import { mealSlotOf, seoulClock } from "./time";
+import { dayDiff, mealSlotOf, seoulClock } from "./time";
 
 /**
  * 「지금 뭐 먹지」 세 단계 — A 후보 모으기(candidates.ts) → B 점수(score.ts) → C 다양성 다시 고르기(mmr.ts).
@@ -35,6 +37,8 @@ export type RecInput = {
   weather: Weather | null;
   /** 앞서 보여 준 가게 key — 「다시 추천」. */
   avoid?: string[];
+  /** Explicit research opt-in. The app passes no seed while exploration is disabled. */
+  explorationSeed?: string;
 };
 
 export type RecResult = {
@@ -48,27 +52,35 @@ export type RecResult = {
   /** 점수 순 상위(로그 · 진단용) — 고른 5곳을 포함합니다. */
   ranked: Scored[];
   ctx: RecContext;
-  diagnostics: { pool: number; eligible: number; bySource: Record<Source, number> };
+  policy: ExplorationPolicy;
+  diagnostics: {
+    pool: number; eligible: number; bySource: Record<Source, number>;
+    ranking: ReturnType<typeof rankingDiagnostics>;
+    baselines: ReturnType<typeof compareRankers>;
+  };
 };
 
 /** 강한 조건 — 먹고 싶은 것이 있으면 그 종류만, 빼고 싶은 것은 늘 뺍니다. 식사 자리가 아니면 뺍니다. */
 export const eligible = (c: Candidate, filter: RecFilter) => {
   if (!c.cat.eligible || !Number.isFinite(c.distance)) return false;
   const cat = c.cat.recCat;
-  return filter.inc.length ? !!cat && filter.inc.includes(cat) : !cat || !filter.exc.includes(cat);
+  const matches = (value: RecCategory) => value === cat || value === c.cat.cuisine;
+  return !filter.exc.some(matches) && (!filter.inc.length || filter.inc.some(matches));
 };
 
 export function buildContext(input: RecInput): RecContext {
   const clock = seoulClock(input.at);
   const taste = buildTaste({ rows: input.rows, wishes: input.wishes, bookId: input.bookId, today: clock.date, notes: input.notes });
   const recent = mealRows(bookScoped(input.rows, input.bookId)).map((r) => ({ date: r.visited_at!, cat: recordCategory(r.category, r.name, r.kind).recCat as RecCategory | null }));
-  return { today: clock.date, dow: clock.dow, slot: mealSlotOf(clock.minutes), taste, filter: input.filter, couple: input.couple, weather: input.weather, recent };
+  const weatherAge = input.weather ? Math.abs(input.at.getTime() - Date.parse(input.weather.observedAt)) : Infinity;
+  const weather = weatherAge <= REC_CONFIG.weather.maxAgeMinutes * 60000 ? input.weather : null;
+  return { today: clock.date, dow: clock.dow, slot: mealSlotOf(clock.minutes), taste, filter: input.filter, couple: input.couple, weather, recent };
 }
 
 export function recommend(input: RecInput): RecResult {
   const cfg = REC_CONFIG;
   const ctx = buildContext(input);
-  const rows = bookScoped(input.rows, input.bookId);
+  const rows = bookScoped(input.rows, input.bookId).filter((r) => !r.visited_at || dayDiff(r.visited_at, ctx.today) >= 0);
   const wishes = bookScoped(input.wishes, input.bookId);
   const poolAt = (radius: number) => buildPool({ here: input.here, radius, kakao: input.kakao, stats: input.stats, rows, wishes });
 
@@ -94,26 +106,41 @@ export function recommend(input: RecInput): RecResult {
   let picks = mmr(fresh, cfg.count, { requested });
   let cycled = false;
   if (picks.length < cfg.count && avoid.size) {
-    const again = mmr(scored.filter((s) => avoid.has(s.c.key)), cfg.count - picks.length, { requested });
+    const again = mmr(scored.filter((s) => avoid.has(s.c.key)), cfg.count - picks.length, { requested, initial: picks });
     cycled = again.length > 0;
     picks = [...picks, ...again];
   }
 
   // 그래도 모자라면 10km 안의 내 위시 · 두 번 넘게 간 곳(남의 숫자 없이).
   let relax: Relax = radius > cfg.radii[0] ? { kind: "wider", radius } : { kind: "strict" };
+  let fallback: Scored[] = [];
   if (picks.length < cfg.count) {
     const taken = new Set(picks.map((p) => p.c.key));
-    const mine = poolAt(cfg.mineRadius)
+    fallback = poolAt(cfg.mineRadius)
       .filter((c) => !taken.has(c.key) && !pool.some((p) => p.key === c.key) && eligible(c, input.filter))
       .filter((c) => c.wish || new Set(c.visits.map((r) => r.visited_at)).size >= 2)
       .map((c) => score({ ...c, stat: null }, ctx));
-    const more = mmr(mine, cfg.count - picks.length, { requested });
+    const more = mmr(fallback, cfg.count - picks.length, { requested, initial: picks });
     if (more.length) relax = { kind: "mine" };
     picks = [...picks, ...more];
   }
 
+  // Explore only a complete fresh nearby slate, never a cycled or long-distance fallback slate.
+  const exploration = exploreLastSlot(picks, fresh, requested, !cycled && relax.kind !== "mine" ? input.explorationSeed : undefined);
+  picks = exploration.picks;
+
   const bySource: Record<Source, number> = { kakao: 0, community: 0, history: 0, wish: 0 };
   for (const c of pool) for (const s of c.sources) bySource[s] += 1;
-  const ranked = [...new Map([...picks, ...scored.slice(0, 20)].map((s) => [s.c.key, s])).values()];
-  return { picks, relax, radius, wantRadius, cycled, ranked, ctx, diagnostics: { pool: pool.length, eligible: ok.length, bySource } };
+  const allScored = [...scored, ...fallback].sort(byScore).map((s, i) => ({ ...s, baseRank: i + 1 }));
+  const rawRank = new Map(allScored.map((s) => [s.c.key, s.baseRank]));
+  picks = picks.map((s) => ({ ...s, baseRank: rawRank.get(s.c.key) }));
+  const support = new Set(exploration.policy.distribution.map((p) => p.key));
+  const ranked = [...new Map([...allScored.slice(0, 20), ...allScored.filter((s) => support.has(s.c.key)), ...picks].map((s) => [s.c.key, s])).values()].sort(byScore);
+  return {
+    picks, relax, radius, wantRadius, cycled, ranked, ctx, policy: exploration.policy,
+    diagnostics: {
+      pool: pool.length, eligible: ok.length, bySource,
+      ranking: rankingDiagnostics(scored, requested), baselines: compareRankers(scored, { requested }),
+    },
+  };
 }

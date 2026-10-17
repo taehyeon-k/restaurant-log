@@ -126,7 +126,8 @@ describe("Algorithm C — 반복 회피", () => {
     const mk = (d: string) => [row({ name: "단골", category: "양식", visited_at: d, ...at(200) })];
     const rY = score(pool1([k], { rows: mk("2026-10-15") })[0], buildContext(input({ rows: mk("2026-10-15") }))).repetition.place;
     const rOld = score(pool1([k], { rows: mk("2026-07-01") })[0], buildContext(input({ rows: mk("2026-07-01") }))).repetition.place;
-    assert.ok(rY > 0.15 && rOld < 0.001);
+    assert.ok(rY > 0.10 && rY < 0.15, "recent visit still matters, with a softer v4 penalty");
+    assert.ok(rOld < 0.001);
   });
 });
 

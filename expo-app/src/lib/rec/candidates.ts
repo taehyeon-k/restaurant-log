@@ -104,7 +104,7 @@ export function buildPool(opts: {
   }
   for (const r of mealRows(rows)) {
     if (!inRange(r.lat, r.lng)) continue;
-    add({ key: `mine:${r.place_key ?? `${r.name}|${r.address ?? ""}`.toLowerCase()}`, kakaoId: kakaoIdOf(r.place_url), name: r.name, address: r.address, lat: r.lat!, lng: r.lng!, cat: recordCategory(r.category, r.name, r.kind), placeUrl: r.place_url ?? null, source: "history" });
+    add({ key: `mine:${r.place_key ?? `${r.name}|${r.address ?? ""}`.toLowerCase()}`, kakaoId: kakaoIdOf(r.place_url), name: r.name, address: r.address, lat: r.lat!, lng: r.lng!, cat: recordCategory(r.category, r.name, r.kind, r.menus?.length ? r.menus.map((m) => m.name) : r.menu ? [r.menu] : []), placeUrl: r.place_url ?? null, source: "history" });
   }
   for (const w of wishes) {
     if (!inRange(w.lat, w.lng)) continue;

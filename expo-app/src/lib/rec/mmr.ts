@@ -14,8 +14,10 @@ import type { Scored } from "./score";
 export function similarity(a: Candidate, b: Candidate, requested: boolean) {
   if (a.chain && a.chain === b.chain) return 1;
   const s = REC_CONFIG.mmr.sim;
-  const cuisine = a.cat.recCat && a.cat.recCat === b.cat.recCat ? s.cuisine * (requested ? REC_CONFIG.mmr.requestedCuisineFactor : 1) : 0;
-  const sub = a.cat.sub && a.cat.sub === b.cat.sub ? s.sub * (requested ? REC_CONFIG.mmr.requestedCuisineFactor : 1) : 0;
+  const sameCuisine = a.cat.cuisine && b.cat.cuisine ? a.cat.cuisine === b.cat.cuisine : a.cat.recCat && a.cat.recCat === b.cat.recCat;
+  const cuisine = sameCuisine ? s.cuisine * (requested ? REC_CONFIG.mmr.requestedCuisineFactor : 1) : 0;
+  const sameDish = a.cat.dish && b.cat.dish ? a.cat.dish === b.cat.dish : a.cat.sub && a.cat.sub === b.cat.sub;
+  const sub = sameDish ? s.sub * (requested ? REC_CONFIG.mmr.requestedCuisineFactor : 1) : 0;
   const price = a.priceLevel != null && a.priceLevel === b.priceLevel ? s.price : 0;
   const geo = s.geo * Math.exp(-metersBetweenLL(a.lat, a.lng, b.lat, b.lng) / s.geoTauM);
   return Math.min(1, cuisine + sub + price + geo);
@@ -24,23 +26,29 @@ export function similarity(a: Candidate, b: Candidate, requested: boolean) {
 /** 정렬은 점수 → key 로 고정해, 같은 입력이면 늘 같은 결과입니다. */
 export const byScore = (a: Scored, b: Scored) => b.score - a.score || (a.c.key < b.c.key ? -1 : a.c.key > b.c.key ? 1 : 0);
 
-export function mmr(scored: Scored[], k: number, opts: { requested: boolean; lambda?: number }): Scored[] {
+export function marginalUtility(s: Scored, chosen: Scored[], opts: { requested: boolean; lambda?: number }) {
   const lambda = opts.lambda ?? REC_CONFIG.mmr.lambda;
-  const saturation = REC_CONFIG.mmr.saturation;
   const cuisineSim = REC_CONFIG.mmr.sim.cuisine * (opts.requested ? REC_CONFIG.mmr.requestedCuisineFactor : 1);
-  const pool = [...scored].sort(byScore);
-  const chosen: Scored[] = [];
-  while (chosen.length < k && pool.length) {
+  const pen = chosen.reduce((m, j) => Math.max(m, similarity(s.c, j.c, opts.requested)), 0);
+  const same = s.c.cat.recCat ? chosen.filter((j) => j.c.cat.recCat === s.c.cat.recCat).length : 0;
+  const penalty = lambda * pen + REC_CONFIG.mmr.saturation * Math.max(0, same - 1) * cuisineSim;
+  return { penalty, utility: s.score - penalty };
+}
+
+export function mmr(scored: Scored[], k: number, opts: { requested: boolean; lambda?: number; initial?: Scored[] }): Scored[] {
+  const initial = opts.initial ?? [];
+  const taken = new Set(initial.map((s) => s.c.key));
+  const pool = scored.filter((s) => !taken.has(s.c.key)).sort(byScore);
+  const chosen: Scored[] = [...initial];
+  while (chosen.length < k + initial.length && pool.length) {
     let best = 0;
     let bestV = -Infinity;
     for (let i = 0; i < pool.length; i++) {
-      const c = pool[i].c;
-      const pen = chosen.reduce((m, s) => Math.max(m, similarity(c, s.c, opts.requested)), 0);
-      const same = c.cat.recCat ? chosen.filter((s) => s.c.cat.recCat === c.cat.recCat).length : 0;
-      const v = pool[i].score - lambda * pen - saturation * Math.max(0, same - 1) * cuisineSim;
+      const v = marginalUtility(pool[i], chosen, opts).utility;
       if (v > bestV + 1e-12) { bestV = v; best = i; }
     }
-    chosen.push(pool.splice(best, 1)[0]);
+    const pick = pool.splice(best, 1)[0];
+    chosen.push({ ...pick, selection: marginalUtility(pick, chosen, opts) });
   }
-  return chosen;
+  return chosen.slice(initial.length);
 }

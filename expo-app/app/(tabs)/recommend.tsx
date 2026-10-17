@@ -17,9 +17,14 @@ import { REC } from "@/features/recommend/ui";
 import { todayIso } from "@/lib/anniversary";
 import { REC_CONFIG } from "@/lib/rec/config";
 import { recommend } from "@/lib/rec/pipeline";
+import { resultSignature } from "@/lib/rec/snapshot";
 import { mealSlotOf, seoulClock } from "@/lib/rec/time";
 import { defaultFilter, FETCH_MAX_M, REC_MODE_LABEL, type RecFilter, type RecMode } from "@/lib/recommend";
+import type { Restaurant, Wish } from "@/lib/types";
 import { C, F, TAB_BAR_H } from "@/theme";
+
+const EMPTY_ROWS: Restaurant[] = [];
+const EMPTY_WISHES: Wish[] = [];
 
 const DAYS = ["일", "월", "화", "수", "목", "금", "토"];
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -40,8 +45,8 @@ export default function RecommendTab() {
   const insets = useSafeAreaInsets();
   const { isCouple, id: bookId } = useActiveBook();
   const { data: notes } = useRecordNotes();
-  const { data: rows = [] } = useRows();
-  const { data: wishes = [] } = useWishes();
+  const { data: rows = EMPTY_ROWS } = useRows();
+  const { data: wishes = EMPTY_WISHES } = useWishes();
   const { recFilter, recPlace, recAt } = useAppState();
   const today = todayIso();
 
@@ -86,10 +91,13 @@ export default function RecommendTab() {
 
   // 「다시 추천」 — 앞서 보여 준 5곳들. 기준(자리 · 시각 · 필터 · 기록장)이 바뀌면 처음부터.
   const [shown, setShown] = useState<string[][]>([]);
+  const [explorationSeed] = useState(uuid);
   const basis = `${here?.lat.toFixed(3)},${here?.lng.toFixed(3)}|${at ?? "now"}|${JSON.stringify(filter)}|${bookId}`;
   useEffect(() => { setShown([]); setWantWide(false); }, [basis]);
 
   const when = useMemo(() => (at ? new Date(at) : clock), [at, clock]);
+  const seoul = seoulClock(when);
+  const timeBasis = `${seoul.date}|${seoul.dow}|${mealSlotOf(seoul.minutes)}`;
   // 3km 결과는 칸이 커서 가까운 곳이 성기니 1.5km 결과와 합칩니다(같은 가게는 buildPool 이 하나로).
   const kakaoData = useMemo(() => {
     const parts = [kakaoNear.data, kakaoWide.data].filter((d): d is NonNullable<typeof d> => !!d);
@@ -104,13 +112,14 @@ export default function RecommendTab() {
       here, at: when, filter, couple: isCouple, bookId,
       kakao: kakaoData?.candidates ?? [], kakaoRadius: kakaoData?.radius ?? null,
       stats: nowQ.data ?? [], rows, wishes, notes: isCouple ? notes : undefined, weather, avoid: shown.flat(),
+      explorationSeed: REC_CONFIG.exploration.enabled ? `${explorationSeed}|${basis}|${shown.length}` : undefined,
     });
     // 시계(30초)마다 다시 고르지 않게 분 단위가 아닌 기준 시각만 봅니다.
-  }, [here, at, filter, isCouple, bookId, kakaoData, nowQ.data, rows, wishes, notes, weather, shown]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [here, at, timeBasis, filter, isCouple, bookId, kakaoData, nowQ.data, rows, wishes, notes, weather, shown, explorationSeed, basis]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (result?.wantRadius === wide) setWantWide(true); }, [result?.wantRadius, wide]);
 
-  // 고른 5곳이 바뀔 때마다 새 로그 세션(화면에 보일 때 서버에 씁니다).
-  const pickSig = result?.picks.map((p) => p.c.key).join(",") ?? "";
+  // A book/context/feature change starts a fresh immutable logging snapshot, even with the same picks.
+  const pickSig = result ? resultSignature(result, `${basis}|${!!recPlace}|${!!recAt}|${kakaoState}|${here?.name ?? ""}|${shown.length}`) : "";
   const session: RecSession | null = useMemo(
     () => (result && pickSig ? {
       id: uuid(), bookId, result,
@@ -123,8 +132,7 @@ export default function RecommendTab() {
   const slotNow = mealSlotOf(seoulClock(clock).minutes);
   const setMeal = (m: "lunch" | "dinner") => {
     if (m === slotNow) return setState({ recAt: null });
-    const d = new Date(clock);
-    d.setHours(m === "lunch" ? 12 : 18, m === "lunch" ? 0 : 30, 0, 0);
+    const d = new Date(`${seoulClock(clock).date}T${m === "lunch" ? "12:00" : "18:30"}:00+09:00`);
     setState({ recAt: d.getTime() });
   };
 

@@ -1,0 +1,1353 @@
+{
+  "kind": "synthetic-calibration-not-user-outcomes",
+  "algorithm": "hybrid-v4.0",
+  "baselineCommit": "a4497b76349a63aad28b3f5e47517fc1e549a6ca",
+  "cases": [
+    {
+      "scenario": "cold-start",
+      "comparisons": [
+        {
+          "name": "distance-only",
+          "keys": [
+            "kakao:1000",
+            "kakao:1001",
+            "kakao:1002",
+            "kakao:1003",
+            "kakao:1004"
+          ],
+          "distance": {
+            "n": 5,
+            "mean": 236,
+            "p50": 272,
+            "p90": 321.4,
+            "max": 349
+          },
+          "diversity": 0.9434742933304004,
+          "cuisines": {
+            "한식": 1,
+            "중식": 1,
+            "일식": 1,
+            "양식": 1,
+            "분식": 1
+          },
+          "meanTaste": 0.5
+        },
+        {
+          "name": "distance-wishlist",
+          "keys": [
+            "kakao:1000",
+            "kakao:1001",
+            "kakao:1002",
+            "kakao:1003",
+            "kakao:1004"
+          ],
+          "distance": {
+            "n": 5,
+            "mean": 236,
+            "p50": 272,
+            "p90": 321.4,
+            "max": 349
+          },
+          "diversity": 0.9434742933304004,
+          "cuisines": {
+            "한식": 1,
+            "중식": 1,
+            "일식": 1,
+            "양식": 1,
+            "분식": 1
+          },
+          "meanTaste": 0.5
+        },
+        {
+          "name": "hybrid-v4.0",
+          "keys": [
+            "kakao:1000",
+            "kakao:1001",
+            "kakao:1002",
+            "kakao:1003",
+            "kakao:1004"
+          ],
+          "distance": {
+            "n": 5,
+            "mean": 236,
+            "p50": 272,
+            "p90": 321.4,
+            "max": 349
+          },
+          "diversity": 0.9434742933304004,
+          "cuisines": {
+            "한식": 1,
+            "중식": 1,
+            "일식": 1,
+            "양식": 1,
+            "분식": 1
+          },
+          "meanTaste": 0.5
+        },
+        {
+          "name": "archived-v3",
+          "keys": [
+            "kakao:1000",
+            "kakao:1001",
+            "kakao:1002",
+            "kakao:1003",
+            "kakao:1004"
+          ],
+          "distance": {
+            "n": 5,
+            "mean": 236,
+            "p50": 272,
+            "p90": 321.4,
+            "max": 349
+          },
+          "diversity": 0.9434742933304004,
+          "cuisines": {
+            "한식": 1,
+            "중식": 1,
+            "일식": 1,
+            "양식": 1,
+            "분식": 1
+          },
+          "meanTaste": 0.5
+        }
+      ],
+      "featureInfluence": {
+        "components": {
+          "taste": {
+            "mean": 0.5,
+            "sd": 0,
+            "share": 1.1224435630376725e-15
+          },
+          "distance": {
+            "mean": 0.6134795131331744,
+            "sd": 0.2472781396733556,
+            "share": 0.9999999999999979
+          },
+          "wish": {
+            "mean": 0,
+            "sd": 0,
+            "share": 0
+          },
+          "favorite": {
+            "mean": 0.5,
+            "sd": 0,
+            "share": 5.612217815188363e-16
+          },
+          "community": {
+            "mean": 0.5,
+            "sd": 0,
+            "share": 1.4030544537970906e-16
+          },
+          "meal": {
+            "mean": 0.5,
+            "sd": 0,
+            "share": 3.5076361344927266e-16
+          },
+          "novelty": {
+            "mean": 0.44444444444444453,
+            "sd": 0,
+            "share": 0
+          },
+          "context": {
+            "mean": 0.5,
+            "sd": 0,
+            "share": 0
+          },
+          "repetition": {
+            "mean": 0,
+            "sd": 0,
+            "share": 0
+          }
+        },
+        "groups": {
+          "personalFit": {
+            "mean": 0,
+            "min": 0,
+            "max": 0
+          },
+          "desirability": {
+            "mean": 0,
+            "min": 0,
+            "max": 0
+          },
+          "practicality": {
+            "mean": 0.12269590262663492,
+            "min": 0.05475630544150833,
+            "max": 0.2
+          },
+          "discovery": {
+            "mean": 0.01777777777777778,
+            "min": 0.01777777777777778,
+            "max": 0.01777777777777778
+          }
+        },
+        "ablations": {
+          "taste": {
+            "replaced": 0,
+            "positionsChanged": 0
+          },
+          "distance": {
+            "replaced": 3,
+            "positionsChanged": 5
+          },
+          "wish": {
+            "replaced": 0,
+            "positionsChanged": 0
+          },
+          "favorite": {
+            "replaced": 0,
+            "positionsChanged": 0
+          },
+          "community": {
+            "replaced": 0,
+            "positionsChanged": 0
+          },
+          "meal": {
+            "replaced": 0,
+            "positionsChanged": 0
+          },
+          "novelty": {
+            "replaced": 0,
+            "positionsChanged": 0
+          },
+          "context": {
+            "replaced": 0,
+            "positionsChanged": 0
+          },
+          "repetition": {
+            "replaced": 0,
+            "positionsChanged": 0
+          }
+        }
+      },
+      "displayed": [
+        {
+          "key": "kakao:1000",
+          "dish": null,
+          "taste": 0.5,
+          "satisfaction": 0.5,
+          "repetition": {
+            "place": 0,
+            "cuisine": 0
+          }
+        },
+        {
+          "key": "kakao:1001",
+          "dish": null,
+          "taste": 0.5,
+          "satisfaction": 0.5,
+          "repetition": {
+            "place": 0,
+            "cuisine": 0
+          }
+        },
+        {
+          "key": "kakao:1002",
+          "dish": "초밥",
+          "taste": 0.5,
+          "satisfaction": 0.5,
+          "repetition": {
+            "place": 0,
+            "cuisine": 0
+          }
+        },
+        {
+          "key": "kakao:1003",
+          "dish": null,
+          "taste": 0.5,
+          "satisfaction": 0.5,
+          "repetition": {
+            "place": 0,
+            "cuisine": 0
+          }
+        },
+        {
+          "key": "kakao:1004",
+          "dish": null,
+          "taste": 0.5,
+          "satisfaction": 0.5,
+          "repetition": {
+            "place": 0,
+            "cuisine": 0
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "sushi-liked-ramen-disliked",
+      "comparisons": [
+        {
+          "name": "distance-only",
+          "keys": [
+            "kakao:1000",
+            "kakao:2002",
+            "kakao:1001",
+            "kakao:1002",
+            "kakao:1003"
+          ],
+          "distance": {
+            "n": 5,
+            "mean": 196.2,
+            "p50": 179,
+            "p90": 276.8,
+            "max": 280
+          },
+          "diversity": 0.8809618445657641,
+          "cuisines": {
+            "한식": 1,
+            "면": 1,
+            "중식": 1,
+            "일식": 1,
+            "양식": 1
+          },
+          "meanTaste": 0.5094482817305546
+        },
+        {
+          "name": "distance-wishlist",
+          "keys": [
+            "kakao:1000",
+            "kakao:1001",
+            "kakao:2002",
+            "kakao:1002",
+            "kakao:1003"
+          ],
+          "distance": {
+            "n": 5,
+            "mean": 196.2,
+            "p50": 179,
+            "p90": 276.8,
+            "max": 280
+          },
+          "diversity": 0.8809618445657641,
+          "cuisines": {
+            "한식": 1,
+            "중식": 1,
+            "면": 1,
+            "일식": 1,
+            "양식": 1
+          },
+          "meanTaste": 0.5094482817305546
+        },
+        {
+          "name": "hybrid-v4.0",
+          "keys": [
+            "kakao:1002",
+            "kakao:1001",
+            "kakao:1000",
+            "kakao:1003",
+            "kakao:1004"
+          ],
+          "distance": {
+            "n": 5,
+            "mean": 236,
+            "p50": 272,
+            "p90": 321.4,
+            "max": 349
+          },
+          "diversity": 0.9434742933304003,
+          "cuisines": {
+            "일식": 1,
+            "중식": 1,
+            "한식": 1,
+            "양식": 1,
+            "분식": 1
+          },
+          "meanTaste": 0.5469942397517892
+        },
+        {
+          "name": "archived-v3",
+          "keys": [
+            "kakao:1000",
+            "kakao:1001",
+            "kakao:1003",
+            "kakao:2002",
+            "kakao:1002"
+          ],
+          "distance": {
+            "n": 5,
+            "mean": 196.2,
+            "p50": 179,
+            "p90": 276.8,
+            "max": 280
+          },
+          "diversity": 0.8809618445657641,
+          "cuisines": {
+            "한식": 1,
+            "중식": 1,
+            "양식": 1,
+            "면": 1,
+            "일식": 1
+          },
+          "meanTaste": 0.5094482817305546
+        }
+      ],
+      "featureInfluence": {
+        "components": {
+          "taste": {
+            "mean": 0.5235083548259394,
+            "sd": 0.09261816197462341,
+            "share": 0.3623160574958976
+          },
+          "distance": {
+            "mean": 0.6284374091361022,
+            "sd": 0.24960928883019282,
+            "share": 0.5424749165773132
+          },
+          "wish": {
+            "mean": 0,
+            "sd": 0,
+            "share": 0
+          },
+          "favorite": {
+            "mean": 0.5,
+            "sd": 0,
+            "share": 4.524081506704231e-16
+          },
+          "community": {
+            "mean": 0.5,
+            "sd": 0,
+            "share": 7.540135844507052e-17
+          },
+          "meal": {
+            "mean": 0.5,
+            "sd": 0,
+            "share": 1.8850339611267631e-16
+          },
+          "novelty": {
+            "mean": 0.5000000000000001,
+            "sd": 0.2190429135575903,
+            "share": 0.09520902592678859
+          },
+          "context": {
+            "mean": 0.5,
+            "sd": 0,
+            "share": 0
+          },
+          "repetition": {
+            "mean": 0,
+            "sd": 0,
+            "share": 0
+          }
+        },
+        "groups": {
+          "personalFit": {
+            "mean": 0.00846300773733815,
+            "min": -0.06758272443822258,
+            "max": 0.08458963155322063
+          },
+          "desirability": {
+            "mean": 0,
+            "min": 0,
+            "max": 0
+          },
+          "practicality": {
+            "mean": 0.12568748182722048,
+            "min": 0.05475630544150833,
+            "max": 0.2
+          },
+          "discovery": {
+            "mean": 0.020000000000000004,
+            "min": 0,
+            "max": 0.04
+          }
+        },
+        "ablations": {
+          "taste": {
+            "replaced": 0,
+            "positionsChanged": 0
+          },
+          "distance": {
+            "replaced": 3,
+            "positionsChanged": 3
+          },
+          "wish": {
+            "replaced": 0,
+            "positionsChanged": 0
+          },
+          "favorite": {
+            "replaced": 0,
+            "positionsChanged": 0
+          },
+          "community": {
+            "replaced": 0,
+            "positionsChanged": 0
+          },
+          "meal": {
+            "replaced": 0,
+            "positionsChanged": 0
+          },
+          "novelty": {
+            "replaced": 0,
+            "positionsChanged": 0
+          },
+          "context": {
+            "replaced": 0,
+            "positionsChanged": 0
+          },
+          "repetition": {
+            "replaced": 0,
+            "positionsChanged": 0
+          }
+        }
+      },
+      "displayed": [
+        {
+          "key": "kakao:1002",
+          "dish": "초밥",
+          "taste": 0.7349711987589462,
+          "satisfaction": 0.5,
+          "repetition": {
+            "place": 0,
+            "cuisine": 0
+          }
+        },
+        {
+          "key": "kakao:1001",
+          "dish": null,
+          "taste": 0.5,
+          "satisfaction": 0.5,
+          "repetition": {
+            "place": 0,
+            "cuisine": 0
+          }
+        },
+        {
+          "key": "kakao:1000",
+          "dish": null,
+          "taste": 0.5,
+          "satisfaction": 0.5,
+          "repetition": {
+            "place": 0,
+            "cuisine": 0
+          }
+        },
+        {
+          "key": "kakao:1003",
+          "dish": null,
+          "taste": 0.5,
+          "satisfaction": 0.5,
+          "repetition": {
+            "place": 0,
+            "cuisine": 0
+          }
+        },
+        {
+          "key": "kakao:1004",
+          "dish": null,
+          "taste": 0.5,
+          "satisfaction": 0.5,
+          "repetition": {
+            "place": 0,
+            "cuisine": 0
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "generous-rater",
+      "comparisons": [
+        {
+          "name": "distance-only",
+          "keys": [
+            "kakao:1000",
+            "kakao:1001",
+            "kakao:1002",
+            "kakao:1003",
+            "kakao:1004"
+          ],
+          "distance": {
+            "n": 5,
+            "mean": 236,
+            "p50": 272,
+            "p90": 321.4,
+            "max": 349
+          },
+          "diversity": 0.9434742933304004,
+          "cuisines": {
+            "한식": 1,
+            "중식": 1,
+            "일식": 1,
+            "양식": 1,
+            "분식": 1
+          },
+          "meanTaste": 0.5229123885043071
+        },
+        {
+          "name": "distance-wishlist",
+          "keys": [
+            "kakao:1000",
+            "kakao:1001",
+            "kakao:1002",
+            "kakao:1003",
+            "kakao:1004"
+          ],
+          "distance": {
+            "n": 5,
+            "mean": 236,
+            "p50": 272,
+            "p90": 321.4,
+            "max": 349
+          },
+          "diversity": 0.9434742933304004,
+          "cuisines": {
+            "한식": 1,
+            "중식": 1,
+            "일식": 1,
+            "양식": 1,
+            "분식": 1
+          },
+          "meanTaste": 0.5229123885043071
+        },
+        {
+          "name": "hybrid-v4.0",
+          "keys": [
+            "kakao:1000",
+            "kakao:1001",
+            "kakao:1002",
+            "kakao:1003",
+            "kakao:1006"
+          ],
+          "distance": {
+            "n": 5,
+            "mean": 258,
+            "p50": 272,
+            "p90": 387.40000000000003,
+            "max": 459
+          },
+          "diversity": 0.916051899059749,
+          "cuisines": {
+            "한식": 1,
+            "중식": 1,
+            "일식": 1,
+            "양식": 1,
+            "고기": 1
+          },
+          "meanTaste": 0.5458247770086142
+        },
+        {
+          "name": "archived-v3",
+          "keys": [
+            "kakao:1000",
+            "kakao:1001",
+            "kakao:1002",
+            "kakao:1003",
+            "kakao:1004"
+          ],
+          "distance": {
+            "n": 5,
+            "mean": 236,
+            "p50": 272,
+            "p90": 321.4,
+            "max": 349
+          },
+          "diversity": 0.9434742933304004,
+          "cuisines": {
+            "한식": 1,
+            "중식": 1,
+            "일식": 1,
+            "양식": 1,
+            "분식": 1
+          },
+          "meanTaste": 0.5229123885043071
+        }
+      ],
+      "featureInfluence": {
+        "components": {
+          "taste": {
+            "mean": 0.5572809712607677,
+            "sd": 0.057280971260767685,
+            "share": 0.2539929290458698
+          },
+          "distance": {
+            "mean": 0.6134795131331743,
+            "sd": 0.24727813967335563,
+            "share": 0.6091503144960961
+          },
+          "wish": {
+            "mean": 0,
+            "sd": 0,
+            "share": 0
+          },
+          "favorite": {
+            "mean": 0.5,
+            "sd": 0,
+            "share": 3.4186842471425926e-16
+          },
+          "community": {
+            "mean": 0.5,
+            "sd": 0,
+            "share": 8.546710617856481e-17
+          },
+          "meal": {
+            "mean": 0.5,
+            "sd": 0,
+            "share": 2.1366776544641203e-16
+          },
+          "novelty": {
+            "mean": 0.7222222222222223,
+            "sd": 0.27777777777777773,
+            "share": 0.13685675645803344
+          },
+          "context": {
+            "mean": 0.5,
+            "sd": 0,
+            "share": 0
+          },
+          "repetition": {
+            "mean": 0,
+            "sd": 0,
+            "share": 0
+          }
+        },
+        "groups": {
+          "personalFit": {
+            "mean": 0.02062114965387637,
+            "min": 0,
+            "max": 0.04124229930775274
+          },
+          "desirability": {
+            "mean": 0,
+            "min": 0,
+            "max": 0
+          },
+          "practicality": {
+            "mean": 0.1226959026266349,
+            "min": 0.05475630544150833,
+            "max": 0.2
+          },
+          "discovery": {
+            "mean": 0.028888888888888888,
+            "min": 0.01777777777777778,
+            "max": 0.04
+          }
+        },
+        "ablations": {
+          "taste": {
+            "replaced": 1,
+            "positionsChanged": 1
+          },
+          "distance": {
+            "replaced": 5,
+            "positionsChanged": 5
+          },
+          "wish": {
+            "replaced": 0,
+            "positionsChanged": 0
+          },
+          "favorite": {
+            "replaced": 0,
+            "positionsChanged": 0
+          },
+          "community": {
+            "replaced": 0,
+            "positionsChanged": 0
+          },
+          "meal": {
+            "replaced": 0,
+            "positionsChanged": 0
+          },
+          "novelty": {
+            "replaced": 1,
+            "positionsChanged": 1
+          },
+          "context": {
+            "replaced": 0,
+            "positionsChanged": 0
+          },
+          "repetition": {
+            "replaced": 0,
+            "positionsChanged": 0
+          }
+        }
+      },
+      "displayed": [
+        {
+          "key": "kakao:1000",
+          "dish": null,
+          "taste": 0.6145619425215354,
+          "satisfaction": 0.5,
+          "repetition": {
+            "place": 0,
+            "cuisine": 0
+          }
+        },
+        {
+          "key": "kakao:1001",
+          "dish": null,
+          "taste": 0.5,
+          "satisfaction": 0.5,
+          "repetition": {
+            "place": 0,
+            "cuisine": 0
+          }
+        },
+        {
+          "key": "kakao:1002",
+          "dish": "초밥",
+          "taste": 0.5,
+          "satisfaction": 0.5,
+          "repetition": {
+            "place": 0,
+            "cuisine": 0
+          }
+        },
+        {
+          "key": "kakao:1003",
+          "dish": null,
+          "taste": 0.5,
+          "satisfaction": 0.5,
+          "repetition": {
+            "place": 0,
+            "cuisine": 0
+          }
+        },
+        {
+          "key": "kakao:1006",
+          "dish": "구이",
+          "taste": 0.6145619425215354,
+          "satisfaction": 0.5,
+          "repetition": {
+            "place": 0,
+            "cuisine": 0
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "wishlist-800m-vs-neutral-300m",
+      "comparisons": [
+        {
+          "name": "distance-only",
+          "keys": [
+            "kakao:1000",
+            "kakao:1001",
+            "kakao:1002",
+            "kakao:1003",
+            "kakao:3002"
+          ],
+          "distance": {
+            "n": 5,
+            "mean": 226.2,
+            "p50": 272,
+            "p90": 292,
+            "max": 300
+          },
+          "diversity": 0.8641909685775218,
+          "cuisines": {
+            "한식": 2,
+            "중식": 1,
+            "일식": 1,
+            "양식": 1
+          },
+          "meanTaste": 0.5019354838709678
+        },
+        {
+          "name": "distance-wishlist",
+          "keys": [
+            "kakao:1000",
+            "kakao:1001",
+            "kakao:1002",
+            "kakao:1003",
+            "kakao:3001"
+          ],
+          "distance": {
+            "n": 5,
+            "mean": 326,
+            "p50": 272,
+            "p90": 591.4000000000001,
+            "max": 799
+          },
+          "diversity": 0.9084630223422476,
+          "cuisines": {
+            "한식": 2,
+            "중식": 1,
+            "일식": 1,
+            "양식": 1
+          },
+          "meanTaste": 0.5019354838709678
+        },
+        {
+          "name": "hybrid-v4.0",
+          "keys": [
+            "kakao:3001",
+            "kakao:1001",
+            "kakao:1002",
+            "kakao:1003",
+            "kakao:1004"
+          ],
+          "distance": {
+            "n": 5,
+            "mean": 375.8,
+            "p50": 280,
+            "p90": 619,
+            "max": 799
+          },
+          "diversity": 0.9660849684072976,
+          "cuisines": {
+            "한식": 1,
+            "중식": 1,
+            "일식": 1,
+            "양식": 1,
+            "분식": 1
+          },
+          "meanTaste": 0.5009677419354839
+        },
+        {
+          "name": "archived-v3",
+          "keys": [
+            "kakao:1000",
+            "kakao:1001",
+            "kakao:1002",
+            "kakao:1003",
+            "kakao:1004"
+          ],
+          "distance": {
+            "n": 5,
+            "mean": 236,
+            "p50": 272,
+            "p90": 321.4,
+            "max": 349
+          },
+          "diversity": 0.9434742933304004,
+          "cuisines": {
+            "한식": 1,
+            "중식": 1,
+            "일식": 1,
+            "양식": 1,
+            "분식": 1
+          },
+          "meanTaste": 0.5009677419354839
+        }
+      ],
+      "featureInfluence": {
+        "components": {
+          "taste": {
+            "mean": 0.5026392961876831,
+            "sd": 0.0024093367632191704,
+            "share": 0.011445141360726014
+          },
+          "distance": {
+            "mean": 0.622464538005305,
+            "sd": 0.24692796999112912,
+            "share": 0.6516605559968689
+          },
+          "wish": {
+            "mean": 0.045454545454545456,
+            "sd": 0.20829889522526557,
+            "share": 0.32982940056788174
+          },
+          "favorite": {
+            "mean": 0.5,
+            "sd": 0,
+            "share": 5.493671040489153e-16
+          },
+          "community": {
+            "mean": 0.5,
+            "sd": 0,
+            "share": 9.156118400815255e-17
+          },
+          "meal": {
+            "mean": 0.5,
+            "sd": 0,
+            "share": 2.2890296002038135e-16
+          },
+          "novelty": {
+            "mean": 0.4591072010426847,
+            "sd": 0.013385204240106521,
+            "share": 0.0070649020745222404
+          },
+          "context": {
+            "mean": 0.5,
+            "sd": 0,
+            "share": 0
+          },
+          "repetition": {
+            "mean": 0,
+            "sd": 0,
+            "share": 0
+          }
+        },
+        "groups": {
+          "personalFit": {
+            "mean": 0.0009501466275659686,
+            "min": 0,
+            "max": 0.0017419354838709422
+          },
+          "desirability": {
+            "mean": 0.005454545454545454,
+            "min": 0,
+            "max": 0.12
+          },
+          "practicality": {
+            "mean": 0.12449290760106103,
+            "min": 0.05475630544150833,
+            "max": 0.2
+          },
+          "discovery": {
+            "mean": 0.01836428804170739,
+            "min": 0.01777777777777778,
+            "max": 0.01885304659498207
+          }
+        },
+        "ablations": {
+          "taste": {
+            "replaced": 0,
+            "positionsChanged": 0
+          },
+          "distance": {
+            "replaced": 2,
+            "positionsChanged": 4
+          },
+          "wish": {
+            "replaced": 1,
+            "positionsChanged": 1
+          },
+          "favorite": {
+            "replaced": 0,
+            "positionsChanged": 0
+          },
+          "community": {
+            "replaced": 0,
+            "positionsChanged": 0
+          },
+          "meal": {
+            "replaced": 0,
+            "positionsChanged": 0
+          },
+          "novelty": {
+            "replaced": 0,
+            "positionsChanged": 0
+          },
+          "context": {
+            "replaced": 0,
+            "positionsChanged": 0
+          },
+          "repetition": {
+            "replaced": 0,
+            "positionsChanged": 0
+          }
+        }
+      },
+      "displayed": [
+        {
+          "key": "kakao:3001",
+          "dish": null,
+          "taste": 0.5048387096774193,
+          "satisfaction": 0.5,
+          "repetition": {
+            "place": 0,
+            "cuisine": 0
+          }
+        },
+        {
+          "key": "kakao:1001",
+          "dish": null,
+          "taste": 0.5,
+          "satisfaction": 0.5,
+          "repetition": {
+            "place": 0,
+            "cuisine": 0
+          }
+        },
+        {
+          "key": "kakao:1002",
+          "dish": "초밥",
+          "taste": 0.5,
+          "satisfaction": 0.5,
+          "repetition": {
+            "place": 0,
+            "cuisine": 0
+          }
+        },
+        {
+          "key": "kakao:1003",
+          "dish": null,
+          "taste": 0.5,
+          "satisfaction": 0.5,
+          "repetition": {
+            "place": 0,
+            "cuisine": 0
+          }
+        },
+        {
+          "key": "kakao:1004",
+          "dish": null,
+          "taste": 0.5,
+          "satisfaction": 0.5,
+          "repetition": {
+            "place": 0,
+            "cuisine": 0
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "happy-regular",
+      "comparisons": [
+        {
+          "name": "distance-only",
+          "keys": [
+            "kakao:1000",
+            "kakao:1001",
+            "kakao:4001",
+            "kakao:1002",
+            "kakao:1003"
+          ],
+          "distance": {
+            "n": 5,
+            "mean": 206.2,
+            "p50": 200,
+            "p90": 276.8,
+            "max": 280
+          },
+          "diversity": 0.8638205220207393,
+          "cuisines": {
+            "한식": 2,
+            "중식": 1,
+            "일식": 1,
+            "양식": 1
+          },
+          "meanTaste": 0.5434375
+        },
+        {
+          "name": "distance-wishlist",
+          "keys": [
+            "kakao:1000",
+            "kakao:1001",
+            "kakao:4001",
+            "kakao:1002",
+            "kakao:1003"
+          ],
+          "distance": {
+            "n": 5,
+            "mean": 206.2,
+            "p50": 200,
+            "p90": 276.8,
+            "max": 280
+          },
+          "diversity": 0.8638205220207393,
+          "cuisines": {
+            "한식": 2,
+            "중식": 1,
+            "일식": 1,
+            "양식": 1
+          },
+          "meanTaste": 0.5434375
+        },
+        {
+          "name": "hybrid-v4.0",
+          "keys": [
+            "kakao:1000",
+            "kakao:1001",
+            "kakao:1002",
+            "kakao:1003",
+            "kakao:1006"
+          ],
+          "distance": {
+            "n": 5,
+            "mean": 258,
+            "p50": 272,
+            "p90": 387.40000000000003,
+            "max": 459
+          },
+          "diversity": 0.916051899059749,
+          "cuisines": {
+            "한식": 1,
+            "중식": 1,
+            "일식": 1,
+            "양식": 1,
+            "고기": 1
+          },
+          "meanTaste": 0.5434374999999999
+        },
+        {
+          "name": "archived-v3",
+          "keys": [
+            "kakao:1001",
+            "kakao:1002",
+            "kakao:1000",
+            "kakao:1003",
+            "kakao:1004"
+          ],
+          "distance": {
+            "n": 5,
+            "mean": 236,
+            "p50": 272,
+            "p90": 321.4,
+            "max": 349
+          },
+          "diversity": 0.9434742933304003,
+          "cuisines": {
+            "중식": 1,
+            "일식": 1,
+            "한식": 1,
+            "양식": 1,
+            "분식": 1
+          },
+          "meanTaste": 0.52171875
+        }
+      ],
+      "featureInfluence": {
+        "components": {
+          "taste": {
+            "mean": 0.5568824404761905,
+            "sd": 0.054235278979036884,
+            "share": 0.1598681435611425
+          },
+          "distance": {
+            "mean": 0.6318852506030231,
+            "sd": 0.2549709095793451,
+            "share": 0.4175400909997381
+          },
+          "wish": {
+            "mean": 0,
+            "sd": 0,
+            "share": 0
+          },
+          "favorite": {
+            "mean": 0.5180512853018775,
+            "sd": 0.08072780203248184,
+            "share": 0.09253983406861296
+          },
+          "community": {
+            "mean": 0.5,
+            "sd": 0,
+            "share": 5.681562647391631e-17
+          },
+          "meal": {
+            "mean": 0.5,
+            "sd": 0,
+            "share": 1.4203906618479077e-16
+          },
+          "novelty": {
+            "mean": 0.6878306878306879,
+            "sd": 0.31167569259308237,
+            "share": 0.10207995669970678
+          },
+          "context": {
+            "mean": 0.5,
+            "sd": 0,
+            "share": 0
+          },
+          "repetition": {
+            "mean": 0.012771965322294358,
+            "sd": 0.027842223055150717,
+            "share": 0.22797197467079955
+          }
+        },
+        "groups": {
+          "personalFit": {
+            "mean": 0.020477678571428584,
+            "min": 0,
+            "max": 0.03909375000000002
+          },
+          "desirability": {
+            "mean": 0.002527179942262851,
+            "min": 0,
+            "max": 0.053070778787519875
+          },
+          "practicality": {
+            "mean": 0.12637705012060468,
+            "min": 0.05475630544150833,
+            "max": 0.2
+          },
+          "discovery": {
+            "mean": 0.01474126219093316,
+            "min": -0.11886252653386387,
+            "max": 0.04
+          }
+        },
+        "ablations": {
+          "taste": {
+            "replaced": 1,
+            "positionsChanged": 5
+          },
+          "distance": {
+            "replaced": 4,
+            "positionsChanged": 5
+          },
+          "wish": {
+            "replaced": 0,
+            "positionsChanged": 0
+          },
+          "favorite": {
+            "replaced": 0,
+            "positionsChanged": 0
+          },
+          "community": {
+            "replaced": 0,
+            "positionsChanged": 0
+          },
+          "meal": {
+            "replaced": 0,
+            "positionsChanged": 0
+          },
+          "novelty": {
+            "replaced": 1,
+            "positionsChanged": 1
+          },
+          "context": {
+            "replaced": 0,
+            "positionsChanged": 0
+          },
+          "repetition": {
+            "replaced": 1,
+            "positionsChanged": 5
+          }
+        }
+      },
+      "displayed": [
+        {
+          "key": "kakao:1000",
+          "dish": null,
+          "taste": 0.60859375,
+          "satisfaction": 0.5,
+          "repetition": {
+            "place": 0,
+            "cuisine": 0.037337186308579406
+          }
+        },
+        {
+          "key": "kakao:1001",
+          "dish": null,
+          "taste": 0.5,
+          "satisfaction": 0.5,
+          "repetition": {
+            "place": 0,
+            "cuisine": 0
+          }
+        },
+        {
+          "key": "kakao:1002",
+          "dish": "초밥",
+          "taste": 0.5,
+          "satisfaction": 0.5,
+          "repetition": {
+            "place": 0,
+            "cuisine": 0
+          }
+        },
+        {
+          "key": "kakao:1003",
+          "dish": null,
+          "taste": 0.5,
+          "satisfaction": 0.5,
+          "repetition": {
+            "place": 0,
+            "cuisine": 0
+          }
+        },
+        {
+          "key": "kakao:1006",
+          "dish": "구이",
+          "taste": 0.60859375,
+          "satisfaction": 0.5,
+          "repetition": {
+            "place": 0,
+            "cuisine": 0
+          }
+        }
+      ]
+    }
+  ]
+}

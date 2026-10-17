@@ -4,7 +4,7 @@ import { recCategoryOf, type RecCategory } from "../recommend";
 /**
  * 카카오 category_name(「음식점 > 한식 > 해장국」) → 추천 필터 종류 · 세부 종류 · 대상 여부.
  * 「지금 뭐 먹지」는 식사 자리만 — 술집 · 간식(제과 · 아이스크림) · 카페는 뺍니다.
- * 세부 종류(sub)는 MMR 유사도에만 씁니다. 모르는 종류는 null — 맛 점수에서 중립값을 받습니다.
+ * Cuisine and dish are separate from the legacy filter category. Unknown attributes stay null.
  */
 export type CategoryInfo = {
   recCat: RecCategory | null;
@@ -12,7 +12,34 @@ export type CategoryInfo = {
   base: string | null;
   sub: string | null;
   eligible: boolean;
+  cuisine?: string | null;
+  dish?: string | null;
 };
+
+// Conservative dictionary shared by diary/menu text and provider metadata. No inferred ingredients.
+const DISH: [string, RegExp][] = [
+  ["초밥", /초밥|스시|스시롤/], ["라멘", /라멘|일본식라면/],
+  ["돈까스", /돈까스|돈가스|돈카츠|톤카츠/], ["쌀국수", /쌀국수/],
+  ["파스타", /파스타|스파게티/], ["피자", /피자/], ["햄버거", /햄버거|수제버거/],
+  ["국밥·탕", /국밥|해장국|설렁탕|곰탕|감자탕|찌개|전골|삼계탕|갈비탕/],
+  ["구이", /삼겹|목살|갈비구이|숯불|육류,고기|고기구이/],
+  ["면", /냉면|국수|우동|소바|라면/], ["만두", /만두/],
+  ["카레", /카레|커리/], ["치킨", /치킨/],
+];
+
+export function dishOf(text: string | null | undefined) {
+  if (!text) return null;
+  let matches = DISH.filter(([, re]) => re.test(text)).map(([dish]) => dish);
+  // Specific noodle types also match the generic noodle expression.
+  if (matches.some((dish) => ["라멘", "쌀국수", "파스타"].includes(dish))) matches = matches.filter((dish) => dish !== "면");
+  return matches.length === 1 ? matches[0] : null;
+}
+
+/** Multiple known dishes on one diary record do not imply one restaurant specialty. */
+export function recordedDish(name: string | null | undefined, menus: string[] = []) {
+  const dishes = [...new Set(menus.map(dishOf).filter((d): d is string => !!d))];
+  return dishes.length ? (dishes.length === 1 ? dishes[0] : null) : dishOf(name);
+}
 
 const NOT_A_MEAL = /^(술집|간식|카페|제과|아이스크림|디저트)/;
 
@@ -36,13 +63,13 @@ export function kakaoCategory(categoryName: string | null | undefined, name?: st
   const byName = recCategoryOf(null, name);
   const recCat = fine ?? byName ?? coarse ?? null;
   const base = coarse && (CATEGORIES.restaurant as string[]).includes(coarse) ? coarse : null;
-  return { recCat, base, sub: sub ?? top ?? null, eligible: true };
+  return { recCat, base, sub: sub ?? top ?? null, eligible: true, cuisine: base, dish: dishOf(parts.slice(2).join(" ")) ?? dishOf(name) };
 }
 
 /** 기록 · 위시의 종류(한식 · 카페 계열 …) → CategoryInfo. 카페 계열은 대상이 아닙니다. */
-export function recordCategory(category: string | null | undefined, name?: string | null, kind?: string): CategoryInfo {
+export function recordCategory(category: string | null | undefined, name?: string | null, kind?: string, menus: string[] = []): CategoryInfo {
   if (kind === "cafe" || CATEGORIES.cafe.includes(category ?? "")) return { recCat: null, base: null, sub: null, eligible: false };
   const recCat = recCategoryOf(category, name);
   const base = (CATEGORIES.restaurant as string[]).includes(category ?? "") ? category! : null;
-  return { recCat, base, sub: null, eligible: true };
+  return { recCat, base, sub: null, eligible: true, cuisine: base, dish: recordedDish(name, menus) };
 }

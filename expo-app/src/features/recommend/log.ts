@@ -1,6 +1,8 @@
 import { getState, setState } from "@/data/store";
 import { metersBetweenLL, norm } from "@/lib/geo";
 import { REC_CONFIG } from "@/lib/rec/config";
+import { createDeliveryCache } from "@/lib/rec/delivery";
+import { featureSnapshot, storedLogRank } from "@/lib/rec/snapshot";
 import type { RecResult } from "@/lib/rec/pipeline";
 import { supabase } from "@/lib/supabase";
 
@@ -28,25 +30,13 @@ export const uuid = () =>
     return (ch === "x" ? r : (r & 0x3) | 0x8).toString(16);
   });
 
-const persisted = new Map<string, Promise<boolean>>();
-const sent = new Set<string>();
+const persisted = createDeliveryCache();
+const impressions = createDeliveryCache();
 const warn = (what: string, msg: string) => { if (__DEV__) console.warn(`추천 로그(${what}) 저장 안 됨:`, msg); };
-
-/** 피처 스냅숏 — 숫자만, 소수 넷째 자리. */
-const snap = (s: RecResult["ranked"][number]) => {
-  const r4 = (n: number) => Math.round(n * 1e4) / 1e4;
-  return {
-    x: Object.fromEntries(Object.entries(s.x).map(([k, v]) => [k, r4(v)])),
-    rep: { place: r4(s.repetition.place), cuisine: r4(s.repetition.cuisine) },
-    visits: s.c.visits.length, wish: !!s.c.wish, community_users: s.c.stat?.users ?? null,
-  };
-};
 
 /** 세션 + 후보 줄 — 한 번만. */
 function persist(s: RecSession): Promise<boolean> {
-  const done = persisted.get(s.id);
-  if (done) return done;
-  const job = (async () => {
+  return persisted.run(s.id, async () => {
     const { data } = await supabase.auth.getSession();
     if (!data.session) return false;
     const r = s.result;
@@ -56,21 +46,21 @@ function persist(s: RecSession): Promise<boolean> {
         slot: r.ctx.slot, dow: r.ctx.dow, date: r.ctx.today, radius: r.radius, relax: r.relax.kind, cycled: r.cycled,
         filter: r.ctx.filter, couple: r.ctx.couple, weather: r.ctx.weather ? { precip: r.ctx.weather.precip, tempC: r.ctx.weather.tempC } : null,
         pool: r.diagnostics.pool, eligible: r.diagnostics.eligible, sources: r.diagnostics.bySource, ...s.meta,
+        ranking: r.diagnostics.ranking, baselines: r.diagnostics.baselines, policy: r.policy,
       },
     });
-    if (error) { warn("session", error.message); return false; }
+    // Append-only tables: retry a partially delivered session without requiring UPDATE permission.
+    if (error && error.code !== "23505") { warn("session", error.message); return false; }
     const shown = new Map(r.picks.map((p, i) => [p.c.key, i + 1]));
     const items = r.ranked.map((it, i) => ({
-      session_id: s.id, candidate_key: it.c.key.slice(0, 300), position: shown.get(it.c.key) ?? null, rank: i + 1,
+      session_id: s.id, candidate_key: it.c.key.slice(0, 300), position: shown.get(it.c.key) ?? null, rank: storedLogRank(it.baseRank ?? i + 1),
       kakao_id: it.c.kakaoId, rec_category: it.c.cat.recCat, distance_m: Math.min(50000, Math.round(it.c.distance)),
-      score: it.score, features: snap(it), sources: it.c.sources,
+      score: it.score, features: featureSnapshot(it), sources: it.c.sources,
     }));
     const { error: e2 } = await supabase.from("rec_items").insert(items);
-    if (e2) warn("items", e2.message);
+    if (e2 && e2.code !== "23505") { warn("items", e2.message); return false; }
     return true;
-  })().catch((e) => { warn("session", String(e)); return false; });
-  persisted.set(s.id, job);
-  return job;
+  });
 }
 
 /** 이벤트 하나. impression 은 세션 · 가게마다 한 번만. */
@@ -79,17 +69,22 @@ export async function logRec(
   type: RecEvent,
   opts: { key?: string; position?: number; recordId?: number; wishId?: string; payload?: Record<string, unknown> } = {},
 ) {
-  const dedupe = type === "impression" ? `${s.id}|${opts.key}` : null;
-  if (dedupe) { if (sent.has(dedupe)) return; sent.add(dedupe); }
-  const ok = "result" in s ? await persist(s) : await (persisted.get(s.id) ?? Promise.resolve(true));
-  if (!ok) return;
-  const { data } = await supabase.auth.getSession();
-  if (!data.session) return;
-  const { error } = await supabase.from("rec_events").insert({
-    session_id: s.id, user_id: data.session.user.id, candidate_key: opts.key?.slice(0, 300) ?? null, position: opts.position ?? null,
-    event_type: type, record_id: opts.recordId ?? null, wish_id: opts.wishId ?? null, payload: opts.payload ?? {},
-  });
-  if (error) warn(type, error.message);
+  const send = async () => {
+    try {
+      const ok = "result" in s ? await persist(s) : await (persisted.get(s.id) ?? Promise.resolve(true));
+      if (!ok) return false;
+      const { data } = await supabase.auth.getSession();
+      if (!data.session) return false;
+      const { error } = await supabase.from("rec_events").insert({
+        session_id: s.id, user_id: data.session.user.id, candidate_key: opts.key?.slice(0, 300) ?? null, position: opts.position ?? null,
+        event_type: type, record_id: opts.recordId ?? null, wish_id: opts.wishId ?? null, payload: opts.payload ?? {},
+      });
+      if (error) warn(type, error.message);
+      return !error;
+    } catch (error) { warn(type, String(error)); return false; }
+  };
+  if (type === "impression") await impressions.run(`${s.id}|${opts.key}`, send);
+  else await send();
 }
 
 /** 화면에 보인 카드를 기억해 둡니다 — 나중에 그 가게를 인증하면 이 세션과 잇습니다(visit_confirmed). */

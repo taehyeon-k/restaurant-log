@@ -9,7 +9,8 @@
     "android": "expo run:android",
     "typecheck": "tsc --noEmit",
     "lint": "expo lint",
-    "test": "tsc -p tsconfig.test.json && node node_modules/.cache/rec-test/lib/rec/__tests__/rec.test.js"
+    "test": "tsc -p tsconfig.test.json && node node_modules/.cache/rec-test/lib/rec/__tests__/all-tests.js",
+    "eval:rec": "tsc -p tsconfig.test.json && node node_modules/.cache/rec-test/lib/rec/__tests__/benchmark.js"
   },
   "dependencies": {
     "@expo-google-fonts/gowun-batang": "^0.4.1",
