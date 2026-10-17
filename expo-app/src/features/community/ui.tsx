@@ -2,6 +2,7 @@ import { useNavigation, useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
 import { Pressable, ScrollView, Text, View, type ViewStyle } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import Svg, { Path } from "react-native-svg";
 import { LABELS } from "@/lib/labels";
 import { C, F } from "@/theme";
 import { SignedImage } from "@/lib/signedPhoto";
@@ -31,17 +32,29 @@ export function useExitCommunity() {
   };
 }
 
-/** 머리 — 왼쪽 알약(기본 「‹ 내 기록」), 오른쪽은 화면마다. 위 안전 영역 아래에 놓입니다. */
+/** 머리 — 왼쪽 알약(화살표 + 기본 「내 기록」), 오른쪽은 화면마다. 위 안전 영역 아래에 놓입니다. */
 export function CommunityHeader({ back, right }: { back?: { label: string; onPress: () => void }; right?: React.ReactNode }) {
   const insets = useSafeAreaInsets();
   const exit = useExitCommunity();
   return (
     <View style={{ paddingTop: insets.top + 8, paddingHorizontal: 20, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-      <Pill label={back?.label ?? "‹ 내 기록"} onPress={back?.onPress ?? exit} accessibilityLabel={back ? undefined : "내 기록으로 돌아가기"} />
+      <Pill onPress={back?.onPress ?? exit} accessibilityLabel={back ? back.label : "내 기록으로 돌아가기"}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
+          <BackArrow />
+          <Text style={{ fontFamily: F.sans, fontSize: 11.5, color: K.text2 }}>{back?.label ?? "내 기록"}</Text>
+        </View>
+      </Pill>
       <View style={{ flexDirection: "row", gap: 6 }}>{right}</View>
     </View>
   );
 }
+
+/** 알약 앞 ‹ — 글자와 비슷한 크기로 보이게 13px SVG. */
+const BackArrow = () => (
+  <Svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke={K.text2} strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M15 5l-7 7 7 7" />
+  </Svg>
+);
 
 export const Pill = ({ label, onPress, children, accessibilityLabel }: { label?: string; onPress?: () => void; children?: React.ReactNode; accessibilityLabel?: string }) => (
   <Pressable

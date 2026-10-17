@@ -60,7 +60,7 @@ export default function RankingDetail() {
 
   return (
     <View style={{ flex: 1, backgroundColor: C.paper }}>
-      <CommunityHeader back={{ label: "‹ 랭킹", onPress: () => router.back() }} right={<MiniSegment value={scope} options={SCOPES} onChange={setScope} />} />
+      <CommunityHeader back={{ label: "랭킹", onPress: () => router.back() }} right={<MiniSegment value={scope} options={SCOPES} onChange={setScope} />} />
       <FlatList
         data={shown}
         keyExtractor={(r) => r.user_id}

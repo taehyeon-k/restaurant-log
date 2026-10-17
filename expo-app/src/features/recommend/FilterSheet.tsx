@@ -7,7 +7,7 @@ import { C, F } from "@/theme";
 import { REC } from "./ui";
 
 /**
- * 필터 시트(§5-2) — 먹고 싶은 것 · 빼고 싶은 것. 한 종류는 둘 중 한쪽에만. 거리는 고르지 않고 가까운 곳 위주로 고릅니다.
+ * 필터 시트(§5-2) — 포함 · 제외. 한 종류는 둘 중 한쪽에만. 거리는 고르지 않고 가까운 곳 위주로 고릅니다.
  * 「초기화」는 기본값(조건 없음)으로 되돌립니다. 최근 먹은 종류는 여기서 빼지 않고 순위만 살짝 내립니다(lib/rec/score.ts).
  */
 export function FilterSheet({
@@ -62,8 +62,8 @@ export function FilterSheet({
         </Pressable>
       </View>
 
-      {section("inc", "먹고 싶은 것", "고르면 이 종류만 찾아요")}
-      {section("exc", "빼고 싶은 것", "고른 종류는 늘 빼요")}
+      {section("inc", "포함", "고르면 이 종류만 찾아요")}
+      {section("exc", "제외", "고른 종류는 늘 빼요")}
 
       <Pressable
         onPress={() => onApply(draft)}

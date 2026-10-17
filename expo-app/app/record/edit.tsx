@@ -345,7 +345,7 @@ export default function EditRoute() {
           )}
         </View>
         <View style={{ marginTop: 14 }}>
-          <Eyebrow>자리</Eyebrow>
+          <Eyebrow>위치</Eyebrow>
           <TextInput
             value={address}
             onChangeText={(t) => { setAddress(t); if (spot) setSpot(null); }}
@@ -354,7 +354,7 @@ export default function EditRoute() {
         </View>
 
         <View style={{ marginTop: 14 }}>
-          <Eyebrow>방문</Eyebrow>
+          <Eyebrow>방문일</Eyebrow>
           {isVerified ? (
             <>
               <View style={[s.verifiedBox]}>
@@ -389,7 +389,7 @@ export default function EditRoute() {
         </View>
 
         <View style={{ marginTop: 18, gap: 9 }}>
-          <Eyebrow>종류</Eyebrow>
+          <Eyebrow>카테고리</Eyebrow>
           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
             {categories.map((c) => <Chip key={c} label={c} active={category === c} onPress={() => setCategory((v) => (v === c ? "" : c))} />)}
           </View>
@@ -443,7 +443,7 @@ export default function EditRoute() {
         </View>
 
         <View style={{ marginTop: 18, gap: 7 }}>
-          <Eyebrow>메뉴</Eyebrow>
+          <Eyebrow>메뉴명</Eyebrow>
           {menus.map((m, i) => (
             <View key={i} style={{ flexDirection: "row", alignItems: "stretch", gap: 6 }}>
               <TextInput value={m.name} onChangeText={(t) => setMenuAt(i, { name: t })} placeholder="먹은 것" placeholderTextColor="#b3ada1" style={[fieldStyle, s.menuField, { flex: 1 }]} />
@@ -456,7 +456,7 @@ export default function EditRoute() {
                     onPress={() => voteMenu(i, v)}
                     accessibilityRole="button"
                     accessibilityState={{ selected: on }}
-                    accessibilityLabel={v === 1 ? "좋았어요" : "별로였어요"}
+                    accessibilityLabel={v === 1 ? "좋았어요" : "아쉬웠어요"}
                     style={[s.vote, on && { backgroundColor: onColor, borderColor: onColor }]}
                   >
                     <ThumbIcon size={19} strokeWidth={1.7} stroke={on ? C.card : "#a29a8c"} down={v === -1} />

@@ -84,7 +84,7 @@ export default function PeopleScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: C.paper }}>
-      <CommunityHeader back={{ label: "‹ 친구", onPress: () => (router.canGoBack() ? router.back() : router.navigate("/community/friends")) }} />
+      <CommunityHeader back={{ label: "친구", onPress: () => (router.canGoBack() ? router.back() : router.navigate("/community/friends")) }} />
       <ScrollView contentContainerStyle={{ paddingBottom: TAB_BAR_H + insets.bottom + 32 }} keyboardShouldPersistTaps="handled">
         <TitleBlock eyebrow="COMMUNITY · FRIENDS" title="친구 추가" sub="카카오 친구 불러오기 · 닉네임 검색 · 초대 링크" />
         <View style={{ paddingHorizontal: 20 }}>

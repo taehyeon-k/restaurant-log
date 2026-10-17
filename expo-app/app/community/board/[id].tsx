@@ -48,7 +48,7 @@ export default function BoardPostScreen() {
     ]);
   }
 
-  const header = <CommunityHeader back={{ label: "‹ 게시판", onPress: back }} right={<Pill label="신고" onPress={menu} />} />;
+  const header = <CommunityHeader back={{ label: "게시판", onPress: back }} right={<Pill label="신고" onPress={menu} />} />;
 
   if (!post) {
     return <View style={{ flex: 1, backgroundColor: C.paper }}>{header}</View>;
