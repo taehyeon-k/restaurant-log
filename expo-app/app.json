@@ -4,6 +4,13 @@
     "slug": "dinary",
     "scheme": "dinary",
     "version": "0.1.0",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/4030deb1-49b3-4d9e-a9d5-6ccc97c8a4fa",
+      "fallbackToCacheTimeout": 0
+    },
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
