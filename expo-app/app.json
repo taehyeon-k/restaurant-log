@@ -100,10 +100,10 @@
           "androidIntentFilters": [
             "text/*"
           ],
-          "iosAppGroupIdentifier": "group.app.dinary",
-          "iosShareExtensionName": "DINARY"
+          "iosAppGroupIdentifier": "group.app.dinary"
         }
       ],
+      "./plugins/withShareExtensionDisplayName",
       "./plugins/withNaverMaven"
     ],
     "experiments": {
