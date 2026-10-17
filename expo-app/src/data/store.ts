@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from "react";
 import type { RecFilter } from "@/lib/recommend";
+import type { SourceKind } from "@/lib/sourceLink";
 import type { Kind } from "@/lib/types";
 
 /**
@@ -15,9 +16,15 @@ export type CommunityTab = "friends" | "recs" | "ranking" | "board";
 
 /** 위시 자리 고르기 화면(wish/spot)이 돌려주는 값 — 폼이 읽고 비웁니다. */
 export type SpotPick = { lat: number; lng: number; found?: { name: string; address: string } } | null;
+/** 링크로 담기(wish/link)를 위시 폼에서 열었을 때 고른 가게 + 출처 — 폼이 읽고 비웁니다. */
+export type LinkPick = {
+  name: string; address: string; category: string | null; lat: number; lng: number; url: string; kind: SourceKind;
+} | null;
 
 type State = {
-  kind: Kind; markerFilter: MarkerFilter; ghost: Ghost; spotPick: SpotPick;
+  kind: Kind; markerFilter: MarkerFilter; ghost: Ghost; spotPick: SpotPick; linkPick: LinkPick;
+  /** 로그인 전에 공유 시트로 받은 링크 — 로그인이 끝나면 wish/link 로 이어갑니다. */
+  pendingShare: { url: string; kind: SourceKind } | null;
   mapSegment: MapSegment; communityTab: CommunityTab;
   /** 이번에 커뮤니티에 들어오기 직전의 last_seen_community_at — 친구 줄의 「새 기록」 테두리 기준. */
   communitySeenSince: string | null;
@@ -41,7 +48,7 @@ export type RecShown = { sessionId: string; key: string; position: number; name:
 export type RecCourse = { id: string; date: string; places: { placeKey: string; name: string }[] };
 export type RecHere = { lat: number; lng: number; name: string | null; fallback: boolean };
 let state: State = {
-  kind: "restaurant", markerFilter: "all", ghost: null, spotPick: null,
+  kind: "restaurant", markerFilter: "all", ghost: null, spotPick: null, linkPick: null, pendingShare: null,
   mapSegment: "records", communityTab: "friends", communitySeenSince: null,
   recFilter: null, recHeading: null, recCourse: null, recHere: null, recPlace: null, recAt: null, recShown: [],
 };

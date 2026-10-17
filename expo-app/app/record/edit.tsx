@@ -6,7 +6,7 @@ import {
   ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { VerifiedMark } from "@/components/icons";
+import { ThumbIcon, VerifiedMark } from "@/components/icons";
 import { Chip, Eyebrow, fieldStyle } from "@/components/ui";
 import { useActiveBook, useSaveNote } from "@/data/books";
 import { refreshAll } from "@/data/invalidate";
@@ -40,8 +40,6 @@ function parsePhotos(raw?: string): string[] {
     return [];
   }
 }
-
-const menuDigits = (v: string) => v.replace(/[^0-9]/g, "").slice(0, 9);
 
 /**
  * 기록 작성 폼 — 새 기록·기록 고치기가 같은 화면입니다.
@@ -78,9 +76,9 @@ export default function EditRoute() {
   const [priceLevel, setPriceLevel] = useState(record?.price_level ?? 0);
   const [revisit, setRevisit] = useState(record?.revisit ?? p.revisit === "1");
   const [menus, setMenus] = useState<MenuItem[]>(() => {
-    if (record?.menus?.length) return record.menus;
+    if (record?.menus?.length) return record.menus.map((m) => ({ name: m.name, vote: m.vote ?? null }));
     const names = (record?.menu ?? "").split(",").map((s) => s.trim()).filter(Boolean);
-    return names.length ? names.map((n) => ({ name: n, price: null })) : [{ name: "", price: null }];
+    return names.length ? names.map((n) => ({ name: n, vote: null })) : [{ name: "", vote: null }];
   });
   const [review, setReview] = useState(record?.review ?? "");
   const [keywords, setKeywords] = useState<string[]>(record?.keywords ?? []);
@@ -125,9 +123,8 @@ export default function EditRoute() {
   }
 
   const setMenuAt = (i: number, patch: Partial<MenuItem>) => setMenus((l) => l.map((m, n) => (n === i ? { ...m, ...patch } : m)));
-  const menuTotal = menus.reduce((sum, m) => sum + (m.price ?? 0), 0);
-  const namedMenus = menus.filter((m) => m.name.trim() || m.price);
-  const menuTotalLabel = namedMenus.length ? `${namedMenus.length}개 · ${menuTotal.toLocaleString("ko-KR")}원` : "";
+  // 같은 단추를 다시 누르면 꺼지고, 한쪽을 켜면 다른 쪽은 꺼집니다.
+  const voteMenu = (i: number, v: 1 | -1) => setMenus((l) => l.map((m, n) => (n === i ? { ...m, vote: m.vote === v ? null : v } : m)));
 
   const missing = !name.trim() ? "가게 이름을 적어주세요" : !rating ? "별점을 매겨주세요" : "";
   const canSave = !missing;
@@ -186,9 +183,8 @@ export default function EditRoute() {
         address: cleanAddress || null,
         rating: rating || null,
         menu: menus.map((m) => m.name.trim()).filter(Boolean).join(", ") || null,
-        menus: menus.filter((m) => m.name.trim()).map((m) => ({ name: m.name.trim(), price: m.price })),
+        menus: menus.filter((m) => m.name.trim()).map((m) => ({ name: m.name.trim(), vote: m.vote ?? null })),
         price_level: priceLevel || null,
-        price_range: menuTotal || null,
         review: review.trim() || null,
         revisit,
         ...(isVerified ? {} : { visited_at: visitedAt || null }),
@@ -444,22 +440,26 @@ export default function EditRoute() {
         </View>
 
         <View style={{ marginTop: 18, gap: 7 }}>
-          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "baseline" }}>
-            <Eyebrow>메뉴</Eyebrow>
-            <Text style={{ fontFamily: F.mono, fontSize: 11, color: C.faint }}>{menuTotalLabel}</Text>
-          </View>
+          <Eyebrow>메뉴</Eyebrow>
           {menus.map((m, i) => (
             <View key={i} style={{ flexDirection: "row", alignItems: "stretch", gap: 6 }}>
               <TextInput value={m.name} onChangeText={(t) => setMenuAt(i, { name: t })} placeholder="먹은 것" placeholderTextColor="#b3ada1" style={[fieldStyle, s.menuField, { flex: 1 }]} />
-              <View style={{ width: 96, justifyContent: "center" }}>
-                <TextInput
-                  value={m.price == null ? "" : m.price.toLocaleString("ko-KR")}
-                  onChangeText={(t) => { const raw = menuDigits(t); setMenuAt(i, { price: raw ? Number(raw) : null }); }}
-                  keyboardType="number-pad" placeholder="0" placeholderTextColor="#b3ada1"
-                  style={[fieldStyle, s.menuField, { flex: 1, paddingVertical: 0, paddingLeft: 11, paddingRight: 26, textAlign: "right", fontFamily: F.mono, fontSize: 13 }]}
-                />
-                <Text pointerEvents="none" style={{ position: "absolute", right: 11, fontFamily: F.sans, fontSize: 12, color: "#a29a8c" }}>원</Text>
-              </View>
+              {([1, -1] as const).map((v) => {
+                const on = m.vote === v;
+                const onColor = v === 1 ? C.brick : C.ink;
+                return (
+                  <Pressable
+                    key={v}
+                    onPress={() => voteMenu(i, v)}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: on }}
+                    accessibilityLabel={v === 1 ? "좋았어요" : "별로였어요"}
+                    style={[s.vote, on && { backgroundColor: onColor, borderColor: onColor }]}
+                  >
+                    <ThumbIcon size={19} strokeWidth={1.7} stroke={on ? C.card : "#a29a8c"} down={v === -1} />
+                  </Pressable>
+                );
+              })}
               {menus.length > 1 && (
                 <Pressable onPress={() => setMenus((l) => l.filter((_, n) => n !== i))} accessibilityLabel="이 메뉴 지우기" style={{ width: 34, alignItems: "center", justifyContent: "center" }}>
                   <Text style={{ fontSize: 15, color: "#a29a8c" }}>✕</Text>
@@ -467,7 +467,7 @@ export default function EditRoute() {
               )}
             </View>
           ))}
-          <Pressable onPress={() => setMenus((l) => [...l, { name: "", price: null }])} style={{ minHeight: 44, borderRadius: 14, borderWidth: 1, borderStyle: "dashed", borderColor: "#cdc6b8", alignItems: "center", justifyContent: "center" }}>
+          <Pressable onPress={() => setMenus((l) => [...l, { name: "", vote: null }])} style={{ minHeight: 44, borderRadius: 14, borderWidth: 1, borderStyle: "dashed", borderColor: "#cdc6b8", alignItems: "center", justifyContent: "center" }}>
             <Text style={{ fontFamily: F.sans, fontSize: 13, color: C.muted }}>+ 메뉴 추가</Text>
           </Pressable>
         </View>
@@ -518,6 +518,7 @@ const s = StyleSheet.create({
   suggestRow: { paddingHorizontal: 14, paddingVertical: 10, gap: 2, borderBottomWidth: 1, borderBottomColor: C.line },
   // 메뉴 이름·가격 칸은 글꼴이 달라 제 키가 어긋납니다 — 줄을 stretch 로 두어 가격 칸을 이름 칸 키에 맞춥니다.
   menuField: { marginTop: 0, minHeight: 46, borderRadius: 14, textAlignVertical: "center" },
+  vote: { width: 46, height: 46, borderRadius: 14, borderWidth: 1, borderColor: "#ded8cb", backgroundColor: C.card, alignItems: "center", justifyContent: "center" },
   starBase: { fontSize: 27, lineHeight: 34, width: 34, textAlign: "center", color: "#dcd6ca" },
   revisitBox: {
     marginTop: 20, flexDirection: "row", alignItems: "center", gap: 14, borderRadius: 18, borderWidth: 1,

@@ -17,7 +17,7 @@ export function buildShareText(r: Restaurant, opt: ShareOptions): string {
 
   const menus = r.menus
     .filter((m) => m.name.trim())
-    .map((m) => (m.price != null ? `${m.name.trim()} ${m.price.toLocaleString("ko-KR")}원` : m.name.trim()));
+    .map((m) => `${m.vote === 1 ? "👍 " : m.vote === -1 ? "👎 " : ""}${m.name.trim()}`);
   if (menus.length) blocks.push(["먹은 것", ...menus]);
   else if (r.menu?.trim()) blocks.push(["먹은 것", r.menu.trim()]);
 

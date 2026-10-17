@@ -204,3 +204,27 @@ export const SparkIcon = ({ size = 21, stroke = "#000", strokeWidth = 1.6 }: P) 
     <Path d="M18.4 15.6l.7 1.9 1.9.7-1.9.7-.7 1.9-.7-1.9-1.9-.7 1.9-.7z" />
   </Svg>
 );
+
+/** 링크 붙여넣기 — 사슬 두 고리. */
+export const LinkIcon = ({ size = 20, stroke = "#b4552d", strokeWidth = 1.8 }: P) => (
+  <Svg {...base(size, stroke, strokeWidth)}>
+    <Path d="M10 13.5a4.2 4.2 0 0 0 6 .3l3-3a4.2 4.2 0 0 0-6-6l-1.6 1.6" />
+    <Path d="M14 10.5a4.2 4.2 0 0 0-6-.3l-3 3a4.2 4.2 0 0 0 6 6l1.6-1.6" />
+  </Svg>
+);
+
+/** 메뉴 👍 — down 이면 180° 돌린 👎. */
+export const ThumbIcon = ({ size = 19, stroke = "#a29a8c", strokeWidth = 1.7, down = false }: P & { down?: boolean }) => (
+  <Svg {...base(size, stroke, strokeWidth)} style={down ? { transform: [{ rotate: "180deg" }] } : undefined}>
+    <Path d="M7 10.5v9.5H4.2a1.2 1.2 0 0 1-1.2-1.2v-7.1a1.2 1.2 0 0 1 1.2-1.2H7z" />
+    <Path d="M7 10.5l3.6-6.6a1.9 1.9 0 0 1 3.5 1.3l-.7 3.8h5.2a2 2 0 0 1 2 2.4l-1.3 6.9a2.3 2.3 0 0 1-2.3 1.9H7" />
+  </Svg>
+);
+
+/** 바깥으로 열기 ↗ — 상자 모서리 화살표. */
+export const ExternalIcon = ({ size = 13, stroke = "#4d4842", strokeWidth = 1.7 }: P) => (
+  <Svg {...base(size, stroke, strokeWidth)}>
+    <Path d="M14 4h6v6M20 4l-9 9" />
+    <Path d="M18 14v4.5a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 4 18.5v-11A1.5 1.5 0 0 1 5.5 6H10" />
+  </Svg>
+);

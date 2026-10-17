@@ -64,20 +64,22 @@ export const fieldStyle = {
 } as const;
 
 export const Button = ({
-  label, onPress, kind = "dark", disabled, style,
-}: { label: string; onPress: () => void; kind?: "dark" | "brick" | "line"; disabled?: boolean; style?: ViewStyle }) => (
+  label, onPress, kind = "dark", disabled, style, icon,
+}: { label: string; onPress: () => void; kind?: "dark" | "brick" | "line"; disabled?: boolean; style?: ViewStyle; icon?: React.ReactNode }) => (
   <Pressable
     onPress={onPress}
     disabled={disabled}
     style={[
       {
         minHeight: 50, borderRadius: 18, alignItems: "center", justifyContent: "center", paddingHorizontal: 16,
+        flexDirection: "row", gap: 7,
         backgroundColor: kind === "dark" ? C.ink : kind === "brick" ? C.brick : "transparent",
         borderWidth: kind === "line" ? 1 : 0, borderColor: "#ded8cb", opacity: disabled ? 0.5 : 1,
       },
       style,
     ]}
   >
+    {icon}
     <Text style={{ fontFamily: F.sansMd, fontSize: 13.5, color: kind === "line" ? C.ink : C.card }}>{label}</Text>
   </Pressable>
 );

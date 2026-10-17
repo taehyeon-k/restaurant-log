@@ -6,6 +6,7 @@ import type { Session } from "@supabase/supabase-js";
 import { useFonts } from "expo-font";
 import * as Notifications from "expo-notifications";
 import { Stack, useRouter, useSegments } from "expo-router";
+import { useShareIntent } from "expo-share-intent";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
@@ -13,10 +14,12 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { useAccount } from "@/data/profile";
 import { useWishes } from "@/data/queries";
+import { setState, useAppState } from "@/data/store";
 import CommunityTransition from "@/features/community/Transition";
 import { startQueueTriggers } from "@/features/queue/process";
 // 이 import 가 백그라운드 지오펜스 태스크를 정의합니다 — 반드시 앱 진입점에서 불러야 합니다.
 import { syncWishGeofences } from "@/features/notify/geofence";
+import { parseSourceLink } from "@/lib/sourceLink";
 import { supabase } from "@/lib/supabase";
 import { C } from "@/theme";
 
@@ -80,6 +83,22 @@ function Gate({ fontsLoaded }: { fontsLoaded: boolean }) {
     if (ready && session && wishId) router.push({ pathname: "/capture", params: { verifyWishId: wishId } });
   }, [last, ready, session, router]);
 
+  // 공유 시트(릴스 · 쇼츠 …)로 받은 링크 — 링크면 담아두고, 로그인 · 닉네임까지 끝난 뒤 「어느 가게인가요」로 보냅니다.
+  const { hasShareIntent, shareIntent, resetShareIntent } = useShareIntent();
+  const { pendingShare } = useAppState();
+  useEffect(() => {
+    if (!hasShareIntent) return;
+    const link = parseSourceLink(`${shareIntent.webUrl ?? ""} ${shareIntent.text ?? ""}`);
+    resetShareIntent();
+    if (link) setState({ pendingShare: link });
+  }, [hasShareIntent, shareIntent, resetShareIntent]);
+  const signedIn = ready && !!session && !!account?.nickname && first !== "login" && first !== "welcome" && first !== "auth";
+  useEffect(() => {
+    if (!signedIn || !pendingShare) return;
+    setState({ pendingShare: null });
+    router.push({ pathname: "/wish/link", params: { url: pendingShare.url, kind: pendingShare.kind } });
+  }, [signedIn, pendingShare, router]);
+
   if (!ready) return null;
 
   return (
@@ -91,6 +110,7 @@ function Gate({ fontsLoaded }: { fontsLoaded: boolean }) {
       <Stack.Screen name="capture" options={{ presentation: "fullScreenModal", animation: "slide_from_bottom", gestureEnabled: false }} />
       <Stack.Screen name="record/edit" options={{ presentation: "modal" }} />
       <Stack.Screen name="wish/new" options={{ presentation: "modal" }} />
+      <Stack.Screen name="wish/link" options={{ presentation: "modal" }} />
       <Stack.Screen name="wish/spot" options={{ presentation: "fullScreenModal" }} />
       <Stack.Screen name="wish/[id]" options={{ presentation: "transparentModal", animation: "fade", contentStyle: { backgroundColor: "transparent" } }} />
       <Stack.Screen name="couple/new" options={{ presentation: "modal" }} />

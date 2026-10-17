@@ -1,10 +1,13 @@
 import DateTimePicker from "@react-native-community/datetimepicker";
+import * as Clipboard from "expo-clipboard";
+import * as Haptics from "expo-haptics";
 import { useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { logRec } from "@/features/recommend/log";
 import { useEffect, useRef, useState } from "react";
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Switch, Text, TextInput, View } from "react-native";
+import { Animated, KeyboardAvoidingView, Platform, Pressable, ScrollView, Switch, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { LinkIcon } from "@/components/icons";
 import { Button, Chip, Eyebrow, fieldStyle } from "@/components/ui";
 import { refreshAll } from "@/data/invalidate";
 import { useActiveBook } from "@/data/books";
@@ -12,6 +15,7 @@ import { useWishes } from "@/data/queries";
 import { setState, useAppState } from "@/data/store";
 import { askWishPermissions } from "@/features/notify/geofence";
 import { forwardGeocode, searchFoodPlaces, type FoodPlace, type Place } from "@/lib/geocode";
+import { isSourceKind, parseSourceLink, shortUrl, SOURCE_LABEL, sourceGlyph, type SourceKind } from "@/lib/sourceLink";
 import { supabase } from "@/lib/supabase";
 import { ALL_CATEGORIES, matchWish } from "@/lib/types";
 import { C, F, SHADOW } from "@/theme";
@@ -25,13 +29,15 @@ export default function WishForm() {
     id?: string; name?: string; where_text?: string; category?: string; lat?: string; lng?: string; plan_date?: string;
     /** 추천 카드의 「+ 위시에 담기」에서 왔으면 — 저장이 끝난 순간에만 wish_saved 로그(폼을 연 것은 wish_start). */
     rec_session?: string; rec_key?: string; rec_pos?: string;
+    /** 링크로 담기(wish/link)에서 고른 가게면 — 출처 띠로 받습니다. */
+    source_url?: string; source_kind?: string;
   }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const qc = useQueryClient();
   const { data: wishes = [] } = useWishes();
   const { id: bookId } = useActiveBook();
-  const { spotPick } = useAppState();
+  const { spotPick, linkPick } = useAppState();
 
   const wish = p.id ? wishes.find((w) => w.id === p.id) ?? null : null;
   const isNew = !p.id;
@@ -45,6 +51,9 @@ export default function WishForm() {
   const [notify, setNotify] = useState(wish?.notify ?? false);
   const [spot, setSpot] = useState<{ lat: number; lng: number } | null>(
     wish?.lat != null && wish?.lng != null ? { lat: wish.lat, lng: wish.lng } : p.lat && p.lng ? { lat: Number(p.lat), lng: Number(p.lng) } : null
+  );
+  const [source, setSource] = useState<{ url: string; kind: SourceKind } | null>(
+    isNew && p.source_url ? { url: p.source_url, kind: isSourceKind(p.source_kind) ? p.source_kind : "link" } : null
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -103,6 +112,29 @@ export default function WishForm() {
     setState({ spotPick: null });
   }, [spotPick]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // 「링크 붙여넣기」 — 누를 때만 클립보드를 읽습니다(앱이 켜질 때 자동으로 읽지 않음: iOS 붙여넣기 알림).
+  const shake = useRef(new Animated.Value(0)).current;
+  async function pasteLink() {
+    const link = parseSourceLink(await Clipboard.getStringAsync().catch(() => ""));
+    if (link) return router.push({ pathname: "/wish/link", params: { url: link.url, kind: link.kind, from: "form" } });
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    Animated.sequence(
+      [6, -6, 4, -4, 0].map((x) => Animated.timing(shake, { toValue: x, duration: 55, useNativeDriver: true }))
+    ).start();
+  }
+
+  // 폼에서 연 「어느 가게인가요」(wish/link)가 돌려준 가게와 출처.
+  useEffect(() => {
+    if (!linkPick) return;
+    skipSearch.current = true;
+    setName(linkPick.name);
+    setWhereText(linkPick.address);
+    setSpot({ lat: linkPick.lat, lng: linkPick.lng });
+    if (linkPick.category && ALL_CATEGORIES.includes(linkPick.category)) setCategory(linkPick.category);
+    setSource({ url: linkPick.url, kind: linkPick.kind });
+    setState({ linkPick: null });
+  }, [linkPick]);
+
   const missing = !name.trim() ? "가게 이름을 적어주세요" : "";
 
   async function save() {
@@ -115,6 +147,11 @@ export default function WishForm() {
     if (isNew) {
       const dup = matchWish(wishes, cleanName);
       if (dup) {
+        // 그 위시에 출처가 비어 있으면 이번 링크로 채웁니다.
+        if (source && !dup.source_url) {
+          await supabase.from("wishes").update({ source_url: source.url, source_kind: source.kind }).eq("id", dup.id);
+          await refreshAll(qc);
+        }
         setSaving(false);
         return router.replace({ pathname: "/wish/[id]", params: { id: dup.id } });
       }
@@ -123,6 +160,7 @@ export default function WishForm() {
     const payload = {
       name: cleanName, where_text: whereText.trim() || null, category: category || null, note: note.trim() || null,
       plan_date: planDate || null, notify, lat: spot?.lat ?? null, lng: spot?.lng ?? null,
+      ...(isNew ? { source_url: source?.url ?? null, source_kind: source?.kind ?? null } : {}),
     };
     let err;
     if (isNew) {
@@ -162,6 +200,32 @@ export default function WishForm() {
         </View>
 
         <View style={{ marginTop: 11, gap: 11 }}>
+          {isNew && !source && (
+            <Animated.View style={{ transform: [{ translateX: shake }] }}>
+              <Pressable
+                onPress={pasteLink}
+                accessibilityLabel="링크 붙여넣기"
+                style={{ height: 56, borderRadius: 16, borderWidth: 1.5, borderStyle: "dashed", borderColor: "#c9a593", backgroundColor: C.card, paddingHorizontal: 16, flexDirection: "row", alignItems: "center", gap: 10 }}
+              >
+                <LinkIcon size={20} stroke={C.brick} strokeWidth={1.8} />
+                <Text style={{ flex: 1, fontFamily: F.sansMd, fontSize: 13.5, color: C.ink }}>링크 붙여넣기</Text>
+                <Text style={{ fontFamily: F.mono, fontSize: 10.5, color: C.faint }}>릴스 · 쇼츠</Text>
+              </Pressable>
+            </Animated.View>
+          )}
+          {isNew && source && (
+            <View style={{ borderRadius: 14, borderWidth: 1, borderColor: "#e0c3b1", backgroundColor: "#f9efe8", paddingVertical: 10, paddingHorizontal: 14, flexDirection: "row", alignItems: "center", gap: 10 }}>
+              <View style={{ width: 26, height: 26, borderRadius: 8, backgroundColor: C.ink, alignItems: "center", justifyContent: "center" }}>
+                <Text style={{ fontFamily: F.sansMd, fontSize: sourceGlyph(source.kind) === "▶" ? 10 : 11, color: "#fff" }}>{sourceGlyph(source.kind)}</Text>
+              </View>
+              <Text numberOfLines={1} style={{ flex: 1, fontFamily: F.sans, fontSize: 12, color: "#8f4323" }}>
+                {SOURCE_LABEL[source.kind]}에서 담음 · {shortUrl(source.url)}
+              </Text>
+              <Pressable onPress={() => setSource(null)} accessibilityLabel="출처 지우기" hitSlop={10}>
+                <Text style={{ fontSize: 11, color: "#a29a8c" }}>✕</Text>
+              </Pressable>
+            </View>
+          )}
           <View>
             <Eyebrow>가게</Eyebrow>
             <TextInput
@@ -229,10 +293,10 @@ export default function WishForm() {
           </View>
 
           <View>
-            <Eyebrow>가고 싶은 이유, 어디서 봤는지</Eyebrow>
+            <Eyebrow>어떤 장소인가요?</Eyebrow>
             <TextInput
               value={note} onChangeText={setNote} multiline numberOfLines={6} textAlignVertical="top"
-              placeholder="마음껏 적어두세요. 링크를 붙여두면 카드에서 바로 열립니다." placeholderTextColor="#b3ada1"
+              placeholder="마음껏 적어두세요." placeholderTextColor="#b3ada1"
               style={[fieldStyle, { borderRadius: 14, minHeight: 150, paddingTop: 12, fontFamily: F.serif, fontSize: 14, lineHeight: 25 }]}
             />
           </View>
@@ -263,10 +327,7 @@ export default function WishForm() {
           </View>
 
           <View style={{ flexDirection: "row", alignItems: "center", gap: 14, borderRadius: 18, borderWidth: 1, borderColor: "#e2c9bb", backgroundColor: "#f9f0e9", paddingHorizontal: 16, paddingVertical: 14 }}>
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontFamily: F.sansMd, fontSize: 13.5, color: C.ink }}>근처를 지나면 알려주기</Text>
-              <Text style={{ marginTop: 4, fontFamily: F.sans, fontSize: 11.5, lineHeight: 18, color: C.muted }}>이 가게에만 걸리는 알림입니다.</Text>
-            </View>
+            <Text style={{ flex: 1, fontFamily: F.sansMd, fontSize: 13.5, color: C.ink }}>근처를 지나면 알려주기</Text>
             <Switch value={notify} onValueChange={setNotify} trackColor={{ true: C.brick, false: "#d8d3c8" }} thumbColor={C.card} />
           </View>
         </View>

@@ -1,6 +1,9 @@
+import type { SourceKind } from "./sourceLink";
+
 export type Kind = "restaurant" | "cafe";
 export type Sort = "recent" | "rating" | "price";
-export type MenuItem = { name: string; price: number | null };
+/** 먹은 것 한 줄 — vote 는 👍(1) · 👎(-1) · 없음. price 는 옛 기록 읽기용으로만 남깁니다(쓰지 않음). */
+export type MenuItem = { name: string; vote: 1 | -1 | null; price?: number | null };
 
 export type Restaurant = {
   id: number;
@@ -44,7 +47,7 @@ export type Restaurant = {
   /** 사진만 찍고 본문을 아직 쓰지 않은 기록 — 보관함에만 보입니다 */
   pending: boolean;
   /** 위시에서 온 기록임을 남기는 자취. 위시가 아니었으면 null. */
-  from_wish: { saved_at: string; days: number; planned: boolean } | null;
+  from_wish: { saved_at: string; days: number; planned: boolean; source_kind?: SourceKind | null } | null;
 };
 
 /** 가고싶다(위시) — 아직 가지 않은 곳. restaurants 와 달리 인증·별점·사진이 없습니다. */
@@ -62,6 +65,9 @@ export type Wish = {
   lng: number | null;
   saved_at: string;
   created_at: string;
+  /** 링크로 담은 위시의 원본(릴스 · 쇼츠 …). 옛 위시는 메모의 URL 만 있습니다. */
+  source_url?: string | null;
+  source_kind?: SourceKind | null;
 };
 
 export const CATEGORIES: Record<Kind, string[]> = {
@@ -224,7 +230,7 @@ export const wishMetInfo = (wish: Wish, visitedAt: string) => {
     0,
     Math.round((new Date(visitedAt).getTime() - new Date(savedDate).getTime()) / 86400000)
   );
-  return { saved_at: savedDate, days, planned: !!wish.plan_date };
+  return { saved_at: savedDate, days, planned: !!wish.plan_date, source_kind: wish.source_kind ?? null };
 };
 
 /** 그 기록의 대표사진 주소. 없으면 null. */

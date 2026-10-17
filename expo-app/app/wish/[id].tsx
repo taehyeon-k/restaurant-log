@@ -4,12 +4,13 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
 import { Alert, Pressable, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { BellIcon, BookmarkIcon } from "@/components/icons";
+import { BellIcon, BookmarkIcon, CameraIcon, ExternalIcon } from "@/components/icons";
 import { Button } from "@/components/ui";
 import { refreshAll } from "@/data/invalidate";
 import { useWishes } from "@/data/queries";
 import { setState } from "@/data/store";
 import { supabase } from "@/lib/supabase";
+import { SOURCE_LABEL } from "@/lib/sourceLink";
 import { dottedDate, wishKind } from "@/lib/types";
 import { firstUrl, noteWithoutUrl } from "@/lib/wishes";
 import { C, F, SHADOW } from "@/theme";
@@ -26,8 +27,11 @@ export default function WishSheetRoute() {
 
   if (!wish) return <Pressable style={{ flex: 1 }} onPress={() => router.back()} />;
 
-  const url = firstUrl(wish.note);
-  const body = noteWithoutUrl(wish.note, url);
+  const noteUrl = firstUrl(wish.note);
+  const url = wish.source_url ?? noteUrl;
+  const body = noteWithoutUrl(wish.note, noteUrl);
+  // 출처 종류를 아는 위시만 태그 — 메모 URL 만 있는 옛 위시는 태그 없이 「원본 보기」.
+  const sourceLabel = wish.source_url && wish.source_kind ? SOURCE_LABEL[wish.source_kind] : null;
 
   async function toggleNotify() {
     setBusy(true);
@@ -53,6 +57,11 @@ export default function WishSheetRoute() {
         </View>
         <Text style={{ marginTop: 6, fontFamily: F.serif, fontSize: 22, color: C.ink }}>{wish.name}</Text>
         <Text style={{ marginTop: 4, fontFamily: F.sans, fontSize: 11.5, color: C.faint }}>{[wish.category, wish.where_text].filter(Boolean).join(" · ")}</Text>
+        {sourceLabel && (
+          <Text style={{ marginTop: 10, alignSelf: "flex-start", borderRadius: 9, backgroundColor: "#efebe2", paddingHorizontal: 10, paddingVertical: 4, fontFamily: F.mono, fontSize: 10.5, color: "#4d4842", overflow: "hidden" }}>
+            {sourceLabel}에서 담음 · {wish.saved_at.slice(5, 10).replace("-", ".")}
+          </Text>
+        )}
         {wish.plan_date && (
           <Text style={{ marginTop: 10, alignSelf: "flex-start", borderRadius: 9, borderWidth: 1, borderColor: "#e0c3b1", backgroundColor: "#f9f0e9", paddingHorizontal: 10, paddingVertical: 4, fontFamily: F.mono, fontSize: 10.5, color: C.brick, overflow: "hidden" }}>
             {dottedDate(wish.plan_date)} 갈 예정
@@ -62,7 +71,8 @@ export default function WishSheetRoute() {
 
         <View style={{ marginTop: 16, flexDirection: "row", alignItems: "center", gap: 8 }}>
           <Button
-            label="여기 왔어요 · 사진 찍기"
+            label="여기 왔어요"
+            icon={<CameraIcon size={18} stroke={C.card} />}
             onPress={() => { setState({ kind: wishKind(wish) }); router.replace({ pathname: "/capture", params: { verifyWishId: wish.id, kind: wishKind(wish) } }); }}
             style={{ flex: 1, borderRadius: 18 }}
           />
@@ -70,8 +80,9 @@ export default function WishSheetRoute() {
             <BellIcon size={16} stroke={wish.notify ? C.brick : C.muted} />
           </Pressable>
           {url && (
-            <Pressable onPress={() => Linking.openURL(url)} accessibilityLabel="출처 열기" style={{ width: 44, height: 44, borderRadius: 22, borderWidth: 1, borderColor: C.line, backgroundColor: C.card, alignItems: "center", justifyContent: "center" }}>
-              <Text style={{ fontSize: 16, color: C.muted }}>↗</Text>
+            <Pressable onPress={() => Linking.openURL(url)} accessibilityLabel="출처 열기" style={{ height: 44, borderRadius: 22, borderWidth: 1, borderColor: C.line, backgroundColor: C.card, paddingHorizontal: 13, flexDirection: "row", alignItems: "center", gap: 5 }}>
+              <Text style={{ fontFamily: F.sans, fontSize: 12, color: "#4d4842" }}>{sourceLabel ? `${sourceLabel}에서 보기` : "원본 보기"}</Text>
+              <ExternalIcon size={13} stroke="#4d4842" />
             </Pressable>
           )}
         </View>

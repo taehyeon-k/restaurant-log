@@ -89,6 +89,20 @@
           }
         }
       ],
+      [
+        "expo-share-intent",
+        {
+          "iosActivationRules": {
+            "NSExtensionActivationSupportsWebURLWithMaxCount": 1,
+            "NSExtensionActivationSupportsText": true
+          },
+          "androidIntentFilters": [
+            "text/*"
+          ],
+          "iosAppGroupIdentifier": "group.app.dinary",
+          "iosShareExtensionName": "DINARY"
+        }
+      ],
       "./plugins/withNaverMaven"
     ],
     "experiments": {

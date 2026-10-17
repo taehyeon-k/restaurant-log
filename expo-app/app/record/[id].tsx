@@ -3,7 +3,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Alert, Dimensions, Image, Modal, Platform, Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { BookmarkIcon, ShareIcon, VerifiedMark } from "@/components/icons";
+import { BookmarkIcon, ShareIcon, ThumbIcon, VerifiedMark } from "@/components/icons";
 import { ShareSheet } from "@/components/ShareSheet";
 import { BackButton, BottomSheetModal, Button, Eyebrow, MobileStars, PhotoBox, Pigs } from "@/components/ui";
 import { copyToPersonal, PARTNER_COLOR, setActiveBook, useActiveBook, useAnniversaryPicks, useRecordNotes, type BookMember } from "@/data/books";
@@ -16,6 +16,7 @@ import { iGa } from "@/lib/josa";
 import { MAX_PHOTOS, pickAlbumUris, removePhotoObjects, uploadAlbumPhoto } from "@/lib/photos";
 import { photosOf, verifiedShotOf } from "@/lib/record";
 import { supabase } from "@/lib/supabase";
+import { SOURCE_LABEL } from "@/lib/sourceLink";
 import { dottedDate, verifiedDateTime, verifiedTime, type Restaurant } from "@/lib/types";
 import { C, F } from "@/theme";
 import { SignedImage } from "@/lib/signedPhoto";
@@ -360,9 +361,10 @@ export default function RecordRoute() {
               {record.menus.some((m) => m.name.trim()) ? (
                 <View style={{ gap: 5 }}>
                   {record.menus.filter((m) => m.name.trim()).map((m, i) => (
-                    <View key={i} style={{ flexDirection: "row", justifyContent: "space-between", gap: 12 }}>
+                    <View key={i} style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                      {m.vote === 1 && <ThumbIcon size={13} stroke={C.brick} />}
+                      {m.vote === -1 && <ThumbIcon size={13} stroke={C.faint} down />}
                       <Text style={{ fontFamily: F.sans, fontSize: 13.5, color: C.ink }}>{m.name}</Text>
-                      {m.price != null && <Text style={{ fontFamily: F.mono, fontSize: 12.5, color: C.muted }}>{m.price.toLocaleString("ko-KR")}원</Text>}
                     </View>
                   ))}
                 </View>
@@ -406,7 +408,11 @@ export default function RecordRoute() {
                 <Text style={{ fontFamily: F.mono, fontSize: 9.5, letterSpacing: 1.8, color: C.brick }}>WISH MET</Text>
               </View>
               <Text style={{ marginTop: 8, fontFamily: F.serif, fontSize: 14, lineHeight: 25, color: "#2e2a25" }}>
-                {record.from_wish.days === 0
+                {record.from_wish.source_kind
+                  ? record.from_wish.days === 0
+                    ? `${SOURCE_LABEL[record.from_wish.source_kind]}에서 보고 바로 다녀오셨네요.`
+                    : `${SOURCE_LABEL[record.from_wish.source_kind]}에서 본 지 ${record.from_wish.days}일 만에 다녀오셨네요.`
+                  : record.from_wish.days === 0
                   ? `${dottedDate(record.from_wish.saved_at)}에 담아두고 바로 다녀오셨네요.`
                   : `${dottedDate(record.from_wish.saved_at)}에 담아둔 곳입니다. ${record.from_wish.days}일 만에 드디어 다녀오셨네요.`}
               </Text>
