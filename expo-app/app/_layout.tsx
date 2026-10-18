@@ -99,7 +99,7 @@ function Gate({ fontsLoaded }: { fontsLoaded: boolean }) {
   const bootStatus = bootState({ elapsed, ready: ready && bootCurrent, resolved: booksResolved,
     offline: net.isConnected === false || net.isInternetReachable === false, fetching: books.isFetching, error: books.isError });
   useEffect(() => { if (first === "capture") setCaptureEscape(true); else if (first !== "record") setCaptureEscape(false); }, [first]);
-  const showBoot = (!bootCurrent || !boot.hidden) && first !== "capture" && !(captureEscape && first === "record" && segments[1] === "edit");
+  const showBoot = (!bootCurrent || !boot.hidden) && first !== "capture" && !(captureEscape && first === "record" && (segments as string[])[1] === "edit");
 
   // 로그인 · 닉네임(첫 로그인) 분기 — 웹의 proxy.ts / auth/callback 이 하던 일.
   useEffect(() => {
