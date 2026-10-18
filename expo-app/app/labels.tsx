@@ -38,7 +38,8 @@ export default function Labels() {
   const stories = labels.filter((l) => l.group === "story");
   const seen = useSeenLabels(account?.userId, labels.filter((l) => l.earned).map((l) => l.id), isSuccess);
   const title = labels.find((l) => l.id === titleId && l.earned) ?? null;
-  const districts = regionTitles(rows).filter((t) => t.tier);
+  // 인증 기록이 한 건이라도 있는 구는 모두 — 칭호를 받기 전이면 회색으로 다음 칭호까지 보여 줍니다.
+  const districts = regionTitles(rows);
 
   const open = (l: EarnedLabel) => {
     if (!l.earned) return;
@@ -154,15 +155,22 @@ export default function Labels() {
           })}
         </View>
 
-        <SectionHead title="동네 칭호" right={`${districts.length}`} />
+        <SectionHead title="동네 칭호" right={`${districts.filter((t) => t.tier).length}`} />
         {districts.length > 0 ? (
           <View style={{ marginTop: 10, flexDirection: "row", flexWrap: "wrap", gap: 7 }}>
-            {districts.map((t) => (
-              <View key={t.region} style={{ flexDirection: "row", alignItems: "center", gap: 5, borderRadius: 13, borderWidth: 1, borderColor: `${t.tier!.color}66`, backgroundColor: `${t.tier!.color}1a`, paddingHorizontal: 11, paddingVertical: 5 }}>
-                <Text style={{ fontFamily: F.sans, fontSize: 11.5, color: t.tier!.color }}>{t.region} {t.tier!.suffix}</Text>
-                <Text style={{ fontFamily: F.mono, fontSize: 9, color: t.tier!.color }}>{"★★★".slice(0, t.tier!.stars)}</Text>
-              </View>
-            ))}
+            {districts.map((t) =>
+              t.tier ? (
+                <View key={t.region} style={{ flexDirection: "row", alignItems: "center", gap: 5, borderRadius: 13, borderWidth: 1, borderColor: `${t.tier.color}66`, backgroundColor: `${t.tier.color}1a`, paddingHorizontal: 11, paddingVertical: 5 }}>
+                  <Text style={{ fontFamily: F.sans, fontSize: 11.5, color: t.tier.color }}>{t.region} {t.tier.suffix}</Text>
+                  <Text style={{ fontFamily: F.mono, fontSize: 9, color: t.tier.color }}>{"★★★".slice(0, t.tier.stars)}</Text>
+                </View>
+              ) : (
+                <View key={t.region} accessibilityLabel={`${t.region} ${t.next!.suffix} · 아직 ${t.have} / ${t.next!.need}`} style={{ flexDirection: "row", alignItems: "center", gap: 6, borderRadius: 13, borderWidth: 1, borderStyle: "dashed", borderColor: "#d6cfc2", backgroundColor: "#f3efe6", paddingHorizontal: 11, paddingVertical: 5 }}>
+                  <Text style={{ fontFamily: F.sans, fontSize: 11.5, color: C.faint }}>{t.region} {t.next!.suffix}</Text>
+                  <Text style={{ fontFamily: F.mono, fontSize: 9.5, color: "#bdb4a3" }}>{t.have} / {t.next!.need}</Text>
+                </View>
+              )
+            )}
           </View>
         ) : (
           <Text style={{ marginTop: 10, fontFamily: F.sans, fontSize: 12, color: C.faint }}>한 구에서 인증 기록 10건이면 첫 칭호를 받아요</Text>
