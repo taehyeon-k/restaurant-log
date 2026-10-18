@@ -75,7 +75,7 @@ export type Wish = {
 };
 
 export const CATEGORIES: Record<Kind, string[]> = {
-  restaurant: ["양식", "한식", "일식", "중식", "아시안", "분식"],
+  restaurant: ["양식", "한식", "일식", "중식", "아시안", "분식", "패스트푸드", "술집"],
   cafe: ["커피", "디저트", "베이커리", "차"],
 };
 
@@ -155,6 +155,8 @@ export const CATEGORY_COLORS: Record<string, string> = {
   양식: "#7a6a9a",
   아시안: "#6f8455",
   분식: "#c07a2e",
+  패스트푸드: "#8f7a3a",
+  술집: "#3f4f6a",
   커피: "#7a5c42",
   디저트: "#b06a86",
   베이커리: "#a8853f",

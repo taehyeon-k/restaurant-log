@@ -30,6 +30,19 @@ describe("v4 evidence and hierarchical taste", () => {
     assert.equal(recordCategory("일식", "일반식당", "restaurant", ["초밥 + 라멘 세트"]).dish, null);
   });
 
+  it("maps Kakao fast food and bars onto the new diary categories", () => {
+    const burger = kakaoCategory("음식점 > 패스트푸드 > 맥도날드");
+    assert.equal(burger.base, "패스트푸드");
+    assert.equal(burger.eligible, true);
+    assert.equal(kakaoCategory("음식점 > 치킨 > 교촌치킨").base, "패스트푸드");
+    const fastFood = recordCategory("패스트푸드", "버거집");
+    assert.equal(fastFood.recCat, null);
+    assert.equal(fastFood.base, "패스트푸드");
+    const bar = recordCategory("술집", "동네호프");
+    assert.equal(bar.recCat, null);
+    assert.equal(bar.eligible, false);
+  });
+
   it("distinguishes liked sushi from disliked ramen with cuisine fallback for unknown dishes", () => {
     const p = profile([
       ...["A", "B", "C"].map((id) => row({ name: `스시${id}`, category: "일식", rating: 5 })),

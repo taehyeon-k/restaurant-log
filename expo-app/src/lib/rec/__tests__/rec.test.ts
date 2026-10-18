@@ -165,6 +165,7 @@ describe("강한 조건 · 후보 정리", () => {
     assert.equal(kakaoCategory("음식점 > 술집 > 호프,요리주점").eligible, false);
     assert.equal(kakaoCategory("음식점 > 간식 > 제과,베이커리").eligible, false);
     assert.equal(kakaoCategory("음식점 > 카페").eligible, false);
+    assert.equal(kakaoCategory("음식점 > 술집 > 일본식주점").base, "술집");
     assert.equal(kakaoCategory("음식점 > 한식 > 해장국").recCat, "국밥·탕");
     assert.equal(kakaoCategory("음식점 > 일식 > 일본식라면").recCat, "면");
     const r = recommend(input({ kakao: [kakao("1", "호프", "술집", 100), kakao("2", "빵집", "간식", 120), kakao("3", "밥집", "한식", 300)] }));

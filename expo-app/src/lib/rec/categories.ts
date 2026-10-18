@@ -47,6 +47,9 @@ const TOP: Record<string, RecCategory> = {
   한식: "한식", 중식: "중식", 일식: "일식", 양식: "양식", 분식: "분식", 아시아음식: "아시안", 패밀리레스토랑: "양식",
 };
 
+/** 카카오 상위 분류 중 추천 종류는 없지만 기록 · 위시 어휘(CATEGORIES.restaurant)에 있는 것. */
+const KAKAO_BASE: Record<string, string> = { 패스트푸드: "패스트푸드", 치킨: "패스트푸드", 술집: "술집" };
+
 const SUB: [RecCategory, RegExp][] = [
   ["고기", /육류|고기|족발|보쌈|곱창|막창|오리|갈비|삼겹|양꼬치/],
   ["국밥·탕", /해장국|국밥|설렁탕|곰탕|감자탕|찌개|전골|삼계탕|추어|순대/],
@@ -57,12 +60,12 @@ export function kakaoCategory(categoryName: string | null | undefined, name?: st
   const parts = (categoryName ?? "").split(">").map((s) => s.trim()).filter(Boolean);
   const [, top, sub] = parts;
   if (parts[0] && parts[0] !== "음식점") return { recCat: null, base: null, sub: null, eligible: false };
-  if (top && NOT_A_MEAL.test(top)) return { recCat: null, base: null, sub: sub ?? top, eligible: false };
+  if (top && NOT_A_MEAL.test(top)) return { recCat: null, base: KAKAO_BASE[top] ?? null, sub: sub ?? top, eligible: false };
   const fine = sub ? SUB.find(([, re]) => re.test(sub))?.[0] : undefined;
   const coarse = top ? TOP[top] : undefined;
   const byName = recCategoryOf(null, name);
   const recCat = fine ?? byName ?? coarse ?? null;
-  const base = coarse && (CATEGORIES.restaurant as string[]).includes(coarse) ? coarse : null;
+  const base = coarse && (CATEGORIES.restaurant as string[]).includes(coarse) ? coarse : (top && KAKAO_BASE[top]) || null;
   return { recCat, base, sub: sub ?? top ?? null, eligible: true, cuisine: base, dish: dishOf(parts.slice(2).join(" ")) ?? dishOf(name) };
 }
 
@@ -71,5 +74,6 @@ export function recordCategory(category: string | null | undefined, name?: strin
   if (kind === "cafe" || CATEGORIES.cafe.includes(category ?? "")) return { recCat: null, base: null, sub: null, eligible: false };
   const recCat = recCategoryOf(category, name);
   const base = (CATEGORIES.restaurant as string[]).includes(category ?? "") ? category! : null;
-  return { recCat, base, sub: null, eligible: true, cuisine: base, dish: recordedDish(name, menus) };
+  // 「지금 뭐 먹지」는 식사 자리만 — 카카오 술집과 같이 기록 · 위시의 술집도 뺍니다.
+  return { recCat, base, sub: null, eligible: category !== "술집", cuisine: base, dish: recordedDish(name, menus) };
 }
