@@ -506,8 +506,17 @@ export default function MapTab() {
         mapPadding={{ top: insets.top + 62, bottom: MAP_PAD_BOTTOM, left: 20, right: 20 }}
         logoAlign="TopLeft"
         logoMargin={{ top: 20, left: 6, right: 0, bottom: 0 }}
-        onCameraChanged={(e) => { if (e.reason === "Gesture") setMapMoved(true); }}
-        onTapMap={(e) => onMapTap(e.latitude, e.longitude)}
+        onCameraChanged={(e) => {
+          if (e.reason !== "Gesture") return;
+          setMapMoved(true);
+          // 핀 요약 카드는 지도를 밀자마자 내립니다 — 같은 값을 돌려주면 다시 그리지 않습니다.
+          setFoundHit((h) => (h?.fromPin ? null : h));
+        }}
+        onTapMap={(e) => {
+          // 핀 요약 카드가 떠 있으면 지도를 누른 건 닫기만 — 그 자리 가게 시트는 열지 않습니다.
+          if (foundHit?.fromPin) return setFoundHit(null);
+          onMapTap(e.latitude, e.longitude);
+        }}
         onCameraIdle={(e) => {
           regionRef.current = { s: e.region.latitude, w: e.region.longitude, n: e.region.latitude + e.region.latitudeDelta, e: e.region.longitude + e.region.longitudeDelta };
           if (e.zoom != null) setZoom(e.zoom);
@@ -519,9 +528,8 @@ export default function MapTab() {
             rating={p.rating} active={false} planned={!!matchWish(wishes, p.name)} showLabel={showLabel(`r:${p.key}`)} badge={placeTag(p)}
             onTap={() => {
               Haptics.selectionAsync();
-              // 이름표가 안 보일 만큼 멀리서 누르면 위시 핀처럼 시트로 이름 · 별점부터 보여 줍니다.
-              if (showLabel(`r:${p.key}`)) openPlace(p);
-              else setFoundHit({ restaurant: p.latest, place: p, fromPin: true });
+              // 이름표가 보이든 안 보이든 요약 카드(이름 · 별점)부터 — 「지난 기록 보기」로 기록 화면에 들어갑니다.
+              setFoundHit({ restaurant: p.latest, place: p, fromPin: true });
             }}
           />
         ))}

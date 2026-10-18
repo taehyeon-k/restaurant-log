@@ -1,10 +1,11 @@
 import { Text, View } from "react-native";
+import Animated, { SlideInDown, SlideOutDown } from "react-native-reanimated";
 import { BookmarkIcon } from "@/components/icons";
 import { BottomSheetModal, Button, Chip, Eyebrow, PhotoBox } from "@/components/ui";
 import { dottedDate, type Kind, type Restaurant } from "@/lib/types";
 import type { Place } from "@/lib/places";
 import { Pressable } from "react-native";
-import { C, F } from "@/theme";
+import { C, F, SHADOW } from "@/theme";
 
 /** 「골라 보기」 시트. */
 export function FilterSheet(p: {
@@ -50,14 +51,12 @@ export function FilterSheet(p: {
   );
 }
 
-/** 지도 검색에서 이미 있는 가게를 찾았을 때, 또는 이름표가 안 보이는 기록 핀을 눌렀을 때의 작은 시트. */
+/** 지도 검색에서 이미 있는 가게를 찾았을 때, 또는 기록 핀을 눌렀을 때의 작은 시트. */
 export function FoundSheet(p: {
   hit: { restaurant: Restaurant; place: Place; fromPin?: boolean } | null; onClose: () => void; onRevisit: () => void; onWish: () => void; onOpen: () => void;
 }) {
   const r = p.hit?.restaurant;
-  return (
-    <BottomSheetModal visible={!!p.hit} onClose={p.onClose}>
-      {r && p.hit && (
+  const body = r && p.hit && (
         <>
           {!p.hit.fromPin && <Eyebrow wide>찾았습니다</Eyebrow>}
           <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 12 }}>
@@ -80,7 +79,23 @@ export function FoundSheet(p: {
             <Button kind="line" label="지난 기록 보기" onPress={p.onOpen} style={{ minHeight: 48, borderRadius: 16, borderColor: "#e4dfd3" }} />
           </View>
         </>
-      )}
+  );
+  // 핀에서 연 요약은 모달이 아닌 카드 — 화면을 덮지 않고 제 높이만큼만 올라오며, 지도는 그대로 만질 수 있습니다.
+  // 지도를 밀거나 누르면 바로 내려갑니다(index 의 onCameraChanged · onTapMap).
+  if (p.hit?.fromPin) {
+    return (
+      <Animated.View
+        entering={SlideInDown.duration(200)}
+        exiting={SlideOutDown.duration(140)}
+        style={[{ position: "absolute", left: 0, right: 0, bottom: 0, backgroundColor: C.paper, borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 20, paddingTop: 18, paddingBottom: 20 }, SHADOW.sheet]}
+      >
+        {body}
+      </Animated.View>
+    );
+  }
+  return (
+    <BottomSheetModal visible={!!p.hit} onClose={p.onClose}>
+      {body}
     </BottomSheetModal>
   );
 }
