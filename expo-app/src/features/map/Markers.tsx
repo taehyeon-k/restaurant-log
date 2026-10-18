@@ -1,7 +1,7 @@
 import { NaverMapMarkerOverlay } from "@mj-studio/react-native-naver-map";
 import { memo, useEffect, useState, type ReactNode } from "react";
-import { Platform, Text, View } from "react-native";
-import Svg, { Path } from "react-native-svg";
+import { Platform, View } from "react-native";
+import Svg, { Path, Text as SvgText } from "react-native-svg";
 import { BOOKMARK_PATH } from "@/components/icons";
 import { pinColor } from "@/lib/types";
 import { C, F, SHADOW } from "@/theme";
@@ -25,7 +25,38 @@ export const tagHeight = (sub: "none" | "rating" | "cta") => 2 + 7 + 6 + NAME_LH
 /** 웹 이름표는 마커 기준점에서 bottom:42px(상자 바닥) 위에 놓입니다 — 상자 바닥은 기준점 아래 A px. */
 export const LABEL_BOTTOM = 42;
 
-const textBase = { includeFontPadding: false, textAlignVertical: "center" } as const;
+const isWide = (ch: string) => /[\u1100-\u11ff\u3000-\u9fff\uac00-\ud7af\uff00-\uffef]/.test(ch);
+/** 글자 폭 어림 — 한글 · 한자 1em, 나머지 0.6em. */
+const textWidth = (s: string, size: number) => [...s].reduce((w, ch) => w + (isWide(ch) ? size : size * 0.6), 0);
+const fitText = (s: string, size: number, max: number) => {
+  if (textWidth(s, size) <= max) return s;
+  let out = "";
+  for (const ch of s) {
+    if (textWidth(out + ch + "…", size) > max) break;
+    out += ch;
+  }
+  return out + "…";
+};
+
+/**
+ * 마커 안 글자 — RN Text 대신 SVG 로 그립니다.
+ * iOS 의 Text 는 글자 뷰 크기를 다음 레이아웃 때 정해서, 마운트하자마자 찍는 마커 스냅샷에는 늘 빈칸으로 남습니다(다시 찍어도 같음).
+ * SVG 는 핀처럼 찍히는 순간 바로 그려집니다. 폰트는 RN Text 와 같은 RCTFont 로 찾습니다.
+ */
+export function MarkerText({ text, size, lineHeight, color, family, weight, maxWidth, align = "start" }: {
+  text: string | number; size: number; lineHeight: number; color: string; family: string;
+  weight?: "700"; maxWidth?: number; align?: "start" | "middle";
+}) {
+  const t = maxWidth ? fitText(String(text), size, maxWidth) : String(text);
+  const w = Math.ceil(textWidth(t, size)) + 2;
+  return (
+    <Svg width={w} height={lineHeight}>
+      <SvgText x={align === "middle" ? w / 2 : 0} y={lineHeight / 2 + size * 0.36} textAnchor={align} fontSize={size} fontFamily={family} fontWeight={weight} fill={color}>
+        {t}
+      </SvgText>
+    </Svg>
+  );
+}
 
 function Tag({ name, rating, cta, badge }: { name: string; rating?: number | null; cta?: string; badge?: string }) {
   return (
@@ -39,13 +70,13 @@ function Tag({ name, rating, cta, badge }: { name: string; rating?: number | nul
       ]}
     >
       <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
-        <Text numberOfLines={1} style={[textBase, { flexShrink: 1, fontFamily: F.sansBd, fontSize: 13, lineHeight: NAME_LH, color: C.ink }]}>{name}</Text>
-        {badge && <Text style={[textBase, { fontFamily: F.mono, fontSize: 9.5, lineHeight: NAME_LH, color: C.brick }]}>{badge}</Text>}
+        <MarkerText text={name} size={13} lineHeight={NAME_LH} color={C.ink} family={F.sansBd} maxWidth={190} />
+        {badge && <MarkerText text={badge} size={9.5} lineHeight={NAME_LH} color={C.brick} family={F.mono} />}
       </View>
       {rating !== undefined && (
-        <Text style={[textBase, { fontFamily: F.sans, fontSize: 11, lineHeight: SUB_LH, color: C.muted }]}>★ {rating == null ? "—" : rating.toFixed(1)}</Text>
+        <MarkerText text={`★ ${rating == null ? "—" : rating.toFixed(1)}`} size={11} lineHeight={SUB_LH} color={C.muted} family={F.sans} />
       )}
-      {cta && <Text style={[textBase, { marginTop: 1, fontFamily: F.sans, fontSize: 11, lineHeight: SUB_LH, color: C.brick }]}>{cta}</Text>}
+      {cta && <View style={{ marginTop: 1 }}><MarkerText text={cta} size={11} lineHeight={SUB_LH} color={C.brick} family={F.sans} /></View>}
     </View>
   );
 }
@@ -72,8 +103,8 @@ const anchorAt = (h: number, a: number) => ({ x: 0.5, y: (h - a) / h });
 const markerKey = (...deps: unknown[]) => deps.join("/");
 
 /**
- * iOS 는 Text 를 마운트 다음 프레임에 그려서, 마커 첫 스냅샷에 글자가 빠집니다.
- * 생김새(sig)가 바뀐 뒤 잠깐 기다렸다가 key 를 한 번 더 바꿔 다시 찍게 합니다.
+ * iOS 에서 생김새(sig)가 바뀐 뒤 잠깐 기다렸다가 key 를 한 번 더 바꿔 다시 찍게 합니다.
+ * 글자 빠짐은 이것으로 안 고쳐져서 MarkerText(SVG)로 그립니다 — 이건 그 밖의 첫 프레임 어긋남을 덜어 주는 보험입니다.
  */
 export function useResnap(sig: string, delay = 80) {
   const [n, setN] = useState(0);
@@ -178,7 +209,7 @@ export const NumberPin = memo(function NumberPin(p: Base & { n: number; filled: 
             backgroundColor: p.filled ? C.brick : C.card, alignItems: "center", justifyContent: "center",
           }}
         >
-          <Text style={[textBase, { fontFamily: F.mono, fontSize: 11, lineHeight: 13, color: p.filled ? C.card : C.brick }]}>{p.n}</Text>
+          <MarkerText text={p.n} size={11} lineHeight={13} color={p.filled ? C.card : C.brick} family={F.mono} align="middle" />
         </View>
       </View>
     </NaverMapMarkerOverlay>
@@ -259,11 +290,11 @@ export const FriendMarker = memo(function FriendMarker(p: FriendProps) {
           <Path d={dropPath(size, sw)} fill={C.brick} stroke={C.card} strokeWidth={sw} />
         </Svg>
         <View style={{ position: "absolute", left: 0, right: 0, bottom: center - size / 2, height: size, alignItems: "center", justifyContent: "center" }}>
-          <Text style={[textBase, { fontFamily: F.sansBd, fontSize: font, lineHeight: font + 2, color: C.card }]}>{p.letter}</Text>
+          <MarkerText text={p.letter} size={font} lineHeight={font + 2} color={C.card} family={F.sansBd} align="middle" />
         </View>
         {p.count > 1 && (
           <View style={{ position: "absolute", left: w / 2 + size / 2 - 7, bottom: size - 2, minWidth: 16, height: 16, borderRadius: 8, borderWidth: 1.5, borderColor: C.card, backgroundColor: C.ink, paddingHorizontal: 3, alignItems: "center", justifyContent: "center" }}>
-            <Text style={[textBase, { fontFamily: F.mono, fontSize: 9, lineHeight: 11, color: C.card }]}>{p.count}</Text>
+            <MarkerText text={p.count} size={9} lineHeight={11} color={C.card} family={F.mono} align="middle" />
           </View>
         )}
         {p.inWish && (

@@ -2,7 +2,7 @@ import { NaverMapMarkerOverlay } from "@mj-studio/react-native-naver-map";
 import { memo } from "react";
 import { Linking, Pressable, Text, View } from "react-native";
 import Svg, { Circle, Path } from "react-native-svg";
-import { useResnap } from "@/features/map/Markers";
+import { MarkerText, useResnap } from "@/features/map/Markers";
 import { C, F } from "@/theme";
 
 /**
@@ -32,8 +32,6 @@ export function BackPill({ label, onPress }: { label: string; onPress: () => voi
   );
 }
 
-const textBase = { includeFontPadding: false, textAlignVertical: "center" } as const;
-
 /** 말풍선 이름 — 검정 바탕 11/500 흰 글자. */
 const bubbleW = (name: string) => Math.min(160, Math.max(48, name.length * 11 + 20));
 
@@ -54,7 +52,7 @@ export const NumberMarker = memo(function NumberMarker(p: {
       <View key={snapKey} collapsable={false} style={{ width: w, height: h, alignItems: "center", justifyContent: "flex-end" }}>
         {showName && (
           <View style={{ marginBottom: 4, maxWidth: w, borderRadius: 8, backgroundColor: p.active ? REC.ink : "rgba(28,26,23,.78)", paddingHorizontal: 8, paddingVertical: 4 }}>
-            <Text numberOfLines={1} style={[textBase, { fontFamily: F.sansMd, fontSize: 11, lineHeight: 14, color: "#ffffff" }]}>{p.name}</Text>
+            <MarkerText text={p.name} size={11} lineHeight={14} color="#ffffff" family={F.sansMd} maxWidth={w - 16} />
           </View>
         )}
         <View style={{ width: d + 12, height: d + 12, alignItems: "center", justifyContent: "center" }}>
@@ -65,7 +63,7 @@ export const NumberMarker = memo(function NumberMarker(p: {
               shadowColor: C.brick, shadowOpacity: p.active ? 0.45 : 0, shadowRadius: 6, shadowOffset: { width: 0, height: 4 }, elevation: p.active ? 6 : 0,
             }}
           >
-            <Text style={[textBase, { fontFamily: F.mono, fontSize: p.active ? 12 : 10, lineHeight: 14, fontWeight: "700", color: p.active ? "#ffffff" : C.brick }]}>{p.n}</Text>
+            <MarkerText text={p.n} size={p.active ? 12 : 10} lineHeight={14} weight="700" color={p.active ? "#ffffff" : C.brick} family={F.mono} align="middle" />
           </View>
         </View>
       </View>
@@ -93,7 +91,7 @@ export const RingLabelMarker = memo(function RingLabelMarker({ lat, lng, text }:
     <NaverMapMarkerOverlay latitude={lat} longitude={lng} width={w} height={22} anchor={{ x: 0.5, y: 0.5 }} zIndex={100}>
       <View key={snapKey} collapsable={false} style={{ width: w, height: 22, alignItems: "center", justifyContent: "center" }}>
         <View style={{ borderRadius: 9, backgroundColor: "rgba(251,250,246,.92)", paddingHorizontal: 6, paddingVertical: 2 }}>
-          <Text style={[textBase, { fontFamily: F.mono, fontSize: 9.5, lineHeight: 12, color: REC.excInk }]}>{text}</Text>
+          <MarkerText text={text} size={9.5} lineHeight={12} color={REC.excInk} family={F.mono} />
         </View>
       </View>
     </NaverMapMarkerOverlay>
