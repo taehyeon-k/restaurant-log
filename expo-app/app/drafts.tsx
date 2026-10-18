@@ -52,7 +52,7 @@ export default function Drafts() {
       <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 14, paddingBottom: insets.bottom + 40, gap: 10 }}>
         {total === 0 && (
           <Text style={{ paddingHorizontal: 20, paddingVertical: 44, textAlign: "center", fontFamily: F.sans, fontSize: 12.5, lineHeight: 22, color: C.faint }}>
-            {"아직 쓰지 않은 기록이 없습니다.\n사진을 찍고 «나중에 쓸게요»를 누르면 여기에 담깁니다."}
+            아직 쓰지 않은 기록이 없습니다.
           </Text>
         )}
 
