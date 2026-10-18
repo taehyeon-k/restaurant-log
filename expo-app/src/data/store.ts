@@ -11,7 +11,7 @@ export type Ghost = { name: string; address: string; lat: number; lng: number } 
 /** 지도 시트 머리의 전환 — 맛집 기록 / 위시리스트(커뮤니티 핸드오프 §2). */
 export type MapSegment = "records" | "wish";
 /** 커뮤니티 탭 — 마지막에 본 곳을 기억합니다(§4). */
-export type CommunityTab = "friends" | "recs" | "ranking" | "board";
+export type CommunityTab = "friends" | "gallery" | "ranking" | "board";
 /** 게시판 칸 — 마지막에 고른 곳을 기억합니다(HANDOFF-board-v2 §3). */
 export type BoardTab = "all" | "free" | "theme" | "food" | "cafe" | "course";
 

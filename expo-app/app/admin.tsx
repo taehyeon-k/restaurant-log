@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
-  adminCreateNotice, adminHideComment, adminHidePost, adminRankUnban, adminResolveReport, adminSanction, adminSaveTheme, createPost,
+  adminCreateNotice, adminHideComment, adminHideGalleryComment, adminHideGalleryPhoto, adminHidePost, adminRankUnban, adminResolveReport, adminSanction, adminSaveTheme, createPost,
   useCurrentTheme, useIsAdmin, useRankBans, useReports, type RankBan, type ReportRow,
 } from "@/features/community/api";
 import { Avatar, K, Segmented, timeAgo } from "@/features/community/ui";
@@ -131,6 +131,18 @@ function useReportPreview(r: ReportRow) {
           ? { title: "댓글", text: data.body, authorId: data.author_id, authorName: data.nickname, hidden: !!data.hidden_at }
           : { title: "지워진 댓글", text: null, authorId: null, authorName: null, hidden: false };
       }
+      if (r.target_type === "gallery_photo") {
+        const { data } = await supabase.from("gallery_feed").select("place_name, menu, caption, author_id, nickname, hidden_at").eq("id", Number(r.target_id)).maybeSingle();
+        return data
+          ? { title: `사진 · ${data.place_name}${data.menu ? ` · ${data.menu}` : ""}`, text: data.caption, authorId: data.author_id, authorName: data.nickname, hidden: !!data.hidden_at }
+          : { title: "지워진 사진", text: null, authorId: null, authorName: null, hidden: false };
+      }
+      if (r.target_type === "gallery_comment") {
+        const { data } = await supabase.from("gallery_comment_rows").select("body, author_id, nickname, hidden_at").eq("id", Number(r.target_id)).maybeSingle();
+        return data
+          ? { title: "갤러리 댓글", text: data.body, authorId: data.author_id, authorName: data.nickname, hidden: !!data.hidden_at }
+          : { title: "지워진 댓글", text: null, authorId: null, authorName: null, hidden: false };
+      }
       if (r.target_type === "user") {
         const { data } = await supabase.from("public_profiles").select("id, nickname").eq("id", r.target_id).maybeSingle();
         return { title: "사람", text: null, authorId: data?.id ?? null, authorName: data?.nickname ?? null, hidden: false };
@@ -186,8 +198,14 @@ function ReportCard({ r }: { r: ReportRow }) {
     ]);
   }
 
-  const canHide = (r.target_type === "post" || r.target_type === "board_comment") && p && !p.hidden && !p.title.startsWith("지워진");
-  const hide = () => act(() => (r.target_type === "post" ? adminHidePost(qc, Number(r.target_id), true) : adminHideComment(qc, Number(r.target_id), true)), "hide");
+  const HIDE: Record<string, (id: number) => Promise<unknown>> = {
+    post: (id) => adminHidePost(qc, id, true),
+    board_comment: (id) => adminHideComment(qc, id, true),
+    gallery_photo: (id) => adminHideGalleryPhoto(qc, id, true),
+    gallery_comment: (id) => adminHideGalleryComment(qc, id, true),
+  };
+  const canHide = !!HIDE[r.target_type] && p && !p.hidden && !p.title.startsWith("지워진");
+  const hide = () => act(() => HIDE[r.target_type](Number(r.target_id)), "hide");
 
   return (
     <View style={{ borderRadius: 16, borderWidth: 1, borderColor: done ? C.lineSoft : K.brickLine, backgroundColor: C.card, padding: 13, gap: 7, opacity: done ? 0.6 : 1 }}>
@@ -197,8 +215,12 @@ function ReportCard({ r }: { r: ReportRow }) {
         <Text style={{ fontFamily: F.mono, fontSize: 10, color: K.inactive }}>{timeAgo(r.created_at)}</Text>
       </View>
       <Pressable
-        onPress={r.target_type === "post" ? () => router.push({ pathname: "/community/board/[id]", params: { id: r.target_id } }) : undefined}
-        disabled={r.target_type !== "post"}
+        onPress={
+          r.target_type === "post" ? () => router.push({ pathname: "/community/board/[id]", params: { id: r.target_id } })
+          : r.target_type === "gallery_photo" ? () => router.push({ pathname: "/community/gallery/[id]", params: { id: r.target_id } })
+          : undefined
+        }
+        disabled={r.target_type !== "post" && r.target_type !== "gallery_photo"}
       >
         <Text numberOfLines={1} style={{ fontFamily: F.serif, fontSize: 14, color: C.ink }}>{p?.title ?? "…"}{p?.hidden ? " · 숨김" : ""}</Text>
         {!!p?.text && <Text numberOfLines={3} style={{ marginTop: 3, fontFamily: F.sans, fontSize: 12, lineHeight: 18, color: K.text2 }}>{p.text}</Text>}

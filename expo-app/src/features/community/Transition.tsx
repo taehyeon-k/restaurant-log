@@ -33,7 +33,7 @@ export default function CommunityTransition() {
     if (pushed.current) return;
     pushed.current = true;
     // 마지막에 본 커뮤니티 탭(처음엔 친구)으로 바로 엽니다.
-    router.push(`/community/${getState().communityTab}`);
+    router.push(`/community/${getState().communityTab === ("recs" as string) ? "gallery" : getState().communityTab}`);
   };
 
   const leave = () => {

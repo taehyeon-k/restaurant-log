@@ -599,6 +599,8 @@ export const BOARD_ERRORS: Record<string, string> = {
   no_post: "지워진 글입니다",
   not_admin: "운영자만 할 수 있습니다",
   role_locked: "바꿀 수 없는 값입니다",
+  already_posted: "이미 갤러리에 올린 사진입니다",
+  not_my_photo: "내 기록의 사진만 올릴 수 있습니다",
 };
 const boardError = (msg: string) => BOARD_ERRORS[Object.keys(BOARD_ERRORS).find((k) => msg.includes(k)) ?? ""] ?? msg;
 
@@ -763,9 +765,169 @@ export const useAppNotice = (enabled: boolean) =>
     },
   });
 
+/* ───────────── 갤러리(HANDOFF-gallery) ───────────── */
+
+/** gallery_feed 한 줄 — 사진 한 장 + 올린 사람 + 가게. 기록의 메모 · 다른 사진은 오지 않습니다. */
+export type GalleryPhoto = {
+  id: number; author_id: string; nickname: string | null; avatar_url: string | null; character_id: string | null; title_label_id: string | null;
+  author_role: "user" | "admin";
+  record_id: number; photo_ref: string; menu: string | null; caption: string | null; area: string | null; created_at: string; hidden_at: string | null;
+  place_name: string; kind: Kind; category: string | null; address: string | null; verified: boolean; verified_at: string | null;
+  lat: number | null; lng: number | null; place: string; by_friend: boolean;
+  like_count: number; comment_count: number; my_like: boolean;
+};
+
+export type GallerySort = "latest" | "popular" | "friends";
+/** 격자를 좁히는 값 — 가게(place) · 동네(area, 앞부분 일치) · 메뉴(포함) · 사람. */
+export type GalleryFilter = { sort: GallerySort; gu?: string | null; place?: string | null; area?: string | null; menu?: string | null; authorId?: string | null };
+
+const weekAgo = () => new Date(Date.now() - 7 * 86400000).toISOString();
+
+export const useGalleryFeed = (f: GalleryFilter) =>
+  useQuery({
+    queryKey: ["community", "gallery", "feed", f],
+    queryFn: async () => {
+      let q = supabase.from("gallery_feed").select("*").is("hidden_at", null);
+      if (f.sort === "popular") q = q.gte("created_at", weekAgo()).order("like_count", { ascending: false });
+      if (f.sort === "friends") q = q.eq("by_friend", true);
+      q = q.order("created_at", { ascending: false }).limit(150);
+      if (f.gu) q = q.like("area", `${f.gu}%`);
+      if (f.area) q = q.like("area", `${f.area}%`);
+      if (f.place) q = q.eq("place", f.place);
+      if (f.menu) q = q.ilike("menu", `%${f.menu.replace(/[%_]/g, "")}%`);
+      if (f.authorId) q = q.eq("author_id", f.authorId);
+      const { data, error } = await q;
+      return soft("gallery_feed 조회", error, (data ?? []) as GalleryPhoto[]);
+    },
+  });
+
+export const useGalleryPhoto = (id: number) =>
+  useQuery({
+    queryKey: ["community", "gallery", "photo", id],
+    queryFn: async () => {
+      const { data } = await supabase.from("gallery_feed").select("*").eq("id", id).maybeSingle();
+      return (data as GalleryPhoto | null) ?? null;
+    },
+  });
+
+/** 오늘(한국 날짜) 올라온 사진 수 — 갤러리 제목 옆. */
+export const useGalleryToday = () =>
+  useQuery({
+    queryKey: ["community", "gallery", "today"],
+    queryFn: async () => {
+      const since = new Date(`${seoulToday()}T00:00:00+09:00`).toISOString();
+      const { count } = await supabase.from("gallery_feed").select("id", { count: "exact", head: true }).is("hidden_at", null).gte("created_at", since);
+      return count ?? 0;
+    },
+  });
+
+/** 내가 이미 올린 사진(record_id · photo_ref) — 올리기 화면에서 흐리게 「올림」. 오늘 올린 수도 함께. */
+export const useMyGalleryRefs = () =>
+  useQuery({
+    queryKey: ["community", "gallery", "mine"],
+    queryFn: async () => {
+      const me = await myId();
+      if (!me) return { refs: new Set<string>(), today: 0 };
+      const { data } = await supabase.from("gallery_photos").select("record_id, photo_ref, created_at").eq("author_id", me);
+      const rows = (data ?? []) as { record_id: number; photo_ref: string; created_at: string }[];
+      const since = Date.parse(`${seoulToday()}T00:00:00+09:00`);
+      return { refs: new Set(rows.map((r) => `${r.record_id}|${r.photo_ref}`)), today: rows.filter((r) => Date.parse(r.created_at) >= since).length };
+    },
+  });
+
+export async function postGalleryPhoto(qc: QueryClient, p: { recordId: number; photoRef: string; menu: string | null; caption: string; addMenuToRecord: boolean; area: string | null }) {
+  const { data, error } = await supabase.rpc("post_gallery_photo", {
+    p_record_id: p.recordId, p_photo_ref: p.photoRef, p_menu: p.menu?.trim() || null, p_caption: stripContact(p.caption).trim() || null,
+    p_add_menu_to_record: p.addMenuToRecord, p_area: p.area,
+  });
+  if (error) throw new Error(error.message.includes("daily_limit") ? "사진은 하루 10장까지 올릴 수 있습니다" : boardError(error.message));
+  await qc.invalidateQueries({ queryKey: ["community", "gallery"] });
+  if (p.addMenuToRecord) await refreshAll(qc);
+  return Number(data);
+}
+
+/** 갤러리에서 내리기 — 기록 · 사진 파일은 그대로, 다시 기록 공개 범위대로만 보입니다. */
+export async function removeGalleryPhoto(qc: QueryClient, id: number) {
+  const { error } = await supabase.from("gallery_photos").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+  await qc.invalidateQueries({ queryKey: ["community", "gallery"] });
+}
+
+export async function setGalleryLike(qc: QueryClient, photoId: number, on: boolean) {
+  const me = await myId();
+  if (!me) return;
+  const { error } = on
+    ? await supabase.from("gallery_likes").insert({ photo_id: photoId, user_id: me })
+    : await supabase.from("gallery_likes").delete().eq("photo_id", photoId).eq("user_id", me);
+  if (error && !error.message.includes("duplicate")) throw new Error(error.message);
+  await qc.invalidateQueries({ queryKey: ["community", "gallery"] });
+}
+
+export type GalleryComment = {
+  id: number; photo_id: number; parent_id: number | null; author_id: string; created_at: string; hidden_at: string | null;
+  body: string | null; nickname: string | null; avatar_url: string | null; character_id: string | null; title_label_id: string | null; author_role: "user" | "admin";
+};
+
+export const useGalleryComments = (photoId: number) =>
+  useQuery({
+    queryKey: ["community", "gallery", "comments", photoId],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("gallery_comment_rows").select("*").eq("photo_id", photoId).order("created_at");
+      const rows = soft("gallery_comment_rows 조회", error, (data ?? []) as GalleryComment[]);
+      return rows.filter((c) => c.parent_id == null).map((c) => ({ ...c, replies: rows.filter((r) => r.parent_id === c.id) }));
+    },
+  });
+
+export async function addGalleryComment(qc: QueryClient, p: { photoId: number; body: string; parentId?: number | null }) {
+  const { error } = await supabase.rpc("add_gallery_comment", {
+    p_photo_id: p.photoId, p_body: stripContact(p.body).trim().slice(0, 500), p_parent_id: p.parentId ?? null,
+  });
+  if (error) throw new Error(boardError(error.message));
+  await qc.invalidateQueries({ queryKey: ["community", "gallery"] });
+}
+
+export async function deleteGalleryComment(qc: QueryClient, id: number) {
+  const { error } = await supabase.from("gallery_comments").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+  await qc.invalidateQueries({ queryKey: ["community", "gallery"] });
+}
+
+export const adminHideGalleryPhoto = (qc: QueryClient, id: number, hide: boolean) => adminRpc(qc, "admin_hide_gallery_photo", { p_id: id, p_hide: hide });
+export const adminHideGalleryComment = (qc: QueryClient, id: number, hide: boolean) => adminRpc(qc, "admin_hide_gallery_comment", { p_id: id, p_hide: hide });
+
+export type GalleryScope = "all" | "menu" | "place" | "area" | "person";
+export type GalleryPlaceHit = { place: string; name: string; address: string | null; category: string | null; area: string | null; photo_count: number; cover_ref: string | null };
+export type GalleryAreaHit = { area: string; photo_count: number; cover_ref: string | null };
+export type GalleryPersonHit = { id: string; nickname: string; avatar_url: string | null; character_id: string | null; title_label_id: string | null; role: "user" | "admin"; photo_count: number };
+export type GallerySearch = { menu: GalleryPhoto[]; places: GalleryPlaceHit[]; areas: GalleryAreaHit[]; people: GalleryPersonHit[] };
+
+const EMPTY_SEARCH: GallerySearch = { menu: [], places: [], areas: [], people: [] };
+
+export const useGallerySearch = (q: string, scope: GalleryScope) =>
+  useQuery({
+    queryKey: ["community", "gallery", "search", q, scope],
+    enabled: q.trim().length > 0,
+    placeholderData: (prev) => prev,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("gallery_search", { p_q: q, p_scope: scope });
+      return soft("gallery_search", error, (data as GallerySearch | null) ?? EMPTY_SEARCH);
+    },
+  });
+
+/** 요즘 많이 찾는 메뉴 — 최근 7일 갤러리 메뉴 상위 4개. */
+export const useGalleryTopMenus = () =>
+  useQuery({
+    queryKey: ["community", "gallery", "top-menus"],
+    staleTime: 10 * 60 * 1000,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("gallery_top_menus");
+      return soft("gallery_top_menus", error, ((data ?? []) as { menu: string }[]).map((m) => m.menu));
+    },
+  });
+
 /* ───────────── 신고 · 차단 ───────────── */
 
-export type ReportTarget = "post" | "answer" | "comment" | "board_comment" | "user" | "tour";
+export type ReportTarget = "post" | "answer" | "comment" | "board_comment" | "gallery_photo" | "gallery_comment" | "user" | "tour";
 
 export async function report(targetType: ReportTarget, targetId: string | number, reason: string) {
   const me = await myId();

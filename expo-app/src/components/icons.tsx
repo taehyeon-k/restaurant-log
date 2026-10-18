@@ -205,6 +205,30 @@ export const SparkIcon = ({ size = 21, stroke = "#000", strokeWidth = 1.6 }: P) 
   </Svg>
 );
 
+/** 갤러리 — 둥근 네모 넷. */
+export const GridIcon = ({ size = 21, stroke = "#000", strokeWidth = 1.6 }: P) => (
+  <Svg {...base(size, stroke, strokeWidth)}>
+    <Rect x="3.5" y="3.5" width="7.5" height="7.5" rx="1.6" />
+    <Rect x="13" y="3.5" width="7.5" height="7.5" rx="1.6" />
+    <Rect x="3.5" y="13" width="7.5" height="7.5" rx="1.6" />
+    <Rect x="13" y="13" width="7.5" height="7.5" rx="1.6" />
+  </Svg>
+);
+
+/** 좋아요 — 하트. fill 을 주면 채운 하트. */
+export const HeartIcon = ({ size = 22, stroke = "#000", strokeWidth = 1.7, fill = "none" }: P) => (
+  <Svg {...base(size, stroke, strokeWidth, fill)}>
+    <Path d="M12 20.2s-7.6-4.6-7.6-10.1A4.3 4.3 0 0 1 12 7.4a4.3 4.3 0 0 1 7.6 2.7c0 5.5-7.6 10.1-7.6 10.1z" />
+  </Svg>
+);
+
+/** 댓글 — 말풍선. */
+export const ChatIcon = ({ size = 22, stroke = "#000", strokeWidth = 1.7 }: P) => (
+  <Svg {...base(size, stroke, strokeWidth)}>
+    <Path d="M20 11.6c0 4-3.6 7.1-8 7.1-1.2 0-2.3-.2-3.3-.6L4.5 19.5l1.2-3.4A6.6 6.6 0 0 1 4 11.6c0-4 3.6-7.1 8-7.1s8 3.2 8 7.1z" />
+  </Svg>
+);
+
 /** 링크 붙여넣기 — 사슬 두 고리. */
 export const LinkIcon = ({ size = 20, stroke = "#b4552d", strokeWidth = 1.8 }: P) => (
   <Svg {...base(size, stroke, strokeWidth)}>
