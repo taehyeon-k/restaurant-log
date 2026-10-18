@@ -641,9 +641,6 @@ export default function MapTab() {
         onChange={(i, pos) => { sheetIndex.current = i; setSheetVisible((layoutH || windowH) - pos); Haptics.selectionAsync(); }}
         // 시트는 위의 손잡이 바를 끌 때만 오르내리고, 목록을 밀면 어느 높이에서든 목록만 스크롤됩니다.
         enableContentPanningGesture={false}
-        // 목록 높이로 멈출 자리를 하나 더 만들지 않게 — 켜 두면 긴 목록에선 화면 맨 위(검색줄 밑)까지 올라가고,
-        // 바닥 여백(sheetHidden)이 바뀔 때마다 그 자리도 바뀌어 시트가 저절로 움직입니다.
-        enableDynamicSizing={false}
       >
         {mapSegment === "wish" ? (
           <BottomSheetFlatList
