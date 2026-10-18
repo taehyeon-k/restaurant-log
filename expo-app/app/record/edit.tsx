@@ -327,7 +327,7 @@ export default function EditRoute() {
               <View style={{ flex: 1 }}>
                 <Text style={{ fontFamily: F.sansMd, fontSize: 13, color: C.ink }}>앨범에서 고르기</Text>
                 <Text style={{ marginTop: 3, fontFamily: F.sans, fontSize: 11.5, lineHeight: 18, color: C.faint }}>
-                  최대 10장. 지금 없으면 나중에 기록 상세에서 더할 수 있어요.
+                  최대 10장.
                 </Text>
               </View>
             </View>
@@ -465,9 +465,11 @@ export default function EditRoute() {
         <View style={s.revisitBox}>
           <View style={{ flex: 1 }}>
             <Text style={{ fontFamily: F.sansMd, fontSize: 13.5, color: C.ink }}>재방문 의사</Text>
-            <Text style={{ marginTop: 4, fontFamily: F.sans, fontSize: 11.5, lineHeight: 18, color: C.muted }}>
-              {revisit ? "다시 갈 곳으로 표시됩니다 — 지도 핀도 색이 찹니다." : "켜면 목록 필터와 지도 핀에 함께 반영됩니다."}
-            </Text>
+            {revisit && (
+              <Text style={{ marginTop: 4, fontFamily: F.sans, fontSize: 11.5, lineHeight: 18, color: C.muted }}>
+                다시 갈 곳으로 표시됩니다 — 지도 핀도 색이 찹니다.
+              </Text>
+            )}
           </View>
           <Switch value={revisit} onValueChange={setRevisit} trackColor={{ true: C.brick, false: "#d8d3c8" }} thumbColor={C.card} />
         </View>
@@ -509,7 +511,7 @@ export default function EditRoute() {
           <Eyebrow>메모</Eyebrow>
           <TextInput
             value={review} onChangeText={setReview} multiline numberOfLines={5} textAlignVertical="top"
-            placeholder="그날 자리, 맛, 다시 올 이유" placeholderTextColor="#b3ada1"
+            placeholder="맛, 분위기, 기억에 남는 순간을 적어보세요" placeholderTextColor="#b3ada1"
             style={[fieldStyle, { minHeight: 130, paddingTop: 12, borderRadius: 14, fontFamily: F.serif, fontSize: 14.5, lineHeight: 26 }]}
           />
         </View>
@@ -550,12 +552,12 @@ const s = StyleSheet.create({
   suggest: { marginTop: 6, borderRadius: 14, borderWidth: 1, borderColor: C.line, backgroundColor: C.card, overflow: "hidden" },
   suggestRow: { paddingHorizontal: 14, paddingVertical: 10, gap: 2, borderBottomWidth: 1, borderBottomColor: C.line },
   // 메뉴 이름·가격 칸은 글꼴이 달라 제 키가 어긋납니다 — 줄을 stretch 로 두어 가격 칸을 이름 칸 키에 맞춥니다.
-  menuField: { marginTop: 0, minHeight: 46, borderRadius: 14, textAlignVertical: "center" },
+  menuField: { marginTop: 0, minHeight: 46, height: 46, paddingVertical: 0, borderRadius: 14, textAlignVertical: "center" },
   vote: { width: 46, height: 46, borderRadius: 14, borderWidth: 1, borderColor: "#ded8cb", backgroundColor: C.card, alignItems: "center", justifyContent: "center" },
   starBase: { fontSize: 27, lineHeight: 34, width: 34, textAlign: "center", color: "#dcd6ca" },
   revisitBox: {
     marginTop: 20, flexDirection: "row", alignItems: "center", gap: 14, borderRadius: 18, borderWidth: 1,
-    borderColor: "#e2c9bb", backgroundColor: "#f9f0e9", paddingHorizontal: 16, paddingVertical: 14,
+    borderColor: "#e2c9bb", backgroundColor: "#f9f0e9", paddingHorizontal: 16, paddingVertical: 11,
   },
   addTile: {
     width: 76, height: 76, borderRadius: 16, borderWidth: 1.5, borderStyle: "dashed", borderColor: "#cdc6b8",
