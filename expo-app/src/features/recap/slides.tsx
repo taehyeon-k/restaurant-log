@@ -591,7 +591,7 @@ export function ShareCard({ data, season, nick, height }: SlideProps & { height:
     <View collapsable={false} style={{ height, borderRadius: 26, overflow: "hidden", backgroundColor: season.accent, paddingTop: 24, paddingHorizontal: 22, paddingBottom: 22 }}>
       <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
         <Text style={mono(10, "#f2e0d5", 2)}>DINARY</Text>
-        <Text style={mono(10, "#f2e0d5", 2)}>{q.year} · Q{q.q}</Text>
+        <Text style={mono(10, "#f2e0d5", 2)}>{q.year} · {q.q}분기</Text>
       </View>
       <Text style={[serif(32, CARD, 1.25), { marginTop: 22 }]}>{`${nick}의\n${season.name} 식탁`}</Text>
       <View style={{ marginTop: 18, flexDirection: "row", alignItems: "baseline", gap: 4 }}>

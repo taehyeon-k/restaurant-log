@@ -90,8 +90,8 @@ export function quarterRange(id: QuarterId) {
 
 export const seasonOf = (id: QuarterId) => SEASONS[parseQuarter(id)!.q];
 
-/** "2026 Q3" */
-export const quarterLabel = (id: QuarterId) => id.replace("-", " ");
+/** "2026 3분기" */
+export const quarterLabel = (id: QuarterId) => id.replace(/-Q(\d)$/, " $1분기");
 
 /* ── 한국어 ─────────────────────────────────────── */
 
