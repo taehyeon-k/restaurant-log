@@ -1,7 +1,7 @@
 import type { SourceKind } from "./sourceLink";
 
 export type Kind = "restaurant" | "cafe";
-export type Sort = "recent" | "rating" | "price";
+export type Sort = "recent" | "rating" | "felt";
 /** 먹은 것 한 줄 — vote 는 👍(1) · 👎(-1) · 없음. price 는 옛 기록 읽기용으로만 남깁니다(쓰지 않음). */
 export type MenuItem = { name: string; vote: 1 | -1 | null; price?: number | null };
 

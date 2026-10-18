@@ -33,6 +33,7 @@ import { dayCount, mealLabels } from "@/lib/anniversary";
 import type { Place as GeocodePlace } from "@/lib/geocode";
 import { findRecord, findWish, norm } from "@/lib/geo";
 import { groupPlaces, type Place } from "@/lib/places";
+import { feltLevel } from "@/lib/price";
 import { inRegion, inSearchedRegion, matchRegionName, regionFromSearch, regionNamesFrom } from "@/lib/regions";
 import { matchWish, type Kind, type Restaurant, type Sort } from "@/lib/types";
 import { C, F, SHADOW } from "@/theme";
@@ -40,7 +41,7 @@ import { C, F, SHADOW } from "@/theme";
 const SORTS: { value: Sort; label: string }[] = [
   { value: "recent", label: "최근순" },
   { value: "rating", label: "별점순" },
-  { value: "price", label: "가격순" },
+  { value: "felt", label: "체감가격순" },
 ];
 
 /** 지도 콘텐츠 패딩(아래) — 카메라 중심을 시트 위로 올려둡니다. */
@@ -177,10 +178,12 @@ export default function MapTab() {
       .filter((p) => !verifiedOnly || p.verified)
       .filter(hit);
 
+    const byRecent = (a: Place, b: Place) => ((a.latest.visited_at ?? "") < (b.latest.visited_at ?? "") ? 1 : -1);
     return [...list].sort((a, b) => {
       if (sort === "rating") return (b.rating ?? 0) - (a.rating ?? 0);
-      if (sort === "price") return (a.price_range ?? 0) - (b.price_range ?? 0);
-      return (a.latest.visited_at ?? "") < (b.latest.visited_at ?? "") ? 1 : -1;
+      // 체감가격(돼지 1–5)이 높은 순, 같으면 최근 기록 순.
+      if (sort === "felt") return feltLevel(b) - feltLevel(a) || byRecent(a, b);
+      return byRecent(a, b);
     });
   }, [allPlaces, q, categories, keywords, revisitOnly, verifiedOnly, viewBounds, sort]);
 
@@ -483,11 +486,11 @@ export default function MapTab() {
       <View style={s.sortRow}>
         {SORTS.map((o) => (
           <Pressable key={o.value} onPress={() => { Haptics.selectionAsync(); setSort(o.value); }} style={{ paddingBottom: 3, borderBottomWidth: 1, borderBottomColor: sort === o.value ? C.ink : "transparent" }}>
-            <Text style={{ fontFamily: sort === o.value ? F.sansMd : F.sans, fontSize: 12.5, color: sort === o.value ? C.ink : "#a8a196" }}>{o.label}</Text>
+            <Text numberOfLines={1} style={{ fontFamily: sort === o.value ? F.sansMd : F.sans, fontSize: 12.5, color: sort === o.value ? C.ink : "#a8a196" }}>{o.label}</Text>
           </Pressable>
         ))}
         {/* 「현 지도에 있는 기록만」은 정렬과 같은 줄 오른쪽 끝에 둡니다 */}
-        {chipVisible && <View style={{ marginLeft: "auto" }}>{boundsChip(false)}</View>}
+        {chipVisible && <View style={{ marginLeft: "auto", flexShrink: 0 }}>{boundsChip(false)}</View>}
       </View>
     </View>
   );
@@ -765,5 +768,5 @@ const s = StyleSheet.create({
     paddingHorizontal: 12, flexDirection: "row", alignItems: "center", gap: 8,
   },
   boundsChip: { minHeight: 28, borderRadius: 14, borderWidth: 1, borderColor: "#e0c3b1", backgroundColor: "#f9f0e9", paddingHorizontal: 10, flexDirection: "row", alignItems: "center", gap: 5 },
-  sortRow: { flexDirection: "row", alignItems: "center", minHeight: 28, gap: 16, paddingHorizontal: 20, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: "#e6e0d3", marginBottom: 12 },
+  sortRow: { flexDirection: "row", alignItems: "center", minHeight: 28, gap: 12, paddingHorizontal: 20, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: "#e6e0d3", marginBottom: 12 },
 });
