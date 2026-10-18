@@ -1,0 +1,71 @@
+diff --git a/node_modules/@mj-studio/react-native-naver-map/ios/Overlay/Marker/RNCNaverMapMarker.mm b/node_modules/@mj-studio/react-native-naver-map/ios/Overlay/Marker/RNCNaverMapMarker.mm
+index 7f408df..d64021c 100644
+--- a/node_modules/@mj-studio/react-native-naver-map/ios/Overlay/Marker/RNCNaverMapMarker.mm
++++ b/node_modules/@mj-studio/react-native-naver-map/ios/Overlay/Marker/RNCNaverMapMarker.mm
+@@ -17,6 +17,8 @@ using namespace facebook::react;
+ @implementation RNCNaverMapMarker {
+   RNCNaverMapImageCanceller _imageCanceller;
+   BOOL _isImageSetFromSubview;
++  // [DINARY patch] the custom marker view currently shown (it is never added to the view hierarchy)
++  __weak UIView* _customSubview;
+ }
+ 
+ + (bool)shouldBeRecycled {
+@@ -124,23 +126,55 @@ using namespace facebook::react;
+     _imageCanceller = nil;
+   }
+   _isImageSetFromSubview = YES;
++  _customSubview = subview;
+   _inner.alpha = 0;
+   // prevent default image is set after this logic in old arch
+   runOnMain([self, subview]() {
+-    self.inner.alpha = 1;
+-    self.inner.iconImage = [NMFOverlayImage overlayImageWithImage:[self captureView:subview]];
++    [self snapshotSubview:subview];
+     [self ensureTouchHandler]; // Re-ensure touch handler after custom marker image is set
+   });
++  // [DINARY patch] Text is laid out / drawn a little after mount on Fabric — capture once more so labels aren't blank.
++  runOnMainAfter(0.15, ^{
++    [self snapshotSubview:subview];
++  });
++}
++
++// [DINARY patch] Capture only while the subview is still ours and has a size.
++- (void)snapshotSubview:(UIView*)subview {
++  if (subview != _customSubview) {
++    return;
++  }
++  if (CGRectIsEmpty(subview.bounds)) {
++    return;
++  }
++  self.inner.iconImage = [NMFOverlayImage overlayImageWithImage:[self captureView:subview]];
++  // shown only once a real snapshot exists, so the default green pin never flashes
++  self.inner.alpha = 1;
++}
++
++// [DINARY patch] renderInContext uses whatever a layer has drawn so far — force pending drawing first.
++static void RNCNaverMapDisplayLayerTree(CALayer* layer) {
++  [layer displayIfNeeded];
++  for (CALayer* sublayer in layer.sublayers) {
++    RNCNaverMapDisplayLayerTree(sublayer);
++  }
+ }
+ 
+ - (void)removeReactSubview:(UIView*)subview {
+   _isImageSetFromSubview = NO;
++  if (_customSubview == subview) {
++    _customSubview = nil;
++  }
+ 
+   // after custom marker is removed, set image from prop.
+   self.image = _image;
+ }
+ 
+ - (UIImage*)captureView:(UIView*)view {
++  // [DINARY patch] lay out (Text sizes its inner text view in layoutSubviews) and draw before capturing.
++  [view setNeedsLayout];
++  [view layoutIfNeeded];
++  RNCNaverMapDisplayLayerTree(view.layer);
+   UIGraphicsImageRenderer* renderer =
+       [[UIGraphicsImageRenderer alloc] initWithSize:view.bounds.size];
+   auto ret =
