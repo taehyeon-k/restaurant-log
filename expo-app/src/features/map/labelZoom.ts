@@ -6,10 +6,10 @@ import { LABEL_BOTTOM, tagHeight, tagWidth } from "./Markers";
  * 한산한 곳은 일찍, 붐비는 곳은 더 당겨야 보이고, MAX_ZOOM 부터는 겹쳐도 모두 보입니다.
  * 다 떨어질 때까지 기다리면 너무 늦게 보여서, EARLY 만큼 먼저 — 이웃과 살짝 겹치는 건 받아들입니다.
  */
-export const MIN_ZOOM = 12;
-export const MAX_ZOOM = 15;
+export const MIN_ZOOM = 11.5;
+export const MAX_ZOOM = 14.5;
 /** 겹치지 않는 줌보다 이만큼 먼저 보여 줍니다. */
-const EARLY = 0.7;
+const EARLY = 1.1;
 /** 이름표 둘레 여유(dp). */
 const GAP = 4;
 
