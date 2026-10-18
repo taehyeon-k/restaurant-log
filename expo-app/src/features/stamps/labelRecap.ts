@@ -1,5 +1,5 @@
 import { ieosseoyo, nativeCount } from "@/features/recap/seasons";
-import { eulReul } from "@/lib/josa";
+import { eulReul, iNa } from "@/lib/josa";
 import { BOWL_TIERS, earnedBy, LABELS, labelById, nextBowl, recordTime, stampRows, type LabelDef } from "@/lib/labels";
 import type { Restaurant } from "@/lib/types";
 
@@ -10,8 +10,8 @@ export type LabelRecap = {
   def: LabelDef;
   /** 받은 기록과 그 날(YYYY-MM-DD) */
   earnedOn: string;
-  /** 「열 번의 인증이 여기까지 왔어요」 */
-  journeyTitle: string;
+  /** 어떻게 받았는지 — 「5.0을 준 집을 열 곳이나 찾으셨네요?」 */
+  how: Line;
   /** 이 라벨에 들어간 기록, 오래된 순 · 번호는 1부터 */
   journey: { no: number; row: Restaurant }[];
   days: number;
@@ -100,6 +100,37 @@ function discoveryOf(def: LabelDef, journey: Restaurant[], all: Restaurant[]): L
   return [{ t: `${nativeCount(journeyPlaces || 1)} 곳을 다녀오며 ` }, { t: def.name, em: true }, { t: `${josa(def.name, eulReul)} 받았어요` }];
 }
 
+/** 수를 강조하고 뒤에 「이나 / 나」를 붙인 조각 — 「열 곳」 + 「이나 」. */
+const many = (count: string): Line => [{ t: count, em: true }, { t: iNa(count).slice(count.length) }];
+
+/** 이 라벨을 어떻게 받았는지 — 조건을 내 이야기처럼 한 줄로. */
+function howOf(def: LabelDef, journey: Restaurant[]): Line {
+  const n = nativeCount(def.need);
+  const tier = BOWL_TIERS.find((t) => t.id === def.id);
+  if (tier) {
+    return tier.need === 1
+      ? [{ t: "가게에서 찍은 " }, { t: "첫 인증", em: true }, { t: " 기록을 남기셨네요!" }]
+      : [{ t: "가게에서 찍은 인증 기록을 " }, ...many(`${tier.word} 번`), { t: " 남기셨네요?" }];
+  }
+  switch (def.id) {
+    case "verified": return [{ t: "가게에서 찍은 인증 기록을 " }, ...many(`${n} 번`), { t: " 남기셨네요?" }];
+    case "gold": return [{ t: "5.0을 준 집을 " }, ...many(`${n} 곳`), { t: " 찾으셨네요?" }];
+    case "regular": return [{ t: `${journey[0]?.name ?? "한 가게"}에 ` }, ...many(`${n} 번`), { t: " 가셨네요?" }];
+    case "midnight": return [{ t: "자정 넘어 남긴 기록이 " }, ...many(`${n} 개`), { t: " 되네요?" }];
+    case "regions": return [{ t: "서로 다른 " }, { t: `${n} 동네`, em: true }, { t: "에서 기록을 남기셨네요?" }];
+    case "years": return [{ t: `${n} 해`, em: true }, { t: " 연속으로 기록을 이어 오셨네요?" }];
+    case "revisit": return [{ t: "다시 찾은 가게가 " }, ...many(`${n} 곳`), { t: " 되네요?" }];
+    case "palate": return [{ t: `${n} 가지`, em: true }, { t: " 종류를 고루 드셨네요?" }];
+    case "weekend": return [{ t: "토 · 일요일에 남긴 기록이 " }, ...many(`${n} 개`), { t: " 되네요?" }];
+    case "album": return [{ t: "사진을 세 장 넘게 담은 기록이 " }, ...many(`${n} 개`), { t: " 되네요?" }];
+    case "longform": return [{ t: "100자 넘는 메모를 " }, ...many(`${n} 번`), { t: " 쓰셨네요?" }];
+    case "morning": return [{ t: "오전 11시 전에 인증을 " }, ...many(`${n} 번`), { t: " 하셨네요?" }];
+    case "thrift": return [{ t: "만 원 아래로 " }, ...many(`${n} 그릇`), { t: " 드셨네요?" }];
+    case "december": return [{ t: "12월에 남긴 기록이 " }, ...many(`${n} 개`), { t: " 되네요?" }];
+    default: return [{ t: def.desc, em: true }, { t: `${josa(def.desc, eulReul)} 채우셨네요!` }];
+  }
+}
+
 /** 다음 라벨 — 그릇 수면 다음 단계, 이야기면 가장 가까운 것(없으면 다음 그릇 수). */
 function nextOf(def: LabelDef, rows: Restaurant[]): LabelRecap["next"] {
   const stamps = stampRows(rows).length;
@@ -125,13 +156,10 @@ export function computeLabelRecap(id: string, rows: Restaurant[]): LabelRecap | 
   const dates = contrib.map(dateOf).sort();
   const cats = new Map<string, number>();
   for (const r of contrib) if (r.category) cats.set(r.category, (cats.get(r.category) ?? 0) + 1);
-  const tier = BOWL_TIERS.find((t) => t.id === def.id);
   return {
     def,
     earnedOn: dateOf(by),
-    journeyTitle: tier
-      ? tier.need === 1 ? "첫 인증이 여기까지 왔어요" : `${tier.word} 번의 인증이 여기까지 왔어요`
-      : `${nativeCount(contrib.length)} 번의 기록이 여기까지 왔어요`,
+    how: howOf(def, contrib),
     journey,
     days: dates.length ? dayDiff(dates[0], dates[dates.length - 1]) + 1 : 1,
     places: new Set(contrib.map(placeKey)).size,

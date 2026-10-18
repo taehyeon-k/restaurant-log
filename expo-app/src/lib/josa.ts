@@ -17,3 +17,5 @@ export const euroRo = (word: string) => {
   const jong = code >= 0 && code <= 11171 ? code % 28 : 0;
   return `${word}${jong === 0 || jong === 8 ? "로" : "으로"}`;
 };
+/** 「열 곳이나」 「열 개나」 — 많다는 뜻의 보조사. */
+export const iNa = (word: string) => `${word}${hasBatchim(word) ? "이나" : "나"}`;
