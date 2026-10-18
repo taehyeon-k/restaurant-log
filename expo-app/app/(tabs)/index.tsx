@@ -106,13 +106,12 @@ export default function MapTab() {
   // 시트는 아무 높이에서나 멈추게: 최소~최대 사이를 6px 간격으로 촘촘히 깔아, 손을 뗀 자리 가장 가까운 곳에 섭니다.
   const sheetSnaps = useMemo(() => {
     const H = layoutH || windowH;
-    // 끝까지 올려도 손잡이 바가 검색줄(insets.top + 8, 높이 46) 아래에 남아야 다시 잡아 내릴 수 있습니다.
-    const max = Math.max(260, H - Math.max(84, insets.top + 8 + 46 + 6));
+    const max = Math.max(260, H - 84);
     const pts: number[] = [];
     for (let y = 96; y < max; y += 6) pts.push(y);
     pts.push(max);
     return pts;
-  }, [layoutH, windowH, insets.top]);
+  }, [layoutH, windowH]);
   const sheetStartIndex = useMemo(() => {
     const target = (layoutH || windowH) * 0.75;
     return sheetSnaps.reduce((best, y, i) => (Math.abs(y - target) < Math.abs(sheetSnaps[best] - target) ? i : best), 0);
