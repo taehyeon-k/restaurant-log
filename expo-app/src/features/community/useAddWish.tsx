@@ -24,21 +24,41 @@ export function useAddWish() {
   const [asking, setAsking] = useState<WishSeed | null>(null);
   const resolver = useRef<((bookId: string | null | undefined) => void) | null>(null);
 
+  /** 연인 기록장이 있으면 어느 쪽에 담을지 묻습니다. 고르지 않고 닫으면 undefined. */
+  const pickTarget = useCallback(
+    async (seed: WishSeed): Promise<string | null | undefined> => {
+      if (!couple) return personalId;
+      return new Promise<string | null | undefined>((resolve) => {
+        resolver.current = resolve;
+        setAsking(seed);
+      });
+    },
+    [couple, personalId],
+  );
+
   const add = useCallback(
     async (seed: WishSeed): Promise<WishResult | null> => {
-      let target: string | null | undefined = personalId;
-      if (couple) {
-        target = await new Promise<string | null | undefined>((resolve) => {
-          resolver.current = resolve;
-          setAsking(seed);
-        });
-        if (target === undefined) return null;
-      }
+      const target = await pickTarget(seed);
+      if (target === undefined) return null;
       const res = await addWishFrom(qc, seed, target);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       return res;
     },
-    [qc, couple, personalId],
+    [qc, pickTarget],
+  );
+
+  /** 여러 곳을 한 번에(코스 통째로 담기) — 어느 위시리스트인지는 한 번만 묻습니다. 새로 담은 수를 돌려줍니다. */
+  const addMany = useCallback(
+    async (seeds: WishSeed[]): Promise<number | null> => {
+      if (!seeds.length) return 0;
+      const target = await pickTarget({ ...seeds[0], name: `${seeds[0].name} 외 ${seeds.length - 1}곳` });
+      if (target === undefined) return null;
+      let added = 0;
+      for (const seed of seeds) if ((await addWishFrom(qc, seed, target)) === "added") added += 1;
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      return added;
+    },
+    [qc, pickTarget],
   );
 
   const finish = (bookId: string | null | undefined) => {
@@ -78,5 +98,5 @@ export function useAddWish() {
     </BottomSheetModal>
   );
 
-  return { add, sheet };
+  return { add, addMany, sheet };
 }

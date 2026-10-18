@@ -1,7 +1,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import * as Haptics from "expo-haptics";
 import * as Location from "expo-location";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { FlatList, Pressable, ScrollView, Text, View, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -44,6 +44,9 @@ export default function FriendsScreen() {
   const { data: closeIds = [] } = useCloseFriends();
   const [view, setView] = useState<View_>("feed");
   const [only, setOnly] = useState<string | null>(null);
+  // 프로필 창 「친구 · 기록 보기」 — 그 친구만 거른 소식으로 엽니다(?only=).
+  const { only: onlyParam } = useLocalSearchParams<{ only?: string }>();
+  useEffect(() => { if (onlyParam) setOnly(onlyParam); }, [onlyParam]);
   const [commentsFor, setCommentsFor] = useState<number | null>(null);
   const [posting, setPosting] = useState<{ recordId: number | null } | null>(null);
   const [menuFor, setMenuFor] = useState<FriendPost | null>(null);

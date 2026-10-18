@@ -22,6 +22,7 @@ import { useAccount } from "@/data/profile";
 import { usePersonalRows, useWishes } from "@/data/queries";
 import { setState, useAppState } from "@/data/store";
 import CommunityTransition from "@/features/community/Transition";
+import { NoticeBanner } from "@/features/community/NoticeBanner";
 import { startQueueTriggers } from "@/features/queue/process";
 // 이 import 가 백그라운드 지오펜스 태스크를 정의합니다 — 반드시 앱 진입점에서 불러야 합니다.
 import { syncWishGeofences } from "@/features/notify/geofence";
@@ -171,6 +172,8 @@ function Gate({ fontsLoaded }: { fontsLoaded: boolean }) {
       <Stack.Screen name="login" />
       <Stack.Screen name="welcome" />
     </Stack>
+    {/* 앱 전체 공지 — 메인 탭에 있을 때만 상단 배너로 */}
+    <NoticeBanner enabled={signedIn && !showBoot && first === "(tabs)"} />
     {/* 커뮤니티 들어가기 전환 판 — 상태 표시줄까지 모든 화면 위 */}
     <CommunityTransition />
     {showBoot && <BootScreen key={bootOwner ?? "signed-out"} state={bootStatus} characterId={account && account.userId === userId ? account.characterId : undefined}

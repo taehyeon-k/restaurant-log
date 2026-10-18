@@ -6,7 +6,8 @@ import { coverPhoto, matchWish, type Kind, type Wish } from "@/lib/types";
 
 /**
  * 커뮤니티 데이터 — supabase/migrations/20261015000100_community.sql 의 표 · 뷰 · 함수를 읽습니다.
- * 남의 기록은 restaurants 가 아니라 friend_feed / shared_records / board_feed / board_answer_rows 뷰로만 옵니다.
+ * 남의 기록은 restaurants 가 아니라 friend_feed / shared_records / board_feed / board_course_rows / board_comment_rows 뷰로만 옵니다.
+ * 게시판 개편(투표 · 댓글 · 관리자)은 20261018200000_board_v2.sql.
  */
 
 export type PublicProfile = {
@@ -359,24 +360,31 @@ export const useLeaderboard = (board: BoardId, period: Period, scope: Scope) =>
     },
   });
 
-/* ───────────── 게시판 ───────────── */
+/* ───────────── 게시판(HANDOFF-board-v2) ───────────── */
 
-export type PostType = "record_share" | "theme_answer" | "ask";
+/** 다섯 칸 — 자유(투표 · 댓글) · 주제(공감) · 맛집 · 카페(가보고 싶어요 · 가봤어요) · 코스(통째로 담기). */
+export type PostType = "free" | "theme" | "food" | "cafe" | "course";
 
 export type BoardPost = {
   id: number;
   type: PostType;
   author_id: string;
-  note: string | null;
   created_at: string;
+  edited_at: string | null;
   theme_id: number | null;
-  ask_area: string | null;
-  ask_tags: string[];
   area: string | null;
+  pinned: boolean;
+  /** 관리자가 숨긴 글 — 목록에서 빠지고 상세는 「운영 정책에 따라 삭제된 글입니다」. 내용 칸은 관리자에게만 옵니다. */
+  hidden_at: string | null;
+  title: string | null;
+  body: string | null;
+  tags: string[];
+  record_id: number | null;
   nickname: string | null;
   avatar_url: string | null;
   character_id: string | null;
   title_label_id: string | null;
+  author_role: "user" | "admin";
   place_name: string | null;
   kind: Kind | null;
   category: string | null;
@@ -385,21 +393,32 @@ export type BoardPost = {
   photo_urls: string[] | null;
   cover_index: number | null;
   photo_url: string | null;
+  verified: boolean | null;
   verified_at: string | null;
   lat: number | null;
   lng: number | null;
   place: string | null;
   want_count: number;
   been_count: number;
+  cheer_count: number;
   my_want: boolean;
   my_been: boolean;
-  answer_count: number;
-  top_answer: string | null;
+  my_cheer: boolean;
+  comment_count: number;
+  course_count: number;
+  course_verified: number;
+  course_names: string[] | null;
+  poll_total: number;
+  poll_closes_at: string | null;
+  my_vote: number | null;
 };
 
-export type Theme = { id: number; title: string; starts_on: string; ends_on: string };
+export type Theme = { id: number; title: string; description: string | null; starts_on: string; ends_on: string };
 
 const seoulToday = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul" }).format(new Date());
+
+const themeCount = async (id: number) =>
+  (await supabase.from("board_posts").select("id", { count: "exact", head: true }).eq("theme_id", id).is("hidden_at", null)).count ?? 0;
 
 export const useCurrentTheme = () =>
   useQuery({
@@ -409,58 +428,146 @@ export const useCurrentTheme = () =>
       const { data, error } = await supabase.from("board_themes").select("*").lte("starts_on", today).gte("ends_on", today).order("starts_on", { ascending: false }).limit(1);
       const theme = soft("board_themes 조회", error, ((data ?? [])[0] as Theme | undefined) ?? null);
       if (!theme) return null;
-      const { count } = await supabase.from("board_posts").select("id", { count: "exact", head: true }).eq("theme_id", theme.id);
       const daysLeft = Math.max(0, Math.round((Date.parse(theme.ends_on) - Date.parse(today)) / 86400000));
-      return { ...theme, count: count ?? 0, daysLeft };
+      return { ...theme, count: await themeCount(theme.id), daysLeft };
     },
   });
 
-export const useBoardFeed = (type: PostType | null, area: string | null) =>
+/** 지난 주제 — 「지난 주제 · OO · 답 N ›」 줄. */
+export const useLastTheme = () =>
   useQuery({
-    queryKey: ["community", "board", type, area],
+    queryKey: ["community", "theme", "last"],
     queryFn: async () => {
-      let q = supabase.from("board_feed").select("*").order("created_at", { ascending: false }).limit(60);
-      if (type) q = q.eq("type", type);
-      if (area) q = q.eq("area", area);
+      const { data } = await supabase.from("board_themes").select("*").lt("ends_on", seoulToday()).order("ends_on", { ascending: false }).limit(1);
+      const theme = ((data ?? [])[0] as Theme | undefined) ?? null;
+      return theme ? { ...theme, count: await themeCount(theme.id) } : null;
+    },
+  });
+
+export type FeedFilter = { type: PostType | null; area: string | null; verifiedOnly: boolean; tag: string | null; themeId?: number | null; authorId?: string | null };
+
+/** 목록 — 공지가 맨 위, 그다음 최신순. 숨긴 글은 뺍니다. */
+export const useBoardFeed = (f: FeedFilter) =>
+  useQuery({
+    queryKey: ["community", "board", "feed", f],
+    queryFn: async () => {
+      let q = supabase.from("board_feed").select("*").is("hidden_at", null)
+        .order("pinned", { ascending: false }).order("created_at", { ascending: false }).limit(60);
+      // 공지(pinned)는 어느 칸에서든 맨 위에.
+      if (f.type) q = q.or(`type.eq.${f.type},pinned.is.true`);
+      if (f.area) q = q.eq("area", f.area);
+      if (f.verifiedOnly) q = q.eq("verified", true);
+      if (f.tag) q = q.contains("tags", [f.tag]);
+      if (f.themeId != null) q = q.eq("theme_id", f.themeId);
+      if (f.authorId) q = q.eq("author_id", f.authorId);
       const { data, error } = await q;
       return soft("board_feed 조회", error, (data ?? []) as BoardPost[]);
     },
   });
 
-export const useBoardPost = (id: number) =>
+export const useBoardPost = (id: number, enabled = true) =>
   useQuery({
     queryKey: ["community", "board", "post", id],
+    enabled,
     queryFn: async () => {
       const { data } = await supabase.from("board_feed").select("*").eq("id", id).maybeSingle();
       return (data as BoardPost | null) ?? null;
     },
   });
 
-export type AnswerRow = {
-  id: number; post_id: number; author_id: string; reason: string | null; created_at: string;
-  nickname: string | null; avatar_url: string | null; character_id: string | null; title_label_id: string | null;
-  place_name: string; kind: Kind; category: string | null; address: string | null; lat: number | null; lng: number | null; verified_at: string | null; place: string;
-};
-
-/** 같은 가게를 고른 답을 하나로 묶고, 많이 고른 순으로. */
-export type AnswerGroup = { place: string; first: AnswerRow; picks: number; answers: AnswerRow[] };
-
-export const useAnswers = (postId: number) =>
+/** 요즘 많이 쓰인 태그(최근 7일) — 자유 칸 점선 칩 · 글쓰기 자동완성. */
+export const usePopularTags = (limit = 10) =>
   useQuery({
-    queryKey: ["community", "board", "answers", postId],
-    queryFn: async (): Promise<AnswerGroup[]> => {
-      const { data, error } = await supabase.from("board_answer_rows").select("*").eq("post_id", postId).order("created_at");
-      const rows = soft("board_answer_rows 조회", error, (data ?? []) as AnswerRow[]);
-      const groups = new Map<string, AnswerGroup>();
-      for (const r of rows) {
-        const g = groups.get(r.place);
-        if (g) { g.picks += 1; g.answers.push(r); } else groups.set(r.place, { place: r.place, first: r, picks: 1, answers: [r] });
-      }
-      return [...groups.values()].sort((a, b) => b.picks - a.picks);
+    queryKey: ["community", "board", "tags", limit],
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("board_popular_tags", { p_days: 7, p_limit: limit });
+      return soft("board_popular_tags", error, ((data ?? []) as { tag: string; n: number }[]).map((t) => t.tag));
     },
   });
 
-export async function setReaction(qc: QueryClient, postId: number, kind: "want" | "been", on: boolean) {
+/* 코스 */
+
+export type CourseStop = {
+  post_id: number; position: number; memo: string | null; record_id: number;
+  name: string; kind: Kind; category: string | null; address: string | null; lat: number | null; lng: number | null; rating: number | null;
+  verified: boolean; verified_at: string | null; photo_urls: string[] | null; cover_index: number | null; photo_url: string | null; place: string;
+};
+
+/** 여러 코스 글의 가게를 한 번에 — 목록 카드 · 상세가 같이 씁니다. */
+export const useCourseStops = (postIds: number[]) =>
+  useQuery({
+    queryKey: ["community", "board", "course", postIds.join(",")],
+    enabled: postIds.length > 0,
+    queryFn: async () => {
+      const { data, error } = await supabase.from("board_course_rows").select("*").in("post_id", postIds).order("position");
+      const rows = soft("board_course_rows 조회", error, (data ?? []) as CourseStop[]);
+      const out = new Map<number, CourseStop[]>();
+      for (const r of rows) out.set(r.post_id, [...(out.get(r.post_id) ?? []), r]);
+      return out;
+    },
+  });
+
+/* 투표 */
+
+export type PollOption = { option_id: number; label: string; count: number | null; mine: boolean };
+
+export const usePoll = (postId: number, enabled = true) =>
+  useQuery({
+    queryKey: ["community", "board", "poll", postId],
+    enabled,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("poll_results", { p_post_id: postId });
+      return soft("poll_results", error, (data ?? []) as PollOption[]);
+    },
+  });
+
+export async function votePoll(qc: QueryClient, postId: number, optionId: number) {
+  const { error } = await supabase.rpc("vote_poll", { p_post_id: postId, p_option_id: optionId });
+  if (error) throw new Error(boardError(error.message));
+  await qc.invalidateQueries({ queryKey: ["community", "board"] });
+}
+
+/* 댓글 */
+
+export type BoardComment = {
+  id: number; post_id: number; parent_id: number | null; author_id: string; created_at: string; hidden_at: string | null;
+  /** 숨긴 댓글이면 null(관리자는 그대로) */
+  body: string | null;
+  nickname: string | null; avatar_url: string | null; character_id: string | null; title_label_id: string | null; author_role: "user" | "admin";
+  record_id: number | null; place_name: string | null; category: string | null; address: string | null; verified: boolean | null; verified_at: string | null;
+  photo_urls: string[] | null; cover_index: number | null; photo_url: string | null; lat: number | null; lng: number | null;
+};
+
+/** 시간순 — 답글은 그 댓글 밑에. */
+export const useBoardComments = (postId: number) =>
+  useQuery({
+    queryKey: ["community", "board", "comments", postId],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("board_comment_rows").select("*").eq("post_id", postId).order("created_at");
+      const rows = soft("board_comment_rows 조회", error, (data ?? []) as BoardComment[]);
+      const top = rows.filter((c) => c.parent_id == null);
+      return top.map((c) => ({ ...c, replies: rows.filter((r) => r.parent_id === c.id) }));
+    },
+  });
+
+export async function addBoardComment(qc: QueryClient, p: { postId: number; body: string; parentId?: number | null; recordId?: number | null }) {
+  const { error } = await supabase.rpc("add_board_comment", {
+    p_post_id: p.postId, p_body: stripContact(p.body).trim().slice(0, 500), p_parent_id: p.parentId ?? null, p_record_id: p.recordId ?? null,
+  });
+  if (error) throw new Error(boardError(error.message));
+  await qc.invalidateQueries({ queryKey: ["community", "board"] });
+}
+
+export async function deleteBoardComment(qc: QueryClient, id: number) {
+  const { error } = await supabase.from("board_comments").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+  await qc.invalidateQueries({ queryKey: ["community", "board"] });
+}
+
+/* 반응 */
+
+export async function setReaction(qc: QueryClient, postId: number, kind: "want" | "been" | "cheer", on: boolean) {
   const me = await myId();
   if (!me) return;
   const { error } = on
@@ -470,22 +577,43 @@ export async function setReaction(qc: QueryClient, postId: number, kind: "want" 
   await qc.invalidateQueries({ queryKey: ["community", "board"] });
 }
 
+/* 올리기 · 고치기 · 지우기 */
+
 /** 서버 오류 코드를 사람 말로. */
 export const BOARD_ERRORS: Record<string, string> = {
   need_5_verified: "인증 기록 5건부터 올릴 수 있습니다",
   daily_limit: "하루 3개까지 올릴 수 있습니다",
   no_contact: "링크 · 연락처는 넣을 수 없습니다",
-  record_not_verified: "인증 없는 기록은 고를 수 없습니다",
+  sanctioned: "운영 정책에 따라 지금은 글 · 댓글을 쓸 수 없습니다",
   theme_closed: "이번 주 주제가 끝났습니다",
-  note_too_long: "글자 수를 넘었습니다",
-  need_area: "동네를 골라 주세요",
+  need_title: "제목을 적어 주세요",
+  too_long: "글자 수를 넘었습니다",
+  too_many_tags: "태그는 5개까지입니다",
+  not_my_record: "내 기록만 붙일 수 있습니다",
+  course_size: "코스는 2~5곳입니다",
+  course_duplicate: "같은 기록을 두 번 넣을 수 없습니다",
+  poll_free_only: "투표는 자유 게시판에서만 열 수 있습니다",
+  poll_options: "선택지는 2~5개, 40자까지입니다",
+  poll_closed: "마감된 투표입니다",
+  one_level: "답글에는 답글을 달 수 없습니다",
+  no_post: "지워진 글입니다",
+  not_admin: "운영자만 할 수 있습니다",
+  role_locked: "바꿀 수 없는 값입니다",
 };
 const boardError = (msg: string) => BOARD_ERRORS[Object.keys(BOARD_ERRORS).find((k) => msg.includes(k)) ?? ""] ?? msg;
 
-export async function createPost(qc: QueryClient, p: { type: PostType; recordId?: number; themeId?: number; askArea?: string; askTags?: string[]; area?: string | null; note?: string }) {
+export type NewPost = {
+  type: PostType; title: string; body?: string; tags?: string[]; recordId?: number | null;
+  course?: { record_id: number; memo?: string }[]; themeId?: number | null; poll?: { options: string[]; days: number } | null;
+  area?: string | null; pinned?: boolean;
+};
+
+export async function createPost(qc: QueryClient, p: NewPost) {
   const { data, error } = await supabase.rpc("create_board_post", {
-    p_type: p.type, p_record_id: p.recordId ?? null, p_theme_id: p.themeId ?? null, p_ask_area: p.askArea ?? null,
-    p_ask_tags: p.askTags ?? [], p_area: p.area ?? null, p_note: p.note ? stripContact(p.note) : null,
+    p_type: p.type, p_title: stripContact(p.title).trim(), p_body: p.body ? stripContact(p.body).trim() || null : null, p_tags: p.tags ?? [],
+    p_record_id: p.recordId ?? null,
+    p_course: p.course ? p.course.map((c) => ({ record_id: c.record_id, memo: c.memo ? stripContact(c.memo).trim() : null })) : null,
+    p_theme_id: p.themeId ?? null, p_poll: p.poll ?? null, p_area: p.area ?? null, p_pinned: p.pinned ?? false,
   });
   if (error) throw new Error(boardError(error.message));
   await qc.invalidateQueries({ queryKey: ["community", "board"] });
@@ -493,10 +621,19 @@ export async function createPost(qc: QueryClient, p: { type: PostType; recordId?
   return Number(data);
 }
 
-export async function answerPost(qc: QueryClient, postId: number, recordId: number, reason: string) {
-  const { error } = await supabase.rpc("answer_board_post", { p_post_id: postId, p_record_id: recordId, p_reason: stripContact(reason) || null });
+export async function updatePost(qc: QueryClient, id: number, p: { title: string; body?: string; tags?: string[] }) {
+  const { error } = await supabase.rpc("update_board_post", {
+    p_id: id, p_title: stripContact(p.title).trim(), p_body: p.body ? stripContact(p.body).trim() || null : null, p_tags: p.tags ?? [],
+  });
   if (error) throw new Error(boardError(error.message));
   await qc.invalidateQueries({ queryKey: ["community", "board"] });
+}
+
+export async function deletePost(qc: QueryClient, id: number) {
+  const { error } = await supabase.from("board_posts").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+  await qc.invalidateQueries({ queryKey: ["community", "board"] });
+  await qc.invalidateQueries({ queryKey: ["community", "theme"] });
 }
 
 /** 오늘(한국 날짜) 내가 올린 글 수 — 「하루 3개까지」 안내용. 서버가 한 번 더 막습니다. */
@@ -512,15 +649,105 @@ export const usePostsToday = () =>
     },
   });
 
+/* ───────────── 프로필 창 ───────────── */
+
+export type FriendState = "self" | "friend" | "sent" | "received" | "none";
+
+export type ProfileCard = {
+  id: string; nickname: string; avatar_url: string | null; character_id: string | null; title_label_id: string | null; role: "user" | "admin";
+  record_count: number; verified_count: number; post_count: number; friend_state: FriendState;
+  /** 관리자에게만 — 정지 중이면 끝나는 때(영구면 "forever") */
+  sanctioned_until: string | null;
+};
+
+/** 닉네임을 누르면 여는 프로필 창. 차단한 사람이면 null. */
+export const useProfileCard = (userId: string | null) =>
+  useQuery({
+    queryKey: ["community", "profile-card", userId],
+    enabled: !!userId,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("public_profile_card", { p_user: userId! });
+      return soft("public_profile_card", error, (data as ProfileCard | null) ?? null);
+    },
+  });
+
+/* ───────────── 관리자 ───────────── */
+
+/** 내가 관리자인지 — 서버(is_admin)가 모든 관리자 동작에서 한 번 더 확인합니다. */
+export const useIsAdmin = () =>
+  useQuery({
+    queryKey: ["community", "is-admin"],
+    staleTime: 10 * 60 * 1000,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("is_admin");
+      return !error && data === true;
+    },
+  });
+
+async function adminRpc(qc: QueryClient, fn: string, args: Record<string, unknown>) {
+  const { data, error } = await supabase.rpc(fn, args);
+  if (error) throw new Error(boardError(error.message));
+  await qc.invalidateQueries({ queryKey: ["community"] });
+  return data;
+}
+
+export const adminHidePost = (qc: QueryClient, id: number, hide: boolean) => adminRpc(qc, "admin_hide_post", { p_id: id, p_hide: hide });
+export const adminHideComment = (qc: QueryClient, id: number, hide: boolean) => adminRpc(qc, "admin_hide_comment", { p_id: id, p_hide: hide });
+export const adminPinPost = (qc: QueryClient, id: number, pin: boolean) => adminRpc(qc, "admin_pin_post", { p_id: id, p_pin: pin });
+/** days 가 null 이면 영구 정지. */
+export const adminSanction = (qc: QueryClient, userId: string, days: number | null, reason?: string) =>
+  adminRpc(qc, "admin_sanction", { p_user: userId, p_until: days == null ? null : new Date(Date.now() + days * 86400000).toISOString(), p_reason: reason ?? null });
+export const adminUnsanction = (qc: QueryClient, userId: string) => adminRpc(qc, "admin_unsanction", { p_user: userId });
+export const adminResolveReport = (qc: QueryClient, id: number, note?: string) => adminRpc(qc, "admin_resolve_report", { p_id: id, p_note: note ?? null });
+export const adminCreateNotice = (qc: QueryClient, title: string, body: string, days: number | null) =>
+  adminRpc(qc, "admin_create_notice", { p_title: title, p_body: body || null, p_ends_at: days == null ? null : new Date(Date.now() + days * 86400000).toISOString() });
+export const adminSaveTheme = (qc: QueryClient, t: { title: string; description: string; startsOn: string; endsOn: string; id?: number | null }) =>
+  adminRpc(qc, "admin_save_theme", { p_title: t.title, p_starts_on: t.startsOn, p_ends_on: t.endsOn, p_description: t.description || null, p_id: t.id ?? null });
+
+export type ReportRow = { id: number; target_type: string; target_id: string; reporter_id: string; reason: string | null; created_at: string; resolved_at: string | null };
+
+/** 신고함 — 안 본 것이 위로. 관리자만 읽힙니다(RLS). */
+export const useReports = (enabled: boolean) =>
+  useQuery({
+    queryKey: ["community", "admin", "reports"],
+    enabled,
+    queryFn: async () => {
+      const { data, error } = await supabase.from("reports").select("*")
+        .order("resolved_at", { ascending: false, nullsFirst: true }).order("created_at", { ascending: false }).limit(100);
+      return soft("reports 조회", error, (data ?? []) as ReportRow[]);
+    },
+  });
+
+/* ───────────── 앱 전체 공지 ───────────── */
+
+export type AppNotice = { id: number; title: string; body: string | null; starts_at: string; ends_at: string | null };
+
+/** 기간 안의 가장 최근 공지 하나 — 상단 배너. TODO(푸시): 공지 알림 발송은 이번 범위 밖입니다. */
+export const useAppNotice = (enabled: boolean) =>
+  useQuery({
+    queryKey: ["app-notice"],
+    enabled,
+    staleTime: 10 * 60 * 1000,
+    queryFn: async () => {
+      const now = new Date().toISOString();
+      const { data, error } = await supabase.from("app_notices").select("id, title, body, starts_at, ends_at")
+        .lte("starts_at", now).or(`ends_at.is.null,ends_at.gt.${now}`).order("starts_at", { ascending: false }).limit(1);
+      if (error) return null;
+      return ((data ?? [])[0] as AppNotice | undefined) ?? null;
+    },
+  });
+
 /* ───────────── 신고 · 차단 ───────────── */
 
-export async function report(targetType: "post" | "answer" | "comment" | "user" | "tour", targetId: string | number, reason: string) {
+export type ReportTarget = "post" | "answer" | "comment" | "board_comment" | "user" | "tour";
+
+export async function report(targetType: ReportTarget, targetId: string | number, reason: string) {
   const me = await myId();
   const { error } = await supabase.from("reports").insert({ target_type: targetType, target_id: String(targetId), reporter_id: me, reason });
   if (error) throw new Error(error.message);
 }
 
-/** 숨기기 · 차단 — 그 사람의 기록 · 글 · 답이 내 화면에서 빠집니다. */
+/** 숨기기 · 차단 — 그 사람의 기록 · 글 · 댓글이 내 화면에서 빠집니다. */
 export async function blockUser(qc: QueryClient, otherId: string) {
   const me = await myId();
   if (!me) return;

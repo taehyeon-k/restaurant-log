@@ -12,6 +12,8 @@ export type Ghost = { name: string; address: string; lat: number; lng: number } 
 export type MapSegment = "records" | "wish";
 /** 커뮤니티 탭 — 마지막에 본 곳을 기억합니다(§4). */
 export type CommunityTab = "friends" | "recs" | "ranking" | "board";
+/** 게시판 칸 — 마지막에 고른 곳을 기억합니다(HANDOFF-board-v2 §3). */
+export type BoardTab = "all" | "free" | "theme" | "food" | "cafe" | "course";
 
 /** 링크로 담기(wish/link)를 위시 폼에서 열었을 때 고른 가게 + 출처 — 폼이 읽고 비웁니다. */
 export type LinkPick = {
@@ -22,7 +24,7 @@ type State = {
   kind: Kind; ghost: Ghost; linkPick: LinkPick;
   /** 공유 시트로 받은 글(링크가 섞여 있을 수 있음) — 로그인이 끝나면 위시 폼(wish/new?share=)으로 이어갑니다. */
   pendingShare: string | null;
-  mapSegment: MapSegment; communityTab: CommunityTab;
+  mapSegment: MapSegment; communityTab: CommunityTab; boardTab: BoardTab;
   /** 이번에 커뮤니티에 들어오기 직전의 last_seen_community_at — 친구 줄의 「새 기록」 테두리 기준. */
   communitySeenSince: string | null;
   /** 추천 탭 필터 — 사용자가 바꾼 값은 그 날만 기억합니다(HANDOFF-recommend-all §5-2). */
@@ -46,7 +48,7 @@ export type RecCourse = { id: string; date: string; places: { placeKey: string; 
 export type RecHere = { lat: number; lng: number; name: string | null; fallback: boolean };
 let state: State = {
   kind: "restaurant", ghost: null, linkPick: null, pendingShare: null,
-  mapSegment: "records", communityTab: "friends", communitySeenSince: null,
+  mapSegment: "records", communityTab: "friends", boardTab: "all", communitySeenSince: null,
   recFilter: null, recHeading: null, recCourse: null, recHere: null, recPlace: null, recAt: null, recShown: [],
 };
 const subs = new Set<() => void>();

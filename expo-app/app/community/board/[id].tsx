@@ -1,250 +1,229 @@
 import { useQueryClient } from "@tanstack/react-query";
 import * as Haptics from "expo-haptics";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useMemo, useState } from "react";
-import { Alert, FlatList, Pressable, Text, TextInput, View } from "react-native";
-import { BottomSheetModal } from "@/components/ui";
-import { useAccount } from "@/data/profile";
-import { useRows } from "@/data/queries";
-import { answerPost, blockUser, report, useAnswers, useBoardPost, useCurrentTheme, type AnswerGroup, type BoardPost } from "@/features/community/api";
-import { useAddWish } from "@/features/community/useAddWish";
-import { askTitle, AuthorRow, Cond, myVerifiedAt, PostBody, TYPE_LABEL } from "@/features/community/BoardPost";
-import { CommunityHeader, K, metaLine, Pill, shortAddr, TagChip, timeAgo } from "@/features/community/ui";
-import type { Restaurant } from "@/lib/types";
+import { useRef, useState } from "react";
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import {
+  addBoardComment, useBoardComments, useBoardPost, useCourseStops, useCurrentTheme, useIsAdmin, type BoardComment, type BoardPost,
+} from "@/features/community/api";
+import {
+  AuthorRow, boardPill, CourseBlock, PollOptions, postPhoto, postTitle, Reactions, RecordMini, Tags,
+} from "@/features/community/BoardPost";
+import { MoreButton } from "@/features/community/ItemMenu";
+import { RecordPickerSheet } from "@/features/community/RecordPicker";
+import { K, Pill, timeAgo } from "@/features/community/ui";
+import { coverPhoto, type Restaurant } from "@/lib/types";
 import { C, F } from "@/theme";
 
-/** 글 하나(3f) — 어디 가요? 는 가게 답을 가게별로 묶어 보여 주고, 가 본 사람만 답합니다. */
+const COMMENT_MAX = 500;
+const HIDDEN_POST = "운영 정책에 따라 삭제된 글입니다.";
+const HIDDEN_COMMENT = "운영 정책에 따라 삭제된 댓글입니다.";
+
+/** 글 상세 · 댓글(HANDOFF-board-v2 07) — 본문 전체 · 태그 · 투표 / 기록 / 코스 · 반응, 댓글은 시간순 · 답글 한 단계. */
 export default function BoardPostScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const postId = Number(id);
   const router = useRouter();
-  const qc = useQueryClient();
-  const { data: post } = useBoardPost(postId);
-  const { data: rows = [] } = useRows();
+  const insets = useSafeAreaInsets();
+  const { data: post, isLoading } = useBoardPost(postId);
+  const { data: isAdmin } = useIsAdmin();
   const { data: theme } = useCurrentTheme();
-  const [answering, setAnswering] = useState(false);
+  const { data: comments = [] } = useBoardComments(postId);
+  const { data: stopsMap } = useCourseStops(post?.type === "course" ? [postId] : []);
+  const stops = stopsMap?.get(postId) ?? [];
+  const [replyTo, setReplyTo] = useState<BoardComment | null>(null);
+  const inputRef = useRef<TextInput>(null);
 
   const back = () => (router.canGoBack() ? router.back() : router.replace("/community/board"));
+  const count = comments.reduce((n, c) => n + 1 + c.replies.length, 0);
 
-  function menu() {
-    if (!post) return;
-    Alert.alert("신고", undefined, [
-      {
-        text: "이 글 신고하기",
-        onPress: () => Alert.alert("무엇이 문제인가요?", undefined, [
-          ...["광고 · 홍보", "불쾌한 내용", "인증과 다른 가게", "기타"].map((reason) => ({
-            text: reason,
-            onPress: () => report("post", post.id, reason).then(() => Alert.alert("신고했습니다", "살펴본 뒤 처리합니다.")).catch(() => {}),
-          })),
-          { text: "취소", style: "cancel" as const },
-        ]),
-      },
-      {
-        text: `${post.nickname ?? "이 사람"}의 글 숨기기`,
-        style: "destructive",
-        onPress: () => blockUser(qc, post.author_id).then(back).catch(() => {}),
-      },
-      { text: "취소", style: "cancel" },
-    ]);
-  }
-
-  const header = <CommunityHeader back={{ label: "게시판", onPress: back }} right={<Pill label="신고" onPress={menu} />} />;
+  const header = (
+    <View style={{ paddingTop: insets.top + 8, paddingHorizontal: 20, paddingBottom: 6, flexDirection: "row", alignItems: "center", gap: 8 }}>
+      <Pill onPress={back} accessibilityLabel="게시판으로" label="‹" />
+      <Text style={{ flex: 1, textAlign: "center", fontFamily: F.mono, fontSize: 11, letterSpacing: 1.4, color: C.muted }}>
+        {post ? (post.type === "theme" && post.theme_id === theme?.id ? `주제 · ${theme?.title}` : boardPill(post)) : "게시판"}
+      </Text>
+      <View style={{ minWidth: 32, alignItems: "flex-end" }}>
+        {post && <MoreButton target={{ kind: "post", post }} onEdit={() => router.push({ pathname: "/community/board/new", params: { edit: String(post.id) } })} onDeleted={back} onBlocked={back} />}
+      </View>
+    </View>
+  );
 
   if (!post) {
-    return <View style={{ flex: 1, backgroundColor: C.paper }}>{header}</View>;
-  }
-
-  if (post.type !== "ask") {
     return (
       <View style={{ flex: 1, backgroundColor: C.paper }}>
         {header}
-        <View style={{ paddingHorizontal: 20, paddingTop: 16 }}>
-          <PostBody post={post} rows={rows} themeTitle={post.theme_id === theme?.id ? theme?.title : null} />
-        </View>
+        <Text style={{ paddingVertical: 60, textAlign: "center", fontFamily: F.sans, fontSize: 12.5, color: C.faint }}>{isLoading ? "" : "지워졌거나 볼 수 없는 글입니다."}</Text>
       </View>
     );
   }
 
+  const hidden = !!post.hidden_at && !isAdmin;
+
   return (
-    <View style={{ flex: 1, backgroundColor: C.paper }}>
+    <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1, backgroundColor: C.paper }}>
       {header}
-      <AskAnswers post={post} rows={rows} onAnswer={() => setAnswering(true)} />
-      <AnswerSheet post={post} rows={rows} visible={answering} onClose={() => setAnswering(false)} />
-    </View>
+      <ScrollView contentContainerStyle={{ paddingBottom: 24 }} keyboardShouldPersistTaps="handled">
+        <View style={{ paddingHorizontal: 20, paddingTop: 10, gap: 12 }}>
+          <AuthorRow userId={post.author_id} name={post.nickname} url={post.avatar_url} titleId={post.title_label_id} role={post.author_role} time={timeAgo(post.created_at) + (post.edited_at ? " · 고침" : "")} />
+          {hidden ? (
+            <Text style={{ paddingVertical: 20, fontFamily: F.sans, fontSize: 13, color: K.inactive }}>{HIDDEN_POST}</Text>
+          ) : (
+            <PostContent post={post} stops={stops} />
+          )}
+          {post.hidden_at && isAdmin && <Text style={{ fontFamily: F.mono, fontSize: 10, color: C.brick }}>숨긴 글 · 운영자에게만 보입니다</Text>}
+        </View>
+
+        <View style={{ marginTop: 20, marginHorizontal: 20, paddingTop: 14, borderTopWidth: 1, borderTopColor: C.line, flexDirection: "row", justifyContent: "space-between" }}>
+          <Text style={{ fontFamily: F.sansMd, fontSize: 12.5, color: C.ink }}>댓글 {count}</Text>
+          <Text style={{ fontFamily: F.mono, fontSize: 10, color: C.faint }}>시간순</Text>
+        </View>
+        <View style={{ paddingHorizontal: 20, paddingTop: 6 }}>
+          {comments.length === 0 && <Text style={{ paddingVertical: 24, textAlign: "center", fontFamily: F.sans, fontSize: 12, color: C.faint }}>첫 댓글을 남겨 보세요.</Text>}
+          {comments.map((c) => (
+            <View key={c.id}>
+              <CommentRow c={c} post={post} onReply={() => { setReplyTo(c); inputRef.current?.focus(); }} />
+              {c.replies.map((r) => (
+                <View key={r.id} style={{ paddingLeft: 35 }}>
+                  <CommentRow c={r} post={post} />
+                </View>
+              ))}
+            </View>
+          ))}
+        </View>
+      </ScrollView>
+      {!hidden && <CommentInput post={post} replyTo={replyTo} onClearReply={() => setReplyTo(null)} inputRef={inputRef} />}
+    </KeyboardAvoidingView>
   );
 }
 
-function AskAnswers({ post, rows, onAnswer }: { post: BoardPost; rows: Restaurant[]; onAnswer: () => void }) {
-  const { data: groups = [] } = useAnswers(post.id);
-  const canAnswer = rows.some((r) => r.verified && !r.pending);
+/** 본문 전체 · 태그 · 투표 카드 · 기록 카드 · 코스 · 반응. */
+function PostContent({ post, stops }: { post: BoardPost; stops: Parameters<typeof CourseBlock>[0]["stops"] }) {
+  const hasRecord = !!post.place_name && post.type !== "course";
   return (
     <>
-      <FlatList
-        data={groups}
-        keyExtractor={(g) => g.place}
-        contentContainerStyle={{ paddingBottom: 96 }}
-        ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
-        ListHeaderComponent={
-          <View>
-            <View style={{ paddingTop: 16, paddingHorizontal: 20, gap: 9 }}>
-              <TagChip label={TYPE_LABEL.ask} />
-              <AuthorRow
-                name={post.nickname ?? ""} url={post.avatar_url} seed={post.author_id} titleId={post.title_label_id}
-                right={<Text style={{ fontFamily: F.mono, fontSize: 10, color: K.inactive }}>{timeAgo(post.created_at)}</Text>}
-              />
-              <Text style={{ fontFamily: F.serif, fontSize: 19, lineHeight: 27, color: C.ink }}>{askTitle(post.ask_area, post.ask_tags)}</Text>
-              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
-                {[post.ask_area, ...post.ask_tags].filter(Boolean).map((t) => <Cond key={t} label={t!} />)}
-              </View>
-              {!!post.note && <Text style={{ fontFamily: F.sans, fontSize: 12.5, color: K.text2 }}>{post.note}</Text>}
-            </View>
-            <View style={{ marginTop: 16, marginHorizontal: 20, paddingTop: 14, borderTopWidth: 1, borderTopColor: C.line, flexDirection: "row", justifyContent: "space-between" }}>
-              <Text style={{ fontFamily: F.mono, fontSize: 10, letterSpacing: 1.6, color: C.faint }}>가게 답 {groups.reduce((n, g) => n + g.picks, 0)}</Text>
-              <Text style={{ fontFamily: F.sans, fontSize: 11, color: K.inactive }}>가 본 사람만 답할 수 있어요</Text>
-            </View>
-            <View style={{ height: 10 }} />
-          </View>
-        }
-        ListEmptyComponent={<Text style={{ paddingVertical: 30, textAlign: "center", fontFamily: F.sans, fontSize: 12.5, color: C.faint }}>아직 답이 없습니다.</Text>}
-        renderItem={({ item }) => <View style={{ paddingHorizontal: 16 }}><AnswerCard group={item} post={post} rows={rows} /></View>}
-      />
-      <Pressable
-        onPress={onAnswer}
-        disabled={!canAnswer}
-        style={{ position: "absolute", left: 16, right: 16, bottom: 22, minHeight: 48, borderRadius: 18, backgroundColor: C.ink, alignItems: "center", justifyContent: "center", opacity: canAnswer ? 1 : 0.4, shadowColor: C.ink, shadowOpacity: 0.2, shadowRadius: 20, shadowOffset: { width: 0, height: 8 }, elevation: 8 }}
-      >
-        <Text style={{ fontFamily: F.sansMd, fontSize: 13.5, color: C.card }}>가 본 가게로 답하기</Text>
-      </Pressable>
+      {!!postTitle(post) && <Text style={{ fontFamily: F.serif, fontSize: 20, lineHeight: 28, color: C.ink }}>{postTitle(post)}</Text>}
+      {!!post.body && <Text selectable style={{ fontFamily: F.serif, fontSize: 13.5, lineHeight: 23, color: K.text2 }}>{post.body}</Text>}
+      <Tags tags={post.tags} />
+      {post.type === "free" && !!post.poll_closes_at && (
+        <View style={{ borderRadius: 16, borderWidth: 1, borderColor: C.lineSoft, backgroundColor: C.card, padding: 12 }}>
+          <PollOptions post={post} />
+        </View>
+      )}
+      {hasRecord && (
+        <View style={{ borderRadius: 16, borderWidth: 1, borderColor: C.lineSoft, backgroundColor: C.card, padding: 12 }}>
+          <RecordMini name={post.place_name} photo={postPhoto(post)} rating={post.rating} category={post.category} address={post.address} verifiedAt={post.verified ? post.verified_at : null} />
+        </View>
+      )}
+      {post.type === "course" && <CourseBlock post={post} stops={stops} />}
+      <Reactions post={post} stops={stops} />
     </>
   );
 }
 
-/** 같은 가게를 고른 답 하나로 — N명이 고름, 처음 답한 사람과 그 이유. */
-function AnswerCard({ group, post, rows }: { group: AnswerGroup; post: BoardPost; rows: Restaurant[] }) {
-  const qc = useQueryClient();
-  const a = group.first;
-  const mine = myVerifiedAt(rows, a.place, a.place_name);
-  const { data: account } = useAccount();
-  const already = group.answers.some((x) => x.author_id === account?.userId);
-  const [wish, setWish] = useState<"idle" | "added" | "exists">("idle");
-  const [busy, setBusy] = useState(false);
-  const { add: addWish, sheet: wishSheet } = useAddWish();
-
-  async function metoo() {
-    if (!mine || busy) return;
-    setBusy(true);
-    try {
-      await answerPost(qc, post.id, mine.id, "");
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch (e) { Alert.alert("답하지 못했습니다", e instanceof Error ? e.message : ""); }
-    setBusy(false);
-  }
-
+/** 댓글 한 줄 — 아바타 26 · 닉네임 · 시간 · 본문 12.5 · (기록) · 「답글」. 숨긴 댓글은 작성자 줄을 두고 본문만 바꿉니다. */
+function CommentRow({ c, post, onReply }: { c: BoardComment; post: BoardPost; onReply?: () => void }) {
+  const hidden = !!c.hidden_at && c.body == null;
+  const photo = c.record_id ? coverPhoto({ photo_urls: c.photo_urls ?? [], cover_index: c.cover_index ?? 0, photo_url: c.photo_url }) : null;
   return (
-    <View style={{ borderRadius: 18, borderWidth: 1, borderColor: C.lineSoft, backgroundColor: C.card, paddingVertical: 12, paddingHorizontal: 14, gap: 8 }}>
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-        <View style={{ flex: 1, gap: 2 }}>
-          <Text style={{ fontFamily: F.serif, fontSize: 15, color: C.ink }}>{a.place_name}</Text>
-          <Text style={{ fontFamily: F.sans, fontSize: 11, color: C.faint }}>{metaLine(a.category, shortAddr(a.address, null).split(" ").slice(1).join(" "))}</Text>
-        </View>
-        <Text style={{ borderRadius: 9, borderWidth: 1, borderStyle: "dashed", borderColor: C.brick, paddingHorizontal: 8, paddingVertical: 1, fontFamily: F.mono, fontSize: 10, color: C.brick, overflow: "hidden" }}>{group.picks}명이 고름</Text>
-      </View>
+    <View style={{ paddingVertical: 11, gap: 6 }}>
       <AuthorRow
-        size={20} name={a.nickname ?? ""} url={a.avatar_url} seed={a.author_id} titleId={a.title_label_id}
-        right={<Text style={{ fontFamily: F.mono, fontSize: 10, color: K.inactive }}>✓ 인증</Text>}
+        size={26} userId={c.author_id} name={c.nickname} url={c.avatar_url} titleId={c.title_label_id} role={c.author_role}
+        time={timeAgo(c.created_at)}
+        badge={c.author_id === post.author_id ? (
+          <Text style={{ borderRadius: 8, borderWidth: 1, borderColor: C.line, paddingHorizontal: 6, fontFamily: F.sans, fontSize: 9.5, color: C.muted, overflow: "hidden" }}>글쓴이</Text>
+        ) : undefined}
+        more={<MoreButton target={{ kind: "comment", comment: c }} />}
       />
-      {!!a.reason && <Text style={{ fontFamily: F.serif, fontSize: 12.5, lineHeight: 20, color: K.text2 }}>{a.reason}</Text>}
-      <View style={{ flexDirection: "row", gap: 6 }}>
-        <Pressable
-          disabled={wish !== "idle"}
-          onPress={async () => {
-            const res = await addWish({ name: a.place_name, where_text: a.address, category: a.category, lat: a.lat, lng: a.lng, source: `${a.nickname ?? "게시판"}의 기록` }).catch(() => null);
-            if (res) setWish(res);
-          }}
-          style={{ minHeight: 28, borderRadius: 14, borderWidth: 1, borderColor: K.brickLine, paddingHorizontal: 10, justifyContent: "center", backgroundColor: wish === "idle" ? "transparent" : C.brickSoft }}
-        >
-          <Text style={{ fontFamily: F.sans, fontSize: 11, color: C.brick }}>{wish === "added" ? "✓ 위시에 담음" : wish === "exists" ? "이미 담아둔 곳" : "+ 위시에 담기"}</Text>
-        </Pressable>
-        <Pressable
-          onPress={metoo}
-          disabled={!mine || busy || already}
-          accessibilityHint={mine ? undefined : "이 가게의 인증 기록이 있을 때 누를 수 있습니다"}
-          style={{ minHeight: 28, borderRadius: 14, borderWidth: 1, borderColor: C.lineSoft, paddingHorizontal: 10, justifyContent: "center", opacity: mine && !already ? 1 : 0.45 }}
-        >
-          <Text style={{ fontFamily: F.sans, fontSize: 11, color: C.muted }}>나도 이 집</Text>
-        </Pressable>
+      <View style={{ paddingLeft: 33, gap: 7 }}>
+        {hidden ? (
+          <Text style={{ fontFamily: F.sans, fontSize: 12.5, color: K.inactive }}>{HIDDEN_COMMENT}</Text>
+        ) : (
+          <Text selectable style={{ fontFamily: F.sans, fontSize: 12.5, lineHeight: 19, color: K.text2 }}>{c.body}</Text>
+        )}
+        {!hidden && !!c.place_name && (
+          <View style={{ alignSelf: "flex-start", maxWidth: "100%", borderRadius: 10, borderWidth: 1, borderColor: C.lineSoft, backgroundColor: C.card, padding: 6, paddingRight: 10 }}>
+            <RecordMini size={32} name={c.place_name} photo={photo} verifiedAt={c.verified ? c.verified_at : null} />
+          </View>
+        )}
+        {!!c.hidden_at && !hidden && <Text style={{ fontFamily: F.mono, fontSize: 9.5, color: C.brick }}>숨긴 댓글 · 운영자에게만 보입니다</Text>}
+        {onReply && !hidden && (
+          <Pressable onPress={onReply} hitSlop={6} style={{ alignSelf: "flex-start" }}>
+            <Text style={{ fontFamily: F.sans, fontSize: 11, color: C.faint }}>답글</Text>
+          </Pressable>
+        )}
       </View>
-      {wishSheet}
     </View>
   );
 }
 
-/** 가 본 가게로 답하기 — 내 인증 기록 하나 + 한 줄 이유(60자). */
-function AnswerSheet({ post, rows, visible, onClose }: { post: BoardPost; rows: Restaurant[]; visible: boolean; onClose: () => void }) {
+/** 입력줄 — 왼쪽 「+」(내 기록 붙이기) + 「댓글 달기」 500자. 문턱(5건)은 없습니다. */
+function CommentInput({ post, replyTo, onClearReply, inputRef }: { post: BoardPost; replyTo: BoardComment | null; onClearReply: () => void; inputRef: React.RefObject<TextInput | null> }) {
   const qc = useQueryClient();
-  const [pick, setPick] = useState<number | null>(null);
-  const [reason, setReason] = useState("");
+  const insets = useSafeAreaInsets();
+  const [text, setText] = useState("");
+  const [record, setRecord] = useState<Restaurant | null>(null);
+  const [picking, setPicking] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const verified = useMemo(() => {
-    // 같은 가게는 한 번만, 묻는 동네의 가게를 위로.
-    const seen = new Set<string>();
-    const list = rows.filter((r) => r.verified && !r.pending).filter((r) => {
-      const k = r.place_key ?? r.name;
-      if (seen.has(k)) return false;
-      seen.add(k);
-      return true;
-    });
-    const area = post.ask_area ?? "";
-    return list.sort((a, b) => Number((b.address ?? "").includes(area)) - Number((a.address ?? "").includes(area)));
-  }, [rows, post.ask_area]);
 
   async function send() {
-    if (pick == null || busy) return;
+    if (!text.trim() || busy) return;
     setBusy(true);
     setError("");
     try {
-      await answerPost(qc, post.id, pick, reason);
-      setPick(null);
-      setReason("");
-      onClose();
+      await addBoardComment(qc, { postId: post.id, body: text, parentId: replyTo?.id ?? null, recordId: record?.id ?? null });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setText("");
+      setRecord(null);
+      onClearReply();
+      inputRef.current?.blur();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "답하지 못했습니다");
+      setError(e instanceof Error ? e.message : "댓글을 남기지 못했습니다");
     }
     setBusy(false);
   }
 
   return (
-    <BottomSheetModal visible={visible} onClose={onClose}>
-      <Text style={{ fontFamily: F.serif, fontSize: 18, color: C.ink }}>가 본 가게로 답하기</Text>
-      <Text style={{ marginTop: 4, fontFamily: F.sans, fontSize: 11.5, color: C.faint }}>내가 인증한 가게만 고를 수 있습니다</Text>
-      <FlatList
-        style={{ marginTop: 10, maxHeight: 280 }}
-        data={verified}
-        keyExtractor={(r) => String(r.id)}
-        renderItem={({ item: r }) => {
-          const on = r.id === pick;
-          return (
-            <Pressable onPress={() => setPick(r.id)} style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: "#ece8de" }}>
-              <View style={{ flex: 1, gap: 1 }}>
-                <Text numberOfLines={1} style={{ fontFamily: F.serif, fontSize: 14, color: C.ink }}>{r.name}</Text>
-                <Text numberOfLines={1} style={{ fontFamily: F.sans, fontSize: 10.5, color: C.faint }}>{metaLine(r.category, r.region)}</Text>
-              </View>
-              <View style={{ width: 22, height: 22, borderRadius: 11, alignItems: "center", justifyContent: "center", backgroundColor: on ? C.brick : "transparent", borderWidth: on ? 0 : 1.5, borderColor: K.dashed }}>
-                {on && <Text style={{ fontSize: 11, color: C.card }}>✓</Text>}
-              </View>
+    <View style={{ borderTopWidth: 1, borderTopColor: C.lineSoft, backgroundColor: C.paper, paddingHorizontal: 14, paddingTop: 8, paddingBottom: Math.max(insets.bottom, 10), gap: 6 }}>
+      {(replyTo || record) && (
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+          {replyTo && (
+            <Pressable onPress={onClearReply} style={{ borderRadius: 12, backgroundColor: K.segMap, paddingHorizontal: 9, paddingVertical: 3 }}>
+              <Text style={{ fontFamily: F.sans, fontSize: 11, color: C.muted }}>{replyTo.author_role === "admin" ? "DINARY 운영" : replyTo.nickname}에게 답글 ✕</Text>
             </Pressable>
-          );
-        }}
-      />
-      <View style={{ marginTop: 12, minHeight: 46, borderRadius: 14, borderWidth: 1, borderColor: C.lineSoft, backgroundColor: C.card, paddingHorizontal: 14, flexDirection: "row", alignItems: "center", gap: 8 }}>
-        <TextInput value={reason} onChangeText={(t) => setReason(t.slice(0, 60))} placeholder="한 줄 이유" placeholderTextColor={K.inactive} style={{ flex: 1, paddingVertical: 12, fontFamily: F.sans, fontSize: 12.5, color: C.ink }} />
-        <Text style={{ fontFamily: F.mono, fontSize: 10, color: K.inactive }}>{reason.length} / 60</Text>
+          )}
+          {record && (
+            <Pressable onPress={() => setRecord(null)} style={{ borderRadius: 12, backgroundColor: C.brickSoft, paddingHorizontal: 9, paddingVertical: 3 }}>
+              <Text style={{ fontFamily: F.sans, fontSize: 11, color: C.brick }}>{record.name}{record.verified ? " ✓" : ""} ✕</Text>
+            </Pressable>
+          )}
+        </View>
+      )}
+      <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 8 }}>
+        <Pressable onPress={() => setPicking(true)} accessibilityLabel="내 기록 붙이기" style={{ width: 40, height: 40, borderRadius: 20, borderWidth: 1, borderColor: C.line, backgroundColor: C.card, alignItems: "center", justifyContent: "center" }}>
+          <Text style={{ fontFamily: F.sans, fontSize: 19, color: C.muted, marginTop: -2 }}>+</Text>
+        </Pressable>
+        <TextInput
+          ref={inputRef}
+          value={text}
+          onChangeText={(t) => setText(t.slice(0, COMMENT_MAX))}
+          placeholder="댓글 달기"
+          placeholderTextColor={K.inactive}
+          multiline
+          maxLength={COMMENT_MAX}
+          style={{ flex: 1, minHeight: 40, maxHeight: 110, borderRadius: 20, borderWidth: 1, borderColor: C.lineSoft, backgroundColor: C.card, paddingHorizontal: 14, paddingTop: 10, paddingBottom: 10, fontFamily: F.sans, fontSize: 13, color: C.ink }}
+        />
+        <Pressable onPress={send} disabled={!text.trim() || busy} style={{ height: 40, borderRadius: 20, backgroundColor: C.ink, paddingHorizontal: 14, justifyContent: "center", opacity: !text.trim() || busy ? 0.4 : 1 }}>
+          <Text style={{ fontFamily: F.sansMd, fontSize: 12.5, color: C.card }}>남기기</Text>
+        </Pressable>
       </View>
-      {!!error && <Text style={{ marginTop: 6, fontFamily: F.sans, fontSize: 11.5, color: C.brick }}>{error}</Text>}
-      <Pressable onPress={send} disabled={pick == null || busy} style={{ marginTop: 12, minHeight: 48, borderRadius: 18, backgroundColor: C.ink, alignItems: "center", justifyContent: "center", opacity: pick == null || busy ? 0.4 : 1 }}>
-        <Text style={{ fontFamily: F.sansMd, fontSize: 13.5, color: C.card }}>답하기</Text>
-      </Pressable>
-    </BottomSheetModal>
+      {(text.length > COMMENT_MAX - 60 || !!error) && (
+        <Text style={{ fontFamily: F.sans, fontSize: 11, color: error ? C.brick : K.inactive, textAlign: error ? "left" : "right" }}>{error || `${text.length} / ${COMMENT_MAX}`}</Text>
+      )}
+      <RecordPickerSheet visible={picking} onClose={() => setPicking(false)} onPick={([r]) => setRecord(r ?? null)} title="댓글에 내 기록 붙이기" />
+    </View>
   );
 }
+
