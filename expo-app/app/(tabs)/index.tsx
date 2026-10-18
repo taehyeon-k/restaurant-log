@@ -29,7 +29,7 @@ import PlaceSearch from "@/features/map/PlaceSearch";
 import { SegmentSwitch, useWishItems, WishRow, type WishItem } from "@/features/map/WishSegment";
 import RecapInvite from "@/features/recap/RecapInvite";
 import { FilterSheet as FilterSheetImpl, FoundSheet, SearchMissSheet } from "@/features/map/Sheets";
-import { dayCount, mealLabels } from "@/lib/anniversary";
+import { mealLabels } from "@/lib/anniversary";
 import type { Place as GeocodePlace } from "@/lib/geocode";
 import { findRecord, findWish, norm } from "@/lib/geo";
 import { groupPlaces, type Place } from "@/lib/places";
@@ -37,6 +37,11 @@ import { feltLevel } from "@/lib/price";
 import { inRegion, inSearchedRegion, matchRegionName, regionFromSearch, regionNamesFrom } from "@/lib/regions";
 import { matchWish, type Kind, type Restaurant, type Sort } from "@/lib/types";
 import { C, F, SHADOW } from "@/theme";
+
+const KINDS: { value: Kind; label: string }[] = [
+  { value: "restaurant", label: "맛집" },
+  { value: "cafe", label: "카페" },
+];
 
 const SORTS: { value: Sort; label: string }[] = [
   { value: "recent", label: "최근순" },
@@ -184,8 +189,8 @@ export default function MapTab() {
     const byRecent = (a: Place, b: Place) => ((a.latest.visited_at ?? "") < (b.latest.visited_at ?? "") ? 1 : -1);
     return [...list].sort((a, b) => {
       if (sort === "rating") return (b.rating ?? 0) - (a.rating ?? 0);
-      // 체감가격(돼지 1–5)이 높은 순, 같으면 최근 기록 순.
-      if (sort === "felt") return feltLevel(b) - feltLevel(a) || byRecent(a, b);
+      // 체감가격(돼지 1–5)이 낮은 순, 같으면 최근 기록 순.
+      if (sort === "felt") return feltLevel(a) - feltLevel(b) || byRecent(a, b);
       return byRecent(a, b);
     });
   }, [allPlaces, q, categories, keywords, revisitOnly, verifiedOnly, viewBounds, sort]);
@@ -426,9 +431,16 @@ export default function MapTab() {
       <Text style={{ fontFamily: F.sans, fontSize: small ? 10.5 : 11, color: C.brick }}>현 지도에 있는 기록만</Text>
     </Pressable>
   );
+  // 종류·낱말은 맛집과 카페가 달라 바꿀 때 비웁니다.
+  const changeKind = (k: Kind) => {
+    if (k === kind) return;
+    Haptics.selectionAsync();
+    setState({ kind: k });
+    setCategories([]);
+    setKeywords([]);
+  };
   const chipVisible = mapMoved && !overlayOpen;
   const title = isCouple ? "우리 기록" : kind === "cafe" ? "카페 기록" : "맛집 기록";
-  const dPlus = startedOn ? `D+${dayCount(startedOn)}` : null;
 
   // 시트가 낮으면(peek) 한 줄 요약만 — 검색·칩·정렬은 숨깁니다(웹과 같음).
   const segmentSwitch = (
@@ -454,12 +466,13 @@ export default function MapTab() {
     <View>
       {segmentSwitch}
       <View style={s.headRow}>
-        <View>
-          <View style={{ flexDirection: "row", alignItems: "baseline", gap: 6 }}>
-            <Text style={s.h}>{title}</Text>
-            {dPlus && <Text style={{ fontFamily: F.mono, fontSize: 11.5, color: C.brick }}>{dPlus}</Text>}
-          </View>
-          <Text style={s.count}>가게 {filtered.length} · 기록 {visitCount}</Text>
+        {/* 맛집 / 카페 — 고른 쪽만 목록과 지도 핀에 남습니다(검색·필터·정렬과 함께). */}
+        <View style={{ flexDirection: "row", alignItems: "baseline", gap: 10 }}>
+          {KINDS.map((o) => (
+            <Pressable key={o.value} onPress={() => changeKind(o.value)} hitSlop={{ top: 12, bottom: 12, left: 5, right: 5 }} accessibilityRole="button" accessibilityState={{ selected: kind === o.value }}>
+              <Text numberOfLines={1} style={[s.h, { color: kind === o.value ? C.ink : "#c4bdb0" }]}>{o.label}</Text>
+            </Pressable>
+          ))}
         </View>
         <View style={s.searchIn}>
           <SearchIcon size={14} />
@@ -672,8 +685,6 @@ export default function MapTab() {
 
       <FilterSheetImpl
         visible={filtersOpen}
-        kind={kind}
-        onKindChange={(k: Kind) => { setState({ kind: k }); setCategories([]); setKeywords([]); }}
         categories={uniq(inKind.map((r) => r.category))}
         keywords={uniq(inKind.flatMap((r) => r.keywords))}
         selectedCategories={categories}
@@ -777,7 +788,6 @@ const s = StyleSheet.create({
   headRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 20, paddingBottom: 10 },
   compactRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8, paddingHorizontal: 20, paddingBottom: 12 },
   h: { fontFamily: F.serif, fontSize: 18, color: C.ink },
-  count: { marginTop: 3, fontFamily: F.mono, fontSize: 10.5, color: C.faint },
   filterBtn: { height: 40, borderRadius: 20, borderWidth: 1, borderColor: "#ded8cb", backgroundColor: C.card, paddingHorizontal: 12, flexDirection: "row", alignItems: "center", gap: 5 },
   searchIn: {
     flex: 1, minWidth: 0, height: 40, borderRadius: 20, borderWidth: 1, borderColor: "#ded8cb", backgroundColor: C.card,

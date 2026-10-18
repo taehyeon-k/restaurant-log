@@ -2,14 +2,14 @@ import { Text, View } from "react-native";
 import Animated, { SlideInDown, SlideOutDown } from "react-native-reanimated";
 import { BookmarkIcon } from "@/components/icons";
 import { BottomSheetModal, Button, Chip, Eyebrow, PhotoBox } from "@/components/ui";
-import { dottedDate, type Kind, type Restaurant } from "@/lib/types";
+import { dottedDate, type Restaurant } from "@/lib/types";
 import type { Place } from "@/lib/places";
 import { Pressable } from "react-native";
 import { C, F, SHADOW } from "@/theme";
 
 /** 「골라 보기」 시트. */
 export function FilterSheet(p: {
-  visible: boolean; kind: Kind; onKindChange: (k: Kind) => void; categories: string[]; keywords: string[];
+  visible: boolean; categories: string[]; keywords: string[];
   selectedCategories: string[]; selectedKeywords: string[]; revisitOnly: boolean; verifiedOnly: boolean; count: number;
   onToggleCategory: (c: string) => void; onToggleKeyword: (k: string) => void; onToggleRevisit: () => void;
   onToggleVerified: () => void; onReset: () => void; onClose: () => void;
@@ -19,11 +19,6 @@ export function FilterSheet(p: {
       <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
         <Text style={{ fontFamily: F.serif, fontSize: 18, color: C.ink }}>골라 보기</Text>
         <Pressable onPress={p.onReset} style={{ paddingVertical: 6 }}><Text style={{ fontFamily: F.sans, fontSize: 12, color: C.faint }}>모두 지우기</Text></Pressable>
-      </View>
-
-      <View style={{ marginTop: 16 }}><Eyebrow>맛집 · 카페</Eyebrow></View>
-      <View style={{ marginTop: 9, flexDirection: "row", gap: 7 }}>
-        {(["restaurant", "cafe"] as Kind[]).map((k) => <Chip key={k} label={k === "restaurant" ? "맛집" : "카페"} active={p.kind === k} onPress={() => p.onKindChange(k)} />)}
       </View>
 
       {p.categories.length > 0 && (
