@@ -151,10 +151,9 @@ function JourneySlide({ recap }: { recap: LabelRecap }) {
   const last = recap.journey[recap.journey.length - 1]?.no;
   return (
     <View style={{ flex: 1 }}>
-      <Text style={s.kicker}>이렇게 받았어요</Text>
-      <View style={{ marginTop: 12 }}><LineText line={recap.how} size={24} color={INK} align="left" /></View>
+      <LineText line={recap.how} size={24} color={INK} align="left" />
       <Text style={{ marginTop: 10, fontFamily: F.sans, fontSize: 12.5, color: MUTED }}>
-        {recap.def.desc} · {dottedDate(recap.earnedOn)}에 채웠어요
+        {recap.def.desc} · {dottedDate(recap.earnedOn)}
       </Text>
       <ScrollView style={{ marginTop: 20 }} contentContainerStyle={{ gap: 4 }} showsVerticalScrollIndicator={false}>
         {trimJourney(recap.journey).map((j) =>
