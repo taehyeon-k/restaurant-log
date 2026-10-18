@@ -463,14 +463,7 @@ export default function EditRoute() {
         </View>
 
         <View style={s.revisitBox}>
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontFamily: F.sansMd, fontSize: 13.5, color: C.ink }}>재방문 의사</Text>
-            {revisit && (
-              <Text style={{ marginTop: 4, fontFamily: F.sans, fontSize: 11.5, lineHeight: 18, color: C.muted }}>
-                다시 갈 곳으로 표시됩니다 — 지도 핀도 색이 찹니다.
-              </Text>
-            )}
-          </View>
+          <Text style={{ flex: 1, fontFamily: F.sansMd, fontSize: 13.5, color: C.ink }}>재방문 의사</Text>
           <Switch value={revisit} onValueChange={setRevisit} trackColor={{ true: C.brick, false: "#d8d3c8" }} thumbColor={C.card} />
         </View>
 
