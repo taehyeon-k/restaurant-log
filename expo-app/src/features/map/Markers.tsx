@@ -27,17 +27,30 @@ export const LABEL_BOTTOM = 42;
 
 const textBase = { includeFontPadding: false, textAlignVertical: "center" } as const;
 
-function Tag({ name, rating, cta, badge }: { name: string; rating?: number | null; cta?: string; badge?: string }) {
+/**
+ * 말풍선 바탕 — 테두리 1px, 모서리 14 에 왼쪽 아래만 3.
+ * iOS 는 테두리 있는 상자나 모서리가 제각각인 상자의 바탕을 별도 레이어(zPosition 음수)로 그리는데,
+ * 네이버 지도 마커 스냅샷(renderInContext)은 zPosition 을 무시해 그 바탕이 글자를 덮습니다(흰 상자만 보임).
+ * 그래서 테두리 없는 둥근 상자(바탕이 뷰 자기 레이어에 그려짐)를 겹쳐 같은 모양을 만듭니다: 바깥은 선 색, 1px 안쪽은 카드 색.
+ */
+function TagBubble() {
+  const fill = { position: "absolute", left: 0, top: 0, right: 0, bottom: 0 } as const;
+  const corner = { position: "absolute", left: 0, bottom: 0, width: 14, height: 14 } as const;
   return (
-    <View
-      style={[
-        {
-          alignSelf: "center", borderWidth: 1, borderColor: C.line, backgroundColor: C.card, paddingTop: 7, paddingBottom: 6,
-          paddingHorizontal: 12, borderTopLeftRadius: 14, borderTopRightRadius: 14, borderBottomRightRadius: 14, borderBottomLeftRadius: 3,
-        },
-        SHADOW.card,
-      ]}
-    >
+    <>
+      <View style={[fill, { borderRadius: 14, backgroundColor: C.line }, SHADOW.card]} />
+      <View style={[corner, { borderRadius: 3, backgroundColor: C.line }]} />
+      <View style={[fill, { left: 1, top: 1, right: 1, bottom: 1, borderRadius: 13, backgroundColor: C.card }]} />
+      <View style={[corner, { left: 1, bottom: 1, width: 13, height: 13, borderRadius: 2, backgroundColor: C.card }]} />
+    </>
+  );
+}
+
+function Tag({ name, rating, cta, badge }: { name: string; rating?: number | null; cta?: string; badge?: string }) {
+  // 패딩에 테두리 1px 을 더해 예전 상자(테두리 1 + 패딩 7/6/12)와 크기가 같습니다.
+  return (
+    <View style={{ alignSelf: "center", paddingTop: 8, paddingBottom: 7, paddingHorizontal: 13 }}>
+      <TagBubble />
       <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
         <Text numberOfLines={1} style={[textBase, { flexShrink: 1, fontFamily: F.sansBd, fontSize: 13, lineHeight: NAME_LH, color: C.ink }]}>{name}</Text>
         {badge && <Text style={[textBase, { fontFamily: F.mono, fontSize: 9.5, lineHeight: NAME_LH, color: C.brick }]}>{badge}</Text>}
