@@ -2,7 +2,7 @@
 
 Date: 2026-10-18
 
-This records the implementation of the revised [technical brief](technical-assessment-and-remediation.md). Implementation is prepared on `main`. Production migrations have not been applied, and no OTA update has been published. See Git history for local commits.
+This records the implementation of the revised [technical brief](technical-assessment-and-remediation.md). Implementation is prepared on `main`. The three production migrations were applied and verified on 2026-10-18 (columns, unique indexes, and trigger present). No OTA update has been published. See Git history for local commits.
 
 ## Implemented behavior
 
@@ -22,7 +22,7 @@ This records the implementation of the revised [technical brief](technical-asses
 
 Recommendation logs use `hybrid-v4.1` to distinguish the corrected book isolation and capture-time evidence from v4.0. Ranking weights are unchanged.
 
-## Required production migrations — not applied
+## Required production migrations — applied 2026-10-18
 
 The client now depends on all three columns. Apply and verify these migrations before any push that triggers the production EAS Update workflow:
 
@@ -103,7 +103,7 @@ No physical device or simulator was available for this implementation. Complete 
 
 ## Remaining limits
 
-- Production migrations require separate owner approval and have not been applied. Existing backend authorization was inspected from migration definitions, not exercised against production.
+- Production migrations were applied on 2026-10-18 with owner approval. Existing backend authorization was inspected from migration definitions, not exercised against production.
 - Device acceptance, OS geofencing reliability, and native performance remain unverified. An Android JavaScript export is not a device test.
 - Other recommendation events remain best-effort; this implements durable visit delivery, not a full event outbox or unbiased learning dataset. Exploration remains disabled.
 - Legacy `verified_at` can still reflect delayed upload time when no `captured_at` exists. No reliable reconstruction is available for old records.
@@ -115,3 +115,10 @@ No physical device or simulator was available for this implementation. Complete 
 ## References
 
 Immutable retry uploads follow [Supabase standard upload behavior](https://supabase.com/docs/guides/storage/uploads/standard-uploads). Explicit pages use the [Supabase range API](https://supabase.com/docs/reference/javascript/range). These references support implementation contracts, not claims that this project's production policies have been tested.
+
+## Follow-up fixes after review (2026-10-18)
+
+- **Unverified capture save (`app/record/edit.tsx`).** The offline/queued branch now applies the same rules as the online save: it matches a wish (passed to the queue as `wish_id` so the upload deletes it, plus `from_wish`), sets `revisit || twin` and the twin address/region fallbacks, and carries the couple note. The note travels in a new queue column `couple_note` (guarded SQLite ALTER) and is written to `record_notes` in the queue's reconcile step only when the record's book is a couple book. The reconcile step now receives the inserted record id.
+- **Wish geofences (`app/_layout.tsx`).** Geofences are stopped only when the signed-in account actually changes (another account or sign-out), not on every launch. An offline launch or a geofence-triggered background launch no longer turns nearby alerts off.
+- Regression tests: reconcile receives the record id; the SQLite upgrade adds `couple_note`. `npm run check`: 73 tests passed, lint 0 errors.
+- Not changed: the wish's `capture_path` storage object is not removed by the queued path (same as the existing verified-capture queue path).

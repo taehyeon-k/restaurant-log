@@ -48,7 +48,7 @@ function queueFixture() {
     upload: async (_path: string) => { uploads++; },
     findRecord: async () => remote,
     insert: async () => { inserts++; remote = 42; return remote; },
-    reconcileWish: async () => { reconciles++; },
+    reconcileWish: async (_recordId: number) => { reconciles++; },
     attribute: async () => true,
     cleanup: async () => { cleanups++; },
   };
@@ -67,11 +67,18 @@ test("wishlist reconciliation failure retries only reconciliation", async () => 
   const f = queueFixture();
   const reconcile = f.io.reconcileWish;
   let failed = false;
-  f.io.reconcileWish = async () => { if (!failed) { failed = true; throw new Error("offline"); } await reconcile(); };
+  f.io.reconcileWish = async (id: number) => { if (!failed) { failed = true; throw new Error("offline"); } await reconcile(id); };
   await assert.rejects(resumeJob(f.job, f.io));
   assert.equal(f.job.stage, "inserted");
   assert.equal(await resumeJob(f.job, f.io), 42);
   assert.equal(f.counts().inserts, 1);
+});
+test("reconciliation receives the inserted record id (couple note follows the record)", async () => {
+  const f = queueFixture();
+  const seen: number[] = [];
+  f.io.reconcileWish = async (recordId: number) => { seen.push(recordId); };
+  assert.equal(await resumeJob(f.job, f.io), 42);
+  assert.deepEqual(seen, [42]);
 });
 test("queue never uploads for a different owner and stops on account switch between stages", async () => {
   const f = queueFixture(); f.setOwner("B");
@@ -137,6 +144,7 @@ test("SQLite upgrade preserves legacy jobs, stable operation IDs and malformed q
   const first = db.prepare("SELECT * FROM pending_records WHERE id=1").get()!;
   assert.equal(first.owner_id, "A"); assert.equal(first.photo_uri, "file://a");
   assert.equal(first.stage, "pending"); assert.match(String(first.op_id), /^[0-9a-f-]{36}$/);
+  assert.ok("couple_note" in first); assert.equal(first.couple_note, null);
   assert.equal(db.prepare("SELECT failed FROM pending_records WHERE id=2").get()!.failed, 1);
   await migrateQueue(adapter);
   assert.equal(db.prepare("SELECT op_id FROM pending_records WHERE id=1").get()!.op_id, first.op_id);

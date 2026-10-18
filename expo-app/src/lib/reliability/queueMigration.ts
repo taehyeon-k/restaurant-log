@@ -8,7 +8,7 @@ export interface QueueDatabase {
 export async function migrateQueue(d: QueueDatabase) {
     // CREATE IF NOT EXISTS does not migrate existing devices. Preserve every pending row.
     const columns = new Set((await d.getAllAsync<{ name: string }>("PRAGMA table_info(pending_records)")).map((c) => c.name));
-    for (const [name, definition] of Object.entries({ owner_id: "TEXT", op_id: "TEXT", photo_path: "TEXT", stage: "TEXT NOT NULL DEFAULT 'pending'", record_id: "INTEGER", attribution: "TEXT", extra_photos: "TEXT" })) {
+    for (const [name, definition] of Object.entries({ owner_id: "TEXT", op_id: "TEXT", photo_path: "TEXT", stage: "TEXT NOT NULL DEFAULT 'pending'", record_id: "INTEGER", attribution: "TEXT", extra_photos: "TEXT", couple_note: "TEXT" })) {
       if (!columns.has(name)) await d.execAsync(`ALTER TABLE pending_records ADD COLUMN ${name} ${definition}`);
     }
     for (const row of await d.getAllAsync<{ id: number; payload: string; owner_id: string | null; op_id: string | null }>("SELECT id, payload, owner_id, op_id FROM pending_records")) {

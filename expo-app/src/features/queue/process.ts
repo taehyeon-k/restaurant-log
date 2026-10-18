@@ -54,10 +54,22 @@ async function processOne(row: QueueRow): Promise<number | null> {
       if (existing.error) throw existing.error;
       return existing.data.id as number;
     },
-    reconcileWish: async () => {
-      if (!row.wish_id) return;
-      const { error } = await supabase.from("wishes").delete().eq("id", row.wish_id);
-      if (error) throw error;
+    reconcileWish: async (recordId) => {
+      if (row.wish_id) {
+        const { error } = await supabase.from("wishes").delete().eq("id", row.wish_id);
+        if (error) throw error;
+      }
+      // 연인 기록이면 별점·메모가 곧 찍은 사람의 한 줄입니다(HANDOFF-couple §3-6). 오프라인에선 기록장 종류를 몰라 여기서 봅니다.
+      if (row.couple_note && typeof payload.book_id === "string") {
+        const { data: book, error } = await supabase.from("books").select("kind").eq("id", payload.book_id).maybeSingle();
+        if (error) throw error;
+        if (book?.kind === "couple") {
+          const n = JSON.parse(row.couple_note) as { rating: number | null; note: string | null };
+          const { error: e2 } = await supabase.from("record_notes")
+            .upsert({ record_id: recordId, user_id: row.owner_id, rating: n.rating, note: n.note, updated_at: new Date().toISOString() });
+          if (e2) throw e2;
+        }
+      }
     },
     attribute: async (id) => queueVisit(row.attribution ? JSON.parse(row.attribution) as VisitHint : null, id, payload.verified === true),
     cleanup: async () => {

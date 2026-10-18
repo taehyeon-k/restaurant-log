@@ -204,14 +204,21 @@ export default function EditRoute() {
         const targetBook = await captureBookId(session.user.id, bookId);
         const lat = spot?.lat ?? twin?.lat ?? preLat;
         const lng = spot?.lng ?? twin?.lng ?? preLng;
+        const finalAddress = cleanAddress || twin?.address || null;
+        // 아래 온라인 저장과 같은 규칙 — 위시 짝 · 재방문 · 연인 한 줄은 큐가 기록을 올린 뒤 이어서 처리합니다.
+        const matchedWish = findMatchingWish(wishes, { name: cleanName, lat, lng }, WISH_AUTO_M);
+        const fromWish = matchedWish ? wishMetInfo(matchedWish, visitedAt || today()) : null;
+        const note = shared.rating != null || shared.review ? { rating: shared.rating, note: shared.review } : null;
         const files = pics.filter((pic) => pic.local).map((pic) => persistPhoto(pic.ref));
         const hint = lat != null && lng != null ? await visitAttribution({ name: cleanName, lat, lng }, Date.parse(p.capturedAt)) : null;
         const queueId = await enqueue({
           ...shared, user_id: session.user.id, ...(targetBook ? { book_id: targetBook } : {}),
-          kind, captured_at: visitedAt === p.visitedAt ? p.capturedAt : null, region: regionFromAddress(cleanAddress) || null,
-          place_key: `${cleanName}|${cleanAddress}`.toLowerCase(), lat, lng, verified: false, acc: null,
-          pending: false, from_wish: null, price_range: null, cover_index: cover,
-        }, files[0], null, hint ? JSON.stringify(hint) : null, files.slice(1));
+          kind, captured_at: visitedAt === p.visitedAt ? p.capturedAt : null,
+          region: twin?.region || regionFromAddress(finalAddress ?? "") || null, address: finalAddress,
+          place_key: `${cleanName}|${finalAddress ?? ""}`.toLowerCase(), lat, lng, verified: false, acc: null,
+          revisit: revisit || Boolean(twin),
+          pending: false, from_wish: fromWish, price_range: null, cover_index: cover,
+        }, files[0], matchedWish?.id ?? null, hint ? JSON.stringify(hint) : null, files.slice(1), note);
         parsePhotos(p.photos).forEach(removePhoto);
         void drainQueue(qc, queueId).catch((error) => console.warn("큐 전송 실패", error));
         router.dismissAll();

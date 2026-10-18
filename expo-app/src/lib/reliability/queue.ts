@@ -14,7 +14,7 @@ export async function resumeJob(job: Job, io: {
   upload: (path: string) => Promise<void>;
   findRecord: (operation: string) => Promise<number | null>;
   insert: (operation: string, path: string) => Promise<number>;
-  reconcileWish: () => Promise<void>;
+  reconcileWish: (recordId: number) => Promise<void>;
   attribute: (recordId: number) => Promise<boolean>;
   cleanup: () => Promise<void>;
 }): Promise<number | null> {
@@ -39,7 +39,7 @@ export async function resumeJob(job: Job, io: {
   }
   if (job.stage === "inserted") {
     await check();
-    await io.reconcileWish();
+    await io.reconcileWish(job.record_id!);
     await save({ stage: "reconciled" });
   }
   await check();

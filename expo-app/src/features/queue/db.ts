@@ -17,6 +17,8 @@ export type QueueRow = {
   record_id: number | null;
   attribution: string | null;
   extra_photos: string | null;
+  /** 연인 기록장이면 찍은 사람의 한 줄(record_notes) — `{ rating, note }` JSON. 기록이 들어간 뒤 씁니다. */
+  couple_note: string | null;
   /** restaurants.insert 에 그대로 들어갈 필드(photo_url 은 업로드 뒤에 채웁니다). user_id 포함. */
   payload: string;
   /** documentDirectory 에 복사해 둔 사진 */
@@ -68,14 +70,17 @@ export function removePhoto(uri: string) {
   }
 }
 
-export async function enqueue(payload: object, photoUri: string, wishId: string | null, attribution: string | null = null, extraPhotos: string[] = []) {
+export async function enqueue(
+  payload: object, photoUri: string, wishId: string | null, attribution: string | null = null, extraPhotos: string[] = [],
+  coupleNote: { rating: number | null; note: string | null } | null = null,
+) {
   const d = await db();
   const serialized = JSON.stringify(payload);
   const owner = legacyOwner(serialized);
   if (!owner) throw new Error("queue_owner_missing");
   const res = await d.runAsync(
-    "INSERT INTO pending_records (payload, photo_uri, wish_id, created_at, owner_id, op_id, attribution, extra_photos) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-    serialized, photoUri, wishId, Date.now(), owner, operationId(), attribution, JSON.stringify(extraPhotos)
+    "INSERT INTO pending_records (payload, photo_uri, wish_id, created_at, owner_id, op_id, attribution, extra_photos, couple_note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    serialized, photoUri, wishId, Date.now(), owner, operationId(), attribution, JSON.stringify(extraPhotos), coupleNote ? JSON.stringify(coupleNote) : null
   );
   return res.lastInsertRowId;
 }

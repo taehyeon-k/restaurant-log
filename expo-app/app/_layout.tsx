@@ -15,7 +15,7 @@ import { Stack, useRouter, useSegments } from "expo-router";
 import { useShareIntent } from "expo-share-intent";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { useAccount } from "@/data/profile";
@@ -44,9 +44,19 @@ function Gate({ fontsLoaded }: { fontsLoaded: boolean }) {
   useEffect(() => {
     setState({ recShown: [], recHeading: null, recCourse: null, recHere: null, recPlace: null, recAt: null, recFilter: null, ghost: null, linkPick: null });
     void restoreShown(userId ?? null);
-    void syncWishGeofences([]);
     if (userId) void qc.invalidateQueries();
   }, [userId, qc]);
+
+  // 계정이 실제로 바뀔 때(다른 계정 · 로그아웃)만 이전 계정의 지오펜스를 멈춥니다. 앱을 열 때마다 멈추면
+  // 오프라인으로 열었을 때나 지오펜스가 앱을 깨웠을 때 위시가 다시 읽힐 때까지 근처 알림이 꺼집니다.
+  const geofenceOwner = useRef<string | null | undefined>(undefined);
+  useEffect(() => {
+    if (session === undefined) return;
+    const now = session?.user.id ?? null;
+    const prev = geofenceOwner.current;
+    geofenceOwner.current = now;
+    if (prev !== undefined && prev !== now) void syncWishGeofences([]);
+  }, [session]);
 
   const { data: account, isPending: accountPending, isError: accountError } = useAccount();
   const { data: wishes } = useWishes();
