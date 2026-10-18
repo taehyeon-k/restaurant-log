@@ -2,21 +2,25 @@ import { useQueryClient } from "@tanstack/react-query";
 import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import { Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
-import { BackButton, Eyebrow } from "@/components/ui";
+import { LabelBadge } from "@/components/Badges";
+import { BackButton, BottomSheetModal, Button, Eyebrow } from "@/components/ui";
 import { refreshAll } from "@/data/invalidate";
 import { usePersonalRows } from "@/data/queries";
 import { useAccount } from "@/data/profile";
+import { EmptySlot, Stamp } from "@/features/stamps/Stamp";
 import { useSeenLabels } from "@/lib/labelSeen";
-import { earnedLabels, regionTitles, type EarnedLabel } from "@/lib/labels";
+import { earnedLabels, regionTitles, stampTilt, type EarnedLabel } from "@/lib/labels";
 import { supabase } from "@/lib/supabase";
+import type { Restaurant } from "@/lib/types";
 import { C, F } from "@/theme";
 
 /**
- * 라벨첩(지시서 3 §E-4) — 그릇 수 8단계 타일 · 이야기 5개 목록 · 동네 칭호 칩.
- * 받은 라벨을 누르면 그 라벨의 리캡이 열리고, 길게 누르면 닉네임 옆 대표 라벨로 붙습니다.
+ * 라벨첩(지시서 3 §E-4) — 그릇 수 8단계 타일 · 이야기 목록 · 동네 칭호 칩.
+ * 그릇 수 타일을 누르면 리캡, 이야기 줄을 누르면 메달 · 도장 · 채운 가게 시트(「기록 보기」로 리캡).
+ * 받은 라벨을 길게 누르면 닉네임 옆 대표 라벨로 붙습니다.
  */
 export default function Labels() {
   const insets = useSafeAreaInsets();
@@ -26,6 +30,7 @@ export default function Labels() {
   const { data: account } = useAccount();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [detail, setDetail] = useState<EarnedLabel | null>(null);
 
   const titleId = account?.titleLabelId ?? null;
   const labels = earnedLabels(rows);
@@ -123,12 +128,12 @@ export default function Labels() {
             return (
               <Pressable
                 key={l.id}
-                onPress={() => open(l)}
+                onPress={() => setDetail(l)}
                 onLongPress={() => toggleTitle(l)}
-                disabled={!l.earned}
-                style={{ flexDirection: "row", alignItems: "center", gap: 11, paddingVertical: 13, paddingHorizontal: 14, borderTopWidth: i ? 1 : 0, borderTopColor: "#ece7dc" }}
+                accessibilityLabel={`${l.name}${l.earned ? "" : " · 아직"} 자세히 보기`}
+                style={{ flexDirection: "row", alignItems: "center", gap: 11, paddingVertical: 11, paddingHorizontal: 14, borderTopWidth: i ? 1 : 0, borderTopColor: "#ece7dc" }}
               >
-                <View style={{ width: 9, height: 9, borderRadius: 5, backgroundColor: l.earned ? l.color : "#ddd6c9" }} />
+                <LabelBadge label={l} size={46} />
                 <View style={{ flex: 1 }}>
                   <Text style={{ fontFamily: F.serif, fontSize: 14, color: l.earned ? C.ink : C.muted }}>
                     {l.name}
@@ -138,7 +143,9 @@ export default function Labels() {
                   <Text style={{ marginTop: 2, fontFamily: F.sans, fontSize: 11, color: C.faint }}>{l.desc}</Text>
                 </View>
                 {l.earned ? (
-                  <Text style={{ fontFamily: F.sansMd, fontSize: 11.5, color: C.brick }}>받음 ›</Text>
+                  <Pressable onPress={() => open(l)} hitSlop={10} accessibilityLabel={`${l.name} 기록 보기`}>
+                    <Text style={{ fontFamily: F.sansMd, fontSize: 11.5, color: C.brick }}>기록 보기 ›</Text>
+                  </Pressable>
                 ) : (
                   <Text style={{ fontFamily: F.mono, fontSize: 11, color: C.faint }}>{Math.min(l.have, l.need)} / {l.need}</Text>
                 )}
@@ -161,7 +168,63 @@ export default function Labels() {
           <Text style={{ marginTop: 10, fontFamily: F.sans, fontSize: 12, color: C.faint }}>한 구에서 인증 기록 10건이면 첫 칭호를 받아요</Text>
         )}
       </ScrollView>
+      {detail && (
+        <LabelSheet
+          label={detail}
+          rows={rows}
+          isTitle={detail.id === titleId}
+          onClose={() => setDetail(null)}
+          onRecap={() => { setDetail(null); open(detail); }}
+        />
+      )}
     </View>
+  );
+}
+
+/** 이야기 라벨 시트 — 큰 메달, 채운 만큼 찍힌 도장, 어느 가게를 몇 번 가서 채웠는지. */
+function LabelSheet({ label, rows, isTitle, onClose, onRecap }: {
+  label: EarnedLabel; rows: Restaurant[]; isTitle: boolean; onClose: () => void; onRecap: () => void;
+}) {
+  const { height } = useWindowDimensions();
+  const contrib = label.contrib(rows);
+  const stores = new Map<string, { name: string; n: number }>();
+  for (const r of contrib) {
+    const k = r.place_key ?? `${r.name}|${r.address ?? ""}`;
+    const s = stores.get(k);
+    if (s) s.n += 1;
+    else stores.set(k, { name: r.name, n: 1 });
+  }
+  const list = [...stores.values()].sort((a, b) => b.n - a.n);
+  const size = 34, gap = 8;
+
+  return (
+    <BottomSheetModal visible onClose={onClose}>
+      <ScrollView style={{ maxHeight: height * 0.72 }} contentContainerStyle={{ alignItems: "center", paddingBottom: 6 }}>
+        <LabelBadge label={label} selected={isTitle} size={132} />
+        <Text style={{ marginTop: 14, fontFamily: F.serif, fontSize: 21, color: label.earned ? C.ink : C.muted }}>{label.name}</Text>
+        <Text style={{ marginTop: 5, fontFamily: F.sans, fontSize: 12, color: C.faint }}>
+          {label.desc} · <Text style={{ fontFamily: F.mono, color: label.earned ? label.color : C.faint }}>{Math.min(label.have, label.need)} / {label.need}</Text>
+        </Text>
+
+        <View style={{ marginTop: 18, flexDirection: "row", flexWrap: "wrap", justifyContent: "center", width: size * 5 + gap * 4, rowGap: gap, columnGap: gap }}>
+          {Array.from({ length: label.need }, (_, i) =>
+            i < contrib.length ? <Stamp key={i} n={i + 1} size={size} tilt={stampTilt(i)} /> : <EmptySlot key={i} size={size} label={i + 1} />,
+          )}
+        </View>
+
+        <View style={{ alignSelf: "stretch", marginTop: 20, borderRadius: 16, borderWidth: 1, borderColor: C.lineSoft, backgroundColor: C.card }}>
+          {list.length > 0 ? list.map((s, i) => (
+            <View key={s.name + i} style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 11, paddingHorizontal: 14, borderTopWidth: i ? 1 : 0, borderTopColor: "#ece7dc" }}>
+              <Text numberOfLines={1} style={{ flex: 1, fontFamily: F.sans, fontSize: 13, color: C.ink }}>{s.name}</Text>
+              <Text style={{ fontFamily: F.mono, fontSize: 12, color: C.brick }}>{s.n}번</Text>
+            </View>
+          )) : (
+            <Text style={{ padding: 14, fontFamily: F.sans, fontSize: 12, color: C.faint, textAlign: "center" }}>아직 채운 가게가 없어요</Text>
+          )}
+        </View>
+      </ScrollView>
+      {label.earned && <Button style={{ marginTop: 14 }} label="기록 보기" onPress={onRecap} />}
+    </BottomSheetModal>
   );
 }
 
