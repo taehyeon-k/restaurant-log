@@ -50,20 +50,20 @@ export function FilterSheet(p: {
   );
 }
 
-/** 지도 검색에서 이미 있는 가게를 찾았을 때의 작은 시트. */
+/** 지도 검색에서 이미 있는 가게를 찾았을 때, 또는 이름표가 안 보이는 기록 핀을 눌렀을 때의 작은 시트. */
 export function FoundSheet(p: {
-  hit: { restaurant: Restaurant; place: Place } | null; onClose: () => void; onRevisit: () => void; onWish: () => void; onOpen: () => void;
+  hit: { restaurant: Restaurant; place: Place; fromPin?: boolean } | null; onClose: () => void; onRevisit: () => void; onWish: () => void; onOpen: () => void;
 }) {
   const r = p.hit?.restaurant;
   return (
     <BottomSheetModal visible={!!p.hit} onClose={p.onClose}>
       {r && p.hit && (
         <>
-          <Eyebrow wide>찾았습니다</Eyebrow>
+          <Eyebrow wide>{p.hit.fromPin ? "내 기록" : "찾았습니다"}</Eyebrow>
           <Text style={{ marginTop: 6, fontFamily: F.serif, fontSize: 22, color: C.ink }}>{r.name}</Text>
           <Text style={{ marginTop: 4, fontFamily: F.sans, fontSize: 11.5, color: C.faint }}>{[r.category, r.region].filter(Boolean).join(" · ")}</Text>
           <Text style={{ marginTop: 6, fontFamily: F.mono, fontSize: 10.5, color: "#a29a8c" }}>
-            기록 {p.hit.place.visits.length}건 · 마지막 {dottedDate(p.hit.place.latest.visited_at)}
+            ★ {p.hit.place.rating == null ? "—" : p.hit.place.rating.toFixed(1)} · 기록 {p.hit.place.visits.length}건 · 마지막 {dottedDate(p.hit.place.latest.visited_at)}
           </Text>
           <View style={{ marginTop: 14, flexDirection: "row", gap: 8 }}>
             <Button label="기록 추가" onPress={p.onRevisit} style={{ flex: 1, minHeight: 48, borderRadius: 16 }} />

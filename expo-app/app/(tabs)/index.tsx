@@ -143,7 +143,7 @@ export default function MapTab() {
   const [viewBounds, setViewBounds] = useState<Bounds | null>(null);
   const [zoom, setZoom] = useState(12);
   const [regionView, setRegionView] = useState<{ name: string; count: number } | null>(null);
-  const [foundHit, setFoundHit] = useState<{ restaurant: Restaurant; place: Place } | null>(null);
+  const [foundHit, setFoundHit] = useState<{ restaurant: Restaurant; place: Place; fromPin?: boolean } | null>(null);
   const [plusOpen, setPlusOpen] = useState(false);
   const [me, setMe] = useState<{ lat: number; lng: number } | null>(null);
   const placesAt = usePlacesAt();
@@ -514,7 +514,12 @@ export default function MapTab() {
           <RecordMarker
             key={p.key} lat={p.lat as number} lng={p.lng as number} name={p.name} category={p.category} revisit={p.revisit}
             rating={p.rating} active={false} planned={!!matchWish(wishes, p.name)} showLabel={showLabel(`r:${p.key}`)} badge={placeTag(p)}
-            onTap={() => { Haptics.selectionAsync(); openPlace(p); }}
+            onTap={() => {
+              Haptics.selectionAsync();
+              // 이름표가 안 보일 만큼 멀리서 누르면 위시 핀처럼 시트로 이름 · 별점부터 보여 줍니다.
+              if (showLabel(`r:${p.key}`)) openPlace(p);
+              else setFoundHit({ restaurant: p.latest, place: p, fromPin: true });
+            }}
           />
         ))}
         {wishMarkers.map((w) => (
