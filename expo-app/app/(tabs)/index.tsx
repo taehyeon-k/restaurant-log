@@ -59,6 +59,9 @@ const LOCATE_H = 44;
 const PLACES_SHEET_RATIO = 0.56;
 
 type Bounds = { s: number; w: number; n: number; e: number };
+/** 「이 지도 범위」 — 범위를 고르지 않았으면 모두, 골랐으면 좌표가 그 안에 있는 것만. */
+const inBounds = (b: Bounds | null, lat: number | null, lng: number | null) =>
+  !b || (lat != null && lng != null && lat >= b.s && lat <= b.n && lng >= b.w && lng <= b.e);
 type Pt = [number, number];
 const uniq = (list: (string | null | undefined)[]) => [...new Set(list.filter((v): v is string => !!v))];
 
@@ -70,8 +73,6 @@ export default function MapTab() {
   const { data: allRows = [] } = useRows();
   const { data: wishes = [] } = useWishes();
   const { kind, ghost, mapSegment } = useAppState();
-  // 핀은 시트의 세그먼트만 따릅니다 — 맛집 기록이면 기록 핀, 위시리스트면 위시 핀.
-  const wishItems = useWishItems(wishes);
 
   // 다른 화면의 「위시에 담기」 등이 지도를 segment=wish 로 열 수 있습니다.
   const { segment } = useLocalSearchParams<{ segment?: string }>();
@@ -141,6 +142,8 @@ export default function MapTab() {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [mapMoved, setMapMoved] = useState(false);
   const [viewBounds, setViewBounds] = useState<Bounds | null>(null);
+  const shownWishes = useMemo(() => (viewBounds ? wishes.filter((w) => inBounds(viewBounds, w.lat, w.lng)) : wishes), [wishes, viewBounds]);
+  const wishItems = useWishItems(wishes, shownWishes);
   const [zoom, setZoom] = useState(12);
   const [regionView, setRegionView] = useState<{ name: string; count: number } | null>(null);
   const [foundHit, setFoundHit] = useState<{ restaurant: Restaurant; place: Place; fromPin?: boolean } | null>(null);
@@ -171,7 +174,7 @@ export default function MapTab() {
       p.visits.some((v) => [v.menu, v.review].some((f) => (f ?? "").toLowerCase().includes(needle)));
 
     const list = allPlaces
-      .filter((p) => !viewBounds || (p.lat != null && p.lng != null && p.lat >= viewBounds.s && p.lat <= viewBounds.n && p.lng >= viewBounds.w && p.lng <= viewBounds.e))
+      .filter((p) => inBounds(viewBounds, p.lat, p.lng))
       .filter((p) => !categories.length || categories.includes(p.category ?? ""))
       .filter((p) => !keywords.length || p.keywords.some((k) => keywords.includes(k)))
       .filter((p) => !revisitOnly || p.revisit)
@@ -398,8 +401,8 @@ export default function MapTab() {
   const recordMarkers = useMemo(() => filtered.filter((p) => p.lat != null && p.lng != null), [filtered]);
   const wishMarkers = useMemo(() => {
     const names = new Set(filtered.map((p) => norm(p.name)));
-    return wishes.filter((w) => w.lat != null && w.lng != null && !names.has(norm(w.name)));
-  }, [wishes, filtered]);
+    return wishes.filter((w) => w.lat != null && w.lng != null && inBounds(viewBounds, w.lat, w.lng) && !names.has(norm(w.name)));
+  }, [wishes, filtered, viewBounds]);
   /** 마커마다 이름표가 나타나는 줌 — 이웃 이름표·핀과 안 겹치는 줌부터(labelZoom). */
   const reveal = useMemo(() => revealZooms([
     ...recordMarkers.map((p) => ({ id: `r:${p.key}`, lat: p.lat as number, lng: p.lng as number, name: p.name, kind: "record" as const, planned: !!matchWish(wishes, p.name) })),

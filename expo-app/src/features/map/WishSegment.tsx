@@ -49,7 +49,8 @@ export type WishItem =
   | { t: "empty"; key: string };
 
 /** 예정 · N / 언젠가 · N 두 묶음으로 펼친 목록. 불러온 뒤 한 번, 지난 예정은 조용히 「언젠가」로 되돌립니다. */
-export function useWishItems(wishes: Wish[]) {
+/** shown — 목록에 보일 위시(「이 지도 범위」로 좁힌 것). 지난 예정 정리는 늘 전체(wishes)로 합니다. */
+export function useWishItems(wishes: Wish[], shown: Wish[] = wishes) {
   const qc = useQueryClient();
   const swept = useRef(false);
   useEffect(() => {
@@ -59,8 +60,8 @@ export function useWishItems(wishes: Wish[]) {
   }, [wishes, qc]);
 
   return useMemo(() => {
-    const dated = wishes.filter((w) => w.plan_date).sort((a, b) => (a.plan_date! < b.plan_date! ? -1 : 1));
-    const someday = wishes.filter((w) => !w.plan_date);
+    const dated = shown.filter((w) => w.plan_date).sort((a, b) => (a.plan_date! < b.plan_date! ? -1 : 1));
+    const someday = shown.filter((w) => !w.plan_date);
     const items: WishItem[] = [];
     if (dated.length) {
       items.push({ t: "head", key: "h-dated", title: `예정 · ${dated.length}`, first: true });
@@ -72,7 +73,7 @@ export function useWishItems(wishes: Wish[]) {
     }
     if (!items.length) items.push({ t: "empty", key: "empty" });
     return items;
-  }, [wishes]);
+  }, [shown]);
 }
 
 const pad = (n: number) => String(n).padStart(2, "0");
