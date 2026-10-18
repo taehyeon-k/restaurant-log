@@ -1,6 +1,6 @@
 /**
  * 「바로 촬영」(누르면 dinary://capture) + 「이번 달 인증」 3종(누르면 dinary://calendar).
- * 이번 달 인증 수 · 마지막 기록은 앱이 App Group(group.app.dinary) UserDefaults 에 써 두고 위젯이 읽습니다(src/lib/widget.ts).
+ * 이번 달 인증 수 · 마지막 기록은 앱이 App Group(group.app.dinary.shared) UserDefaults 에 써 두고 위젯이 읽습니다(src/lib/widget.ts).
  */
 /** @type {import('@bacons/apple-targets/app.plugin').Config} */
 module.exports = {
@@ -10,7 +10,7 @@ module.exports = {
   bundleIdentifier: ".widget",
   deploymentTarget: "16.4",
   entitlements: {
-    "com.apple.security.application-groups": ["group.app.dinary"],
+    "com.apple.security.application-groups": ["group.app.dinary.shared"],
   },
   colors: {
     $accent: "#b4552d",

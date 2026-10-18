@@ -107,7 +107,7 @@
           "androidIntentFilters": [
             "text/*"
           ],
-          "iosAppGroupIdentifier": "group.app.dinary"
+          "iosAppGroupIdentifier": "group.app.dinary.shared"
         }
       ],
       "./plugins/withShareExtensionDisplayName",

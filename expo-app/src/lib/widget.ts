@@ -11,7 +11,7 @@ import { coverPhoto, type Restaurant } from "./types";
  * 홈 화면 「이번 달 인증」 위젯 3종(targets/widget/MonthWidgets.swift)에 넘길 값.
  * App Group UserDefaults 에 써 두면 위젯이 읽습니다. 네이티브 모듈이 없는 옛 빌드에서는 ExtensionStorage 가 아무 일도 하지 않습니다.
  */
-const store = new ExtensionStorage("group.app.dinary");
+const store = new ExtensionStorage("group.app.dinary.shared");
 const KINDS = ["MonthWidget", "MonthDotsWidget", "MonthPhotoWidget"];
 
 /** 한국 시간 "YYYY-MM-DD" */
