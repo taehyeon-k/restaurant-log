@@ -948,7 +948,7 @@ export default function MobileShell({
                 }}
                 className="min-h-[48px] flex-1 cursor-pointer rounded-[16px] border-none bg-ink text-[13px] font-medium text-card"
               >
-                여기 또 왔어요 · 기록 추가
+                기록 추가
               </button>
               <button
                 type="button"

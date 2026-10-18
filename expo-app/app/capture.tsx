@@ -370,7 +370,7 @@ export default function Capture() {
             body="인증 사진을 찍는 데에 이용됩니다." />
           <PermCard icon={<MapPinIcon size={21} stroke={C.brick} />} title="위치"
             body="사진 찍는 순간 위치를 읽어 50m 안의 가게를 찾습니다." />
-          <PermCard dashed icon={<BellIcon size={19} stroke={C.faint} />} title="알림 · 나중에 물어봅니다"
+          <PermCard dashed icon={<BellIcon size={19} stroke={C.faint} />} title="알림"
             body="담아둔 곳 근처에 왔을 때 알려드립니다." />
         </View>
         <View style={{ flex: 1 }} />

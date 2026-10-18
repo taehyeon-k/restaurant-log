@@ -66,7 +66,7 @@ export function FoundSheet(p: {
             기록 {p.hit.place.visits.length}건 · 마지막 {dottedDate(p.hit.place.latest.visited_at)}
           </Text>
           <View style={{ marginTop: 14, flexDirection: "row", gap: 8 }}>
-            <Button label="여기 또 왔어요 · 기록 추가" onPress={p.onRevisit} style={{ flex: 1, minHeight: 48, borderRadius: 16 }} />
+            <Button label="기록 추가" onPress={p.onRevisit} style={{ flex: 1, minHeight: 48, borderRadius: 16 }} />
             <Pressable onPress={p.onWish} accessibilityLabel="위시리스트에 담기" style={{ width: 48, height: 48, borderRadius: 16, borderWidth: 1, borderColor: "#e4dfd3", alignItems: "center", justifyContent: "center" }}>
               <BookmarkIcon size={16} stroke={C.muted} />
             </Pressable>

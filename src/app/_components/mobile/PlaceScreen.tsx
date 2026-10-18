@@ -18,7 +18,7 @@ export default function PlaceScreen({
   place: Place;
   onBack: () => void;
   onOpenVisit: (id: number) => void;
-  /** 「여기 또 왔어요 · 기록 추가」(§8) — 이 가게 정보를 이어받은 새 기록을 엽니다. */
+  /** 「기록 추가」(§8) — 이 가게 정보를 이어받은 새 기록을 엽니다. */
   onRevisit: () => void;
   /** 이 가게를 가고싶다에 예정으로 담습니다(§9). */
   onAddWish: () => void;
@@ -99,7 +99,7 @@ export default function PlaceScreen({
               onClick={onRevisit}
               className="min-h-[50px] w-full cursor-pointer rounded-[18px] border-none bg-ink text-[13.5px] font-medium text-card"
             >
-              여기 또 왔어요 · 기록 추가
+              기록 추가
             </button>
 
             <button

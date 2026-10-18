@@ -420,7 +420,7 @@ export default function RecordRoute() {
           {!!error && <Text style={{ marginTop: 16, fontFamily: F.sans, fontSize: 12, color: "#a8412a" }}>{error}</Text>}
 
           {!readOnly && <View style={{ marginTop: 20, gap: 8 }}>
-            <Button label="여기 또 왔어요 · 기록 추가" onPress={revisit} />
+            <Button label="기록 추가" onPress={revisit} />
             <Pressable onPress={addWish} style={{ minHeight: 50, borderRadius: 18, borderWidth: 1, borderColor: "#ded8cb", flexDirection: "row", gap: 8, alignItems: "center", justifyContent: "center" }}>
               <BookmarkIcon size={14} fill={C.brick} stroke={C.brick} />
               <Text style={{ fontFamily: F.sans, fontSize: 13.5, color: C.ink }}>또 갈 예정으로 담기</Text>
