@@ -97,12 +97,22 @@ extension View {
   }
 }
 
-@main
 struct CaptureWidget: Widget {
   var body: some WidgetConfiguration {
     StaticConfiguration(kind: "CaptureWidget", provider: Provider()) { _ in CaptureView() }
       .configurationDisplayName("바로 촬영")
       .description("누르면 카메라가 바로 열려 방문을 기록합니다.")
       .supportedFamilies([.systemSmall, .accessoryCircular, .accessoryRectangular, .accessoryInline])
+  }
+}
+
+/// 한 확장에 위젯 넷 — 위젯 고르기 화면에 각각 따로 뜹니다.
+@main
+struct DinaryWidgets: WidgetBundle {
+  var body: some Widget {
+    CaptureWidget()
+    MonthWidget()
+    MonthDotsWidget()
+    MonthPhotoWidget()
   }
 }

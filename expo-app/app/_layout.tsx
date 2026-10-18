@@ -19,12 +19,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { useAccount } from "@/data/profile";
-import { useWishes } from "@/data/queries";
+import { useRows, useWishes } from "@/data/queries";
 import { setState, useAppState } from "@/data/store";
 import CommunityTransition from "@/features/community/Transition";
 import { startQueueTriggers } from "@/features/queue/process";
 // 이 import 가 백그라운드 지오펜스 태스크를 정의합니다 — 반드시 앱 진입점에서 불러야 합니다.
 import { syncWishGeofences } from "@/features/notify/geofence";
+import { clearMonthWidget, syncMonthWidget } from "@/lib/widget";
 import { C } from "@/theme";
 
 SplashScreen.preventAutoHideAsync();
@@ -115,6 +116,11 @@ function Gate({ fontsLoaded }: { fontsLoaded: boolean }) {
 
   // 오프라인 큐 — 앱 복귀·연결 복구에서 비웁니다.
   useEffect(() => (userId ? startQueueTriggers(qc) : undefined), [userId, qc]);
+
+  // 홈 화면 「이번 달 인증」 위젯 — 기록 목록을 새로 받을 때마다(저장 · 삭제 뒤 다시 읽을 때 포함) 다시 쓰고, 로그아웃 · 탈퇴하면 비웁니다.
+  const { data: rows } = useRows();
+  useEffect(() => { if (session && rows) void syncMonthWidget(rows); }, [session, rows]);
+  useEffect(() => { if (session === null) clearMonthWidget(); }, [session]);
 
   // 위시가 바뀔 때마다 가까운 20곳으로 지오펜스를 다시 맞춥니다.
   useEffect(() => { if (session && wishes) void syncWishGeofences(wishes); }, [session, wishes]);
