@@ -327,7 +327,7 @@ export default function EditRoute() {
               <View style={{ flex: 1 }}>
                 <Text style={{ fontFamily: F.sansMd, fontSize: 13, color: C.ink }}>앨범에서 고르기</Text>
                 <Text style={{ marginTop: 3, fontFamily: F.sans, fontSize: 11.5, lineHeight: 18, color: C.faint }}>
-                  최대 10장.
+                  최대 10장
                 </Text>
               </View>
             </View>
