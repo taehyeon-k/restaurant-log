@@ -69,7 +69,6 @@ export default function MapTab() {
   const { data: wishes = [] } = useWishes();
   const { kind, ghost, mapSegment } = useAppState();
   // 핀은 시트의 세그먼트만 따릅니다 — 맛집 기록이면 기록 핀, 위시리스트면 위시 핀.
-  const markerFilter = mapSegment === "wish" ? "wish" : "visited";
   const wishItems = useWishItems(wishes);
 
   // 다른 화면의 「위시에 담기」 등이 지도를 segment=wish 로 열 수 있습니다.
@@ -389,15 +388,12 @@ export default function MapTab() {
 
   /* ── 마커 ───────────────────────────────────── */
 
-  const recordMarkers = useMemo(() => {
-    const placed = (markerFilter === "wish" ? filtered.filter((p) => matchWish(wishes, p.name)) : filtered).filter((p) => p.lat != null && p.lng != null);
-    return placed;
-  }, [filtered, markerFilter, wishes]);
+  // 지도에는 탭(맛집 기록 · 위시리스트)과 상관없이 기록과 위시를 늘 함께 보여 줍니다 — 탭은 아래 목록만 바꿉니다.
+  const recordMarkers = useMemo(() => filtered.filter((p) => p.lat != null && p.lng != null), [filtered]);
   const wishMarkers = useMemo(() => {
-    if (markerFilter === "visited") return [];
     const names = new Set(filtered.map((p) => norm(p.name)));
     return wishes.filter((w) => w.lat != null && w.lng != null && !names.has(norm(w.name)));
-  }, [wishes, filtered, markerFilter]);
+  }, [wishes, filtered]);
   /** 마커마다 이름표가 나타나는 줌 — 이웃 이름표·핀과 안 겹치는 줌부터(labelZoom). */
   const reveal = useMemo(() => revealZooms([
     ...recordMarkers.map((p) => ({ id: `r:${p.key}`, lat: p.lat as number, lng: p.lng as number, name: p.name, kind: "record" as const, planned: !!matchWish(wishes, p.name) })),
