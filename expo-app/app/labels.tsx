@@ -241,3 +241,5 @@ const SectionHead = ({ title, right }: { title: string; right: string }) => (
     <Text style={{ fontFamily: F.serif, fontSize: 15, color: C.ink }}>{title} · <Text style={{ fontFamily: F.mono, fontSize: 13 }}>{right}</Text></Text>
   </View>
 );
+
+export { ErrorBoundary } from "expo-router";

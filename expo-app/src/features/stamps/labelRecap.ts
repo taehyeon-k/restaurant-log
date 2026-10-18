@@ -1,7 +1,7 @@
 import { ieosseoyo, nativeCount } from "@/features/recap/seasons";
 import { eulReul, iNa } from "@/lib/josa";
 import { BOWL_TIERS, earnedBy, LABELS, labelById, nextBowl, recordTime, stampRows, type LabelDef } from "@/lib/labels";
-import type { Restaurant } from "@/lib/types";
+import type { MenuItem, Restaurant } from "@/lib/types";
 
 /** 강조어만 벽돌색으로 그리는 한 줄. */
 export type Line = { t: string; em?: boolean }[];
@@ -23,8 +23,13 @@ export type LabelRecap = {
 
 /** 낱말 뒤에 붙는 조사만 — 강조어와 조사를 따로 그리려고. */
 const josa = (word: string, f: (w: string) => string) => f(word).slice(word.length);
-const dateOf = (r: Restaurant) => recordTime(r).slice(0, 10);
-const dayDiff = (a: string, b: string) => Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 86400000);
+// 시각이 하나도 없는 행(옛 데이터)은 빈 날짜로 두고, 날짜 집계에서는 건너뜁니다.
+const dateOf = (r: Restaurant) => (recordTime(r) ?? "").slice(0, 10);
+const dayOf = (d: string) => Date.parse(`${d}T00:00:00Z`);
+const validDay = (d: string) => /^\d{4}-\d{2}-\d{2}$/.test(d) && Number.isFinite(dayOf(d));
+const dayDiff = (a: string, b: string) => Math.round((dayOf(b) - dayOf(a)) / 86400000);
+/** 좋았던 · 먹은 메뉴 이름 — 이름이 비었거나 없으면 "". */
+const menuName = (m: MenuItem | null | undefined) => (typeof m?.name === "string" ? m.name.trim() : "");
 const placeKey = (r: Restaurant) => r.place_key ?? `${r.name}|${r.address ?? ""}`.toLowerCase();
 
 /** 「다섯이」 「하나가」 — 수 대명사 + 주격. 1~99 밖이면 숫자. */
@@ -60,7 +65,7 @@ function discoveryOf(def: LabelDef, journey: Restaurant[], all: Restaurant[]): L
   const out: Candidate[] = [];
 
   // 좋았던 메뉴의 공통 종류
-  const liked = journey.flatMap((r) => (r.menus ?? []).filter((m) => m.vote === 1 && m.name.trim()).map((m) => m.name.trim()));
+  const liked = journey.flatMap((r) => (r.menus ?? []).filter((m) => m?.vote === 1 && menuName(m)).map(menuName));
   if (liked.length >= 3) {
     const best = MENU_KINDS.map(([k, re]) => [k, liked.filter((n) => re.test(n)).length] as const).sort((a, b) => b[1] - a[1])[0];
     if (best && best[1] >= 2) {
@@ -80,7 +85,7 @@ function discoveryOf(def: LabelDef, journey: Restaurant[], all: Restaurant[]): L
   // 같은 메뉴를 여러 곳에서
   const menuPlaces = new Map<string, Set<string>>();
   for (const r of journey) for (const m of r.menus ?? []) {
-    const n = m.name.trim().replace(/\s+/g, "");
+    const n = menuName(m).replace(/\s+/g, "");
     if (!n) continue;
     if (!menuPlaces.has(n)) menuPlaces.set(n, new Set());
     menuPlaces.get(n)!.add(placeKey(r));
@@ -153,7 +158,7 @@ export function computeLabelRecap(id: string, rows: Restaurant[]): LabelRecap | 
   const stamps = stampRows(rows);
   // 그릇 수는 도장 번호 그대로, 이야기는 1부터.
   const journey = contrib.map((row, i) => ({ no: def.group === "bowl" ? stamps.indexOf(row) + 1 : i + 1, row }));
-  const dates = contrib.map(dateOf).sort();
+  const dates = contrib.map(dateOf).filter(validDay).sort();
   const cats = new Map<string, number>();
   for (const r of contrib) if (r.category) cats.set(r.category, (cats.get(r.category) ?? 0) + 1);
   return {

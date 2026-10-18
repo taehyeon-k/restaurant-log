@@ -459,3 +459,5 @@ const s = StyleSheet.create({
   sheet: { position: "absolute", left: 0, right: 0, bottom: 0, borderTopLeftRadius: 26, borderTopRightRadius: 26, backgroundColor: C.paper, paddingTop: 18, paddingHorizontal: 22 },
   toast: { position: "absolute", alignSelf: "center", borderRadius: 16, backgroundColor: "rgba(23,22,20,.85)", paddingVertical: 10, paddingHorizontal: 16 },
 });
+
+export { ErrorBoundary } from "expo-router";
