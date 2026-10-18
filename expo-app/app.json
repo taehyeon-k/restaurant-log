@@ -111,7 +111,8 @@
         }
       ],
       "./plugins/withShareExtensionDisplayName",
-      "./plugins/withNaverMaven"
+      "./plugins/withNaverMaven",
+      "@bacons/apple-targets"
     ],
     "experiments": {
       "typedRoutes": true

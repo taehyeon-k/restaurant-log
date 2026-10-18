@@ -11,3 +11,5 @@ android/
 
 expo-env.d.ts
 # @end expo-cli
+# @bacons/apple-targets 가 expo-target.config.js 의 colors 로 prebuild 마다 다시 만듭니다
+targets/*/Assets.xcassets/

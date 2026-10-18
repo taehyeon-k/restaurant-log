@@ -31,6 +31,9 @@ SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient();
 
+// 위젯 · 알림 딥링크(dinary://capture)로 앱이 처음 열려도 탭 화면을 밑에 깔아, 카메라를 닫으면 홈으로 돌아갑니다.
+export const unstable_settings = { anchor: "(tabs)" };
+
 function Gate({ fontsLoaded }: { fontsLoaded: boolean }) {
   const session = useSession();
   const segments = useSegments();

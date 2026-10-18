@@ -14,6 +14,7 @@
     "check": "npm run typecheck && npm test && npm run lint"
   },
   "dependencies": {
+    "@bacons/apple-targets": "^5.0.0",
     "@expo-google-fonts/gowun-batang": "^0.4.1",
     "@expo-google-fonts/jetbrains-mono": "^0.4.1",
     "@expo-google-fonts/noto-sans-kr": "^0.4.3",
