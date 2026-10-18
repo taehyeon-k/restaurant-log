@@ -1,5 +1,5 @@
 diff --git a/node_modules/@mj-studio/react-native-naver-map/ios/Overlay/Marker/RNCNaverMapMarker.mm b/node_modules/@mj-studio/react-native-naver-map/ios/Overlay/Marker/RNCNaverMapMarker.mm
-index 7f408df..d64021c 100644
+index 7f408df..a71900c 100644
 --- a/node_modules/@mj-studio/react-native-naver-map/ios/Overlay/Marker/RNCNaverMapMarker.mm
 +++ b/node_modules/@mj-studio/react-native-naver-map/ios/Overlay/Marker/RNCNaverMapMarker.mm
 @@ -17,6 +17,8 @@ using namespace facebook::react;
@@ -11,7 +11,7 @@ index 7f408df..d64021c 100644
  }
  
  + (bool)shouldBeRecycled {
-@@ -124,23 +126,55 @@ using namespace facebook::react;
+@@ -124,23 +126,91 @@ using namespace facebook::react;
      _imageCanceller = nil;
    }
    _isImageSetFromSubview = YES;
@@ -43,8 +43,44 @@ index 7f408df..d64021c 100644
 +  self.inner.alpha = 1;
 +}
 +
++// [DINARY patch] renderInContext ignores zPosition and paints sublayers in array order. RN Fabric draws
++// backgrounds/borders it can't put on the view's own layer (a border without clipping, uneven corner radii)
++// on extra sublayers appended after the content and pushed behind it with a negative zPosition, so in the
++// snapshot the opaque background covered all text. Reorder those non-view layers the way the screen
++// composites them: negative zPosition to the back, positive to the front. Views' own layers keep their order.
++static void RNCNaverMapOrderLayersByZ(CALayer* layer) {
++  NSArray<CALayer*>* sublayers = [layer.sublayers copy];
++  NSMutableArray<CALayer*>* back = [NSMutableArray new];
++  NSMutableArray<CALayer*>* front = [NSMutableArray new];
++  for (CALayer* sublayer in sublayers) {
++    if ([sublayer.delegate isKindOfClass:[UIView class]]) {
++      continue;
++    }
++    if (sublayer.zPosition < 0) {
++      [back addObject:sublayer];
++    } else if (sublayer.zPosition > 0) {
++      [front addObject:sublayer];
++    }
++  }
++  NSComparator byZ = ^NSComparisonResult(CALayer* a, CALayer* b) {
++    if (a.zPosition < b.zPosition) return NSOrderedAscending;
++    if (a.zPosition > b.zPosition) return NSOrderedDescending;
++    return NSOrderedSame;
++  };
++  [back sortWithOptions:NSSortStable usingComparator:byZ];
++  [front sortWithOptions:NSSortStable usingComparator:byZ];
++  unsigned int index = 0;
++  for (CALayer* sublayer in back) {
++    [layer insertSublayer:sublayer atIndex:index++];
++  }
++  for (CALayer* sublayer in front) {
++    [layer addSublayer:sublayer];
++  }
++}
++
 +// [DINARY patch] renderInContext uses whatever a layer has drawn so far — force pending drawing first.
 +static void RNCNaverMapDisplayLayerTree(CALayer* layer) {
++  RNCNaverMapOrderLayersByZ(layer);
 +  [layer displayIfNeeded];
 +  for (CALayer* sublayer in layer.sublayers) {
 +    RNCNaverMapDisplayLayerTree(sublayer);
