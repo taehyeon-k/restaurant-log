@@ -50,9 +50,9 @@ export default function PlaceRoute() {
 
   return (
     <View style={{ flex: 1, backgroundColor: C.paper }}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingTop: insets.top + 60, paddingBottom: insets.bottom + 40 }}>
-        {/* 기록 화면과 같이 위 버튼 줄 아래에서 1:1 — 사진이 잘리거나 뒤로 버튼에 가리지 않습니다. */}
-        <PhotoBox src={place.photo} category={place.category} radius={0} style={place.photo ? { width: "100%", aspectRatio: 1 } : { width: "100%", height: 210 }}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}>
+        {/* 기록 화면과 같이 가로 5 : 세로 4. 뒤로 버튼은 사진 위에 겹쳐 둡니다. */}
+        <PhotoBox src={place.photo} category={place.category} radius={0} style={place.photo ? { width: "100%", aspectRatio: 5 / 4 } : { width: "100%", height: 210 }}>
           {!place.photo && (
             <Text style={{ position: "absolute", left: 20, bottom: 18, fontFamily: F.mono, fontSize: 9.5, letterSpacing: 1.3, color: "rgba(251,250,246,.85)" }}>
               {place.category} · {place.visits.length}번 방문

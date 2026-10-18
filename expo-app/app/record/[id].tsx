@@ -254,9 +254,9 @@ export default function RecordRoute() {
 
   return (
     <View style={{ flex: 1, backgroundColor: C.paper }}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingTop: insets.top + 60, paddingBottom: insets.bottom + 40 }}>
-        {/* 위 버튼 줄(뒤로 · 공유) 아래에서 1:1 — 지도 카드와 같은 비율이라 사진이 잘리거나 버튼에 가리지 않습니다. */}
-        <PhotoBox src={current} category={record.category} radius={0} style={{ width: Dimensions.get("window").width, height: current ? Dimensions.get("window").width : 268, ...(!current && { backgroundColor: "#efeade" }) }}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}>
+        {/* 가로 5 : 세로 4 — 268 고정 높이보다 덜 잘립니다. 뒤로 · 공유 버튼은 사진 위에 겹쳐 둡니다. */}
+        <PhotoBox src={current} category={record.category} radius={0} style={{ width: Dimensions.get("window").width, height: current ? Dimensions.get("window").width * 0.8 : 268, ...(!current && { backgroundColor: "#efeade" }) }}>
           {!current && canAddPhotos && (
             <Pressable onPress={addAlbum} disabled={pending.length > 0} accessibilityLabel="앨범에서 사진 추가"
               style={{ width: 220, height: 118, borderRadius: 20, borderWidth: 1.5, borderStyle: "dashed", borderColor: "#cdc6b8", alignItems: "center", justifyContent: "center", gap: 4 }}>
@@ -278,7 +278,7 @@ export default function RecordRoute() {
             </View>
           )}
           {anniversary && (
-            <Text style={{ position: "absolute", right: 16, top: 14, borderRadius: 10, backgroundColor: C.brick, paddingHorizontal: 9, paddingVertical: 4, fontFamily: F.mono, fontSize: 11, color: C.card, overflow: "hidden" }}>
+            <Text style={{ position: "absolute", right: 16, top: insets.top + 14, borderRadius: 10, backgroundColor: C.brick, paddingHorizontal: 9, paddingVertical: 4, fontFamily: F.mono, fontSize: 11, color: C.card, overflow: "hidden" }}>
               {anniversary}
             </Text>
           )}
