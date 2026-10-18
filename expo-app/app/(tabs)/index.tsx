@@ -465,7 +465,7 @@ export default function MapTab() {
   ) : (
     <View>
       {segmentSwitch}
-      <View style={s.headRow}>
+      <View style={[s.headRow, chipItems.length > 0 && { paddingBottom: 6 }]}>
         {/* 맛집 / 카페 — 고른 쪽만 목록과 지도 핀에 남습니다(검색·필터·정렬과 함께). */}
         <View style={{ flexDirection: "row", alignItems: "baseline", gap: 10 }}>
           {KINDS.map((o) => (
@@ -489,9 +489,9 @@ export default function MapTab() {
       </View>
 
       {chipItems.length > 0 && (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingHorizontal: 20, paddingBottom: 10, alignItems: "center" }}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingHorizontal: 20, paddingBottom: 6, alignItems: "center" }}>
           {chipItems.map((c) => (
-            <Pressable key={c.key} onPress={c.onClear} style={{ borderRadius: 15, backgroundColor: c.key === "bounds" ? C.card : "#f2e0d5", borderWidth: c.key === "bounds" ? 1 : 0, borderColor: C.line, paddingHorizontal: 10, paddingVertical: 3 }}>
+            <Pressable key={c.key} onPress={c.onClear} style={{ borderRadius: 15, backgroundColor: c.key === "bounds" ? C.card : "#f2e0d5", borderWidth: c.key === "bounds" ? 1 : 0, borderColor: C.line, paddingHorizontal: 10, paddingVertical: 4 }}>
               <Text style={{ fontFamily: F.sans, fontSize: 11, lineHeight: 15, color: c.key === "bounds" ? C.muted : "#a34d27" }}>{c.label} ✕</Text>
             </Pressable>
           ))}
