@@ -178,7 +178,7 @@ function JourneySlide({ recap }: { recap: LabelRecap }) {
   );
 }
 
-/** 라벨까지의 한 장 — 받은 라벨 · 발견 한 줄 · 숫자 셋 · 사진 · 다음 라벨을 한눈에. */
+/** 라벨까지의 한 장 — 받은 라벨 · 발견 한 줄 · 숫자 셋 · 사진 · (그릇 수 라벨만) 다음 단계를 한눈에. */
 function SummarySlide({ recap, onShare, onClose }: { recap: LabelRecap; onShare?: () => void; onClose?: () => void }) {
   const { width: W } = useWindowDimensions();
   const n = recap.next;
@@ -218,7 +218,7 @@ function SummarySlide({ recap, onShare, onClose }: { recap: LabelRecap; onShare?
           })}
         </View>
 
-        <View style={{ marginTop: 22 }}>
+        {recap.def.group === "bowl" && <View style={{ marginTop: 22 }}>
           {n ? (
             <>
               <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "baseline" }}>
@@ -234,7 +234,7 @@ function SummarySlide({ recap, onShare, onClose }: { recap: LabelRecap; onShare?
           ) : (
             <Text style={{ fontFamily: F.serif, fontSize: 16, color: PAPER }}>모든 라벨을 받았어요</Text>
           )}
-        </View>
+        </View>}
       </ScrollView>
       {(onShare || onClose) && (
         <View style={{ marginTop: 14, gap: 10 }}>

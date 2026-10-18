@@ -1,6 +1,6 @@
 import { ieosseoyo, nativeCount } from "@/features/recap/seasons";
 import { eulReul, iNa } from "@/lib/josa";
-import { BOWL_TIERS, earnedBy, LABELS, labelById, nextBowl, recordTime, stampRows, type LabelDef } from "@/lib/labels";
+import { BOWL_TIERS, earnedBy, labelById, nextBowl, recordTime, stampRows, type LabelDef } from "@/lib/labels";
 import type { MenuItem, Restaurant } from "@/lib/types";
 
 /** 강조어만 벽돌색으로 그리는 한 줄. */
@@ -140,17 +140,11 @@ function howOf(def: LabelDef, journey: Restaurant[]): Line {
   }
 }
 
-/** 다음 라벨 — 그릇 수면 다음 단계, 이야기면 가장 가까운 것(없으면 다음 그릇 수). */
-function nextOf(def: LabelDef, rows: Restaurant[]): LabelRecap["next"] {
+/** 다음 그릇 수 단계 — 그릇 수 라벨에만 보여 줍니다(이야기 라벨은 다음 라벨을 안내하지 않음). 다 받았으면 null. */
+function nextOf(rows: Restaurant[]): LabelRecap["next"] {
   const stamps = stampRows(rows).length;
   const bowl = nextBowl(stamps);
-  const bowlNext = bowl ? { name: bowl.tier.name, left: bowl.left, have: stamps, need: bowl.tier.need, from: bowl.from } : null;
-  if (def.group === "bowl") return bowlNext;
-  const story = LABELS.filter((l) => l.group === "story")
-    .map((l) => ({ l, have: l.count(rows) }))
-    .filter((x) => x.have < x.l.need)
-    .sort((a, b) => b.have / b.l.need - a.have / a.l.need)[0];
-  return story ? { name: story.l.name, left: story.l.need - story.have, have: story.have, need: story.l.need, from: 0 } : bowlNext;
+  return bowl ? { name: bowl.tier.name, left: bowl.left, have: stamps, need: bowl.tier.need, from: bowl.from } : null;
 }
 
 export function computeLabelRecap(id: string, rows: Restaurant[]): LabelRecap | null {
@@ -173,7 +167,7 @@ export function computeLabelRecap(id: string, rows: Restaurant[]): LabelRecap | 
     days: dates.length ? dayDiff(dates[0], dates[dates.length - 1]) + 1 : 1,
     places: new Set(contrib.map(placeKey)).size,
     topCategory: [...cats.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null,
-    next: nextOf(def, rows),
+    next: def.group === "bowl" ? nextOf(rows) : null,
     discovery: discoveryOf(def, contrib, rows.filter((r) => !r.pending)),
   };
 }
