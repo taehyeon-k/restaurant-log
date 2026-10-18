@@ -658,6 +658,8 @@ export type ProfileCard = {
   record_count: number; verified_count: number; post_count: number; friend_state: FriendState;
   /** 관리자에게만 — 정지 중이면 끝나는 때(영구면 "forever") */
   sanctioned_until: string | null;
+  /** 관리자에게만 — 랭킹 정지 중이면 끝나는 때(영구 제외면 "forever") */
+  rank_banned_until: string | null;
 };
 
 /** 닉네임을 누르면 여는 프로필 창. 차단한 사람이면 null. */
@@ -698,6 +700,30 @@ export const adminPinPost = (qc: QueryClient, id: number, pin: boolean) => admin
 export const adminSanction = (qc: QueryClient, userId: string, days: number | null, reason?: string) =>
   adminRpc(qc, "admin_sanction", { p_user: userId, p_until: days == null ? null : new Date(Date.now() + days * 86400000).toISOString(), p_reason: reason ?? null });
 export const adminUnsanction = (qc: QueryClient, userId: string) => adminRpc(qc, "admin_unsanction", { p_user: userId });
+
+/** 랭킹 정지 · 제외 — 기록장 · 게시판은 그대로, 랭킹에만 안 나옵니다. days 가 null 이면 영구 제외. */
+export const adminRankBan = (qc: QueryClient, userId: string, days: number | null, reason?: string) =>
+  adminRpc(qc, "admin_rank_ban", { p_user: userId, p_until: days == null ? null : new Date(Date.now() + days * 86400000).toISOString(), p_reason: reason ?? null });
+export const adminRankUnban = (qc: QueryClient, userId: string) => adminRpc(qc, "admin_rank_unban", { p_user: userId });
+
+export type RankBan = { user_id: string; until: string | null; reason: string | null; created_at: string; nickname: string | null; avatar_url: string | null };
+
+/** 지금 랭킹에서 빠져 있는 사람 — 운영 화면에서 풉니다. 관리자만 읽힙니다(RLS). */
+export const useRankBans = (enabled: boolean) =>
+  useQuery({
+    queryKey: ["community", "admin", "rank-bans"],
+    enabled,
+    queryFn: async () => {
+      const now = new Date().toISOString();
+      const { data, error } = await supabase.from("leaderboard_sanctions").select("user_id, until, reason, created_at")
+        .or(`until.is.null,until.gt.${now}`).order("created_at", { ascending: false });
+      const rows = soft("leaderboard_sanctions 조회", error, (data ?? []) as Omit<RankBan, "nickname" | "avatar_url">[]);
+      if (!rows.length) return [] as RankBan[];
+      const { data: ps } = await supabase.from("public_profiles").select("id, nickname, avatar_url").in("id", rows.map((r) => r.user_id));
+      const byId = new Map(((ps ?? []) as { id: string; nickname: string; avatar_url: string | null }[]).map((p) => [p.id, p]));
+      return rows.map((r) => ({ ...r, nickname: byId.get(r.user_id)?.nickname ?? null, avatar_url: byId.get(r.user_id)?.avatar_url ?? null }));
+    },
+  });
 export const adminResolveReport = (qc: QueryClient, id: number, note?: string) => adminRpc(qc, "admin_resolve_report", { p_id: id, p_note: note ?? null });
 export const adminCreateNotice = (qc: QueryClient, title: string, body: string, days: number | null) =>
   adminRpc(qc, "admin_create_notice", { p_title: title, p_body: body || null, p_ends_at: days == null ? null : new Date(Date.now() + days * 86400000).toISOString() });

@@ -8,7 +8,7 @@ import { BottomSheetModal } from "@/components/ui";
 import { characterOf, DEFAULT_CHARACTER, isCharacterId, RARITY } from "@/lib/characters";
 import { C, F } from "@/theme";
 import {
-  acceptFriend, adminSanction, adminUnsanction, removeFriend, requestFriend, useIsAdmin, useProfileCard, type ProfileCard,
+  acceptFriend, adminRankBan, adminRankUnban, adminSanction, adminUnsanction, removeFriend, requestFriend, useIsAdmin, useProfileCard, type ProfileCard,
 } from "./api";
 import { K, titleName } from "./ui";
 
@@ -90,6 +90,18 @@ function CardBody({ card, onClose }: { card: ProfileCard; onClose: () => void })
     ]);
   }
 
+  /** 랭킹 정지 · 제외 — 기록장 · 게시판은 그대로, 랭킹에만 안 나옵니다. */
+  function rankBan() {
+    const until = card.rank_banned_until;
+    Alert.alert(`${card.nickname} 랭킹`, until ? `지금 랭킹 정지 중 · ${until === "forever" ? "영구 제외" : `${until.slice(0, 10)}까지`}` : "부정한 기록이 의심되면 랭킹에서만 뺍니다.", [
+      { text: "랭킹 7일 정지", onPress: () => run(() => adminRankBan(qc, card.id, 7, "부정 기록 의심")) },
+      { text: "랭킹 30일 정지", onPress: () => run(() => adminRankBan(qc, card.id, 30, "부정 기록 의심")) },
+      { text: "랭킹에서 영구 제외", style: "destructive", onPress: () => run(() => adminRankBan(qc, card.id, null, "부정 기록 의심")) },
+      ...(until ? [{ text: "랭킹 정지 풀기", onPress: () => run(() => adminRankUnban(qc, card.id)) }] : []),
+      { text: "취소", style: "cancel" as const },
+    ]);
+  }
+
   return (
     <View style={{ alignItems: "center" }}>
       <View style={{ width: 88, height: 88, borderRadius: 44, backgroundColor: staff ? C.ink : C.brickSoft, borderWidth: 1, borderColor: staff ? C.ink : K.brickLine, alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
@@ -123,6 +135,10 @@ function CardBody({ card, onClose }: { card: ProfileCard; onClose: () => void })
           <Text style={{ fontFamily: F.sans, fontSize: 11, color: K.inactive }}>운영:</Text>
           <Pressable onPress={sanction} hitSlop={6}>
             <Text style={{ fontFamily: F.sans, fontSize: 11, color: card.sanctioned_until ? C.brick : K.inactive }}>{card.sanctioned_until ? "정지 중" : "정지"}</Text>
+          </Pressable>
+          <Text style={{ fontFamily: F.sans, fontSize: 11, color: K.inactive }}>·</Text>
+          <Pressable onPress={rankBan} hitSlop={6}>
+            <Text style={{ fontFamily: F.sans, fontSize: 11, color: card.rank_banned_until ? C.brick : K.inactive }}>{card.rank_banned_until ? "랭킹 정지 중" : "랭킹"}</Text>
           </Pressable>
           <Text style={{ fontFamily: F.sans, fontSize: 11, color: K.inactive }}>·</Text>
           <Pressable onPress={() => { onClose(); router.push({ pathname: "/community/board", params: { author: card.id } }); }} hitSlop={6}>

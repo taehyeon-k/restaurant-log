@@ -284,7 +284,7 @@ export function MyAccount() {
           right={<Toggle label="랭킹 참여" value={account.leaderboardOptIn} onChange={(v) => setLeaderboardOptIn(account.userId, v).catch((e) => setError(e instanceof Error ? e.message : "바꾸지 못했습니다"))} />}
         />
         <Row label="라벨첩" onPress={() => router.push("/labels")} right={<Text style={{ fontSize: 13, color: C.faint }}>›</Text>} />
-        {isAdmin && <Row label="운영" onPress={() => router.push("/admin")} right={<Text style={{ fontFamily: F.mono, fontSize: 11, color: C.brick }}>공지 · 신고함 · 주제 ›</Text>} />}
+        {isAdmin && <Row label="운영" onPress={() => router.push("/admin")} right={<Text style={{ fontFamily: F.mono, fontSize: 11, color: C.brick }}>공지 · 신고함 · 주제 · 랭킹 ›</Text>} />}
         <Row label="기록 내려받기" onPress={exportRecords} right={<Text style={{ fontSize: 13, color: C.faint }}>›</Text>} />
         <Row label="개인정보 처리방침" onPress={() => WebBrowser.openBrowserAsync(`${BASE}/privacy`)} right={<Text style={{ fontSize: 13, color: C.faint }}>›</Text>} />
         <Row label="이용약관" onPress={() => WebBrowser.openBrowserAsync(`${BASE}/terms`)} right={<Text style={{ fontSize: 13, color: C.faint }}>›</Text>} />

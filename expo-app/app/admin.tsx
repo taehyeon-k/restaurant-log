@@ -5,14 +5,14 @@ import { useEffect, useState } from "react";
 import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
-  adminCreateNotice, adminHideComment, adminHidePost, adminResolveReport, adminSanction, adminSaveTheme, createPost,
-  useCurrentTheme, useIsAdmin, useReports, type ReportRow,
+  adminCreateNotice, adminHideComment, adminHidePost, adminRankUnban, adminResolveReport, adminSanction, adminSaveTheme, createPost,
+  useCurrentTheme, useIsAdmin, useRankBans, useReports, type RankBan, type ReportRow,
 } from "@/features/community/api";
-import { K, Segmented, timeAgo } from "@/features/community/ui";
+import { Avatar, K, Segmented, timeAgo } from "@/features/community/ui";
 import { supabase } from "@/lib/supabase";
 import { C, F } from "@/theme";
 
-type Section = "notice" | "reports" | "theme";
+type Section = "notice" | "reports" | "theme" | "rank";
 
 /** 운영(HANDOFF-board-v2 §4) — 내계정에서 관리자에게만 보입니다. 서버(is_admin)가 모든 동작을 한 번 더 확인합니다. */
 export default function AdminScreen() {
@@ -35,12 +35,13 @@ export default function AdminScreen() {
             value={section}
             onChange={setSection}
             style={{ marginTop: 14, marginHorizontal: 20 }}
-            options={[{ id: "notice", label: "공지 쓰기" }, { id: "reports", label: "신고함" }, { id: "theme", label: "이번 주 주제" }]}
+            options={[{ id: "notice", label: "공지" }, { id: "reports", label: "신고함" }, { id: "theme", label: "주제" }, { id: "rank", label: "랭킹" }]}
           />
           <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: insets.bottom + 40, gap: 12 }} keyboardShouldPersistTaps="handled">
             {section === "notice" && <NoticeForm />}
             {section === "reports" && <ReportsBox />}
             {section === "theme" && <ThemeForm />}
+            {section === "rank" && <RankBans />}
           </ScrollView>
         </>
       )}
@@ -280,5 +281,49 @@ function ThemeForm() {
       </View>
       <Submit text={busy ? "저장하는 중…" : editId ? "고치기" : "열기"} onPress={save} disabled={!valid || busy} />
     </>
+  );
+}
+
+/** 랭킹 정지 · 제외 목록 — 랭킹 상세에서 ⋯ 로 뺀 사람. 풀면 바로 랭킹에 다시 나옵니다. */
+function RankBans() {
+  const { data: bans = [], isPending } = useRankBans(true);
+  return (
+    <>
+      <Text style={label}>랭킹에서 빠진 사람 {bans.length} · 랭킹 상세의 ⋯ 로 뺍니다</Text>
+      {!isPending && bans.length === 0 && <Text style={{ paddingVertical: 30, textAlign: "center", fontFamily: F.sans, fontSize: 12.5, color: C.faint }}>랭킹에서 뺀 사람이 없습니다.</Text>}
+      {bans.map((b) => <RankBanRow key={b.user_id} b={b} />)}
+    </>
+  );
+}
+
+function RankBanRow({ b }: { b: RankBan }) {
+  const qc = useQueryClient();
+  const [busy, setBusy] = useState(false);
+  const until = b.until ? `${new Intl.DateTimeFormat("ko-KR", { timeZone: "Asia/Seoul", month: "numeric", day: "numeric" }).format(new Date(b.until))}까지 정지` : "영구 제외";
+
+  function unban() {
+    Alert.alert(`${b.nickname ?? "이 사람"} 랭킹 정지를 풀까요?`, "바로 랭킹에 다시 나옵니다.", [
+      { text: "취소", style: "cancel" },
+      {
+        text: "풀기",
+        onPress: async () => {
+          setBusy(true);
+          try { await adminRankUnban(qc, b.user_id); Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); }
+          catch (e) { Alert.alert("풀지 못했습니다", e instanceof Error ? e.message : ""); }
+          setBusy(false);
+        },
+      },
+    ]);
+  }
+
+  return (
+    <View style={{ borderRadius: 16, borderWidth: 1, borderColor: C.lineSoft, backgroundColor: C.card, padding: 13, flexDirection: "row", alignItems: "center", gap: 10 }}>
+      <Avatar name={b.nickname ?? "?"} url={b.avatar_url} size={34} seed={b.user_id} />
+      <View style={{ flex: 1, gap: 2 }}>
+        <Text style={{ fontFamily: F.sansMd, fontSize: 13.5, color: C.ink }}>{b.nickname ?? "(이름 없음)"}</Text>
+        <Text style={{ fontFamily: F.mono, fontSize: 10, color: b.until ? C.muted : C.brick }}>{until} · {b.reason ?? "사유 없음"} · {timeAgo(b.created_at)}</Text>
+      </View>
+      <Btn label="풀기" onPress={unban} disabled={busy} />
+    </View>
   );
 }

@@ -1,9 +1,10 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
-import { FlatList, Text, View } from "react-native";
+import { FlatList, Pressable, Text, View } from "react-native";
 import { Character } from "@/components/Character";
 import { useAccount } from "@/data/profile";
-import { useFriends, useLeaderboard, type Period, type RankRow, type Scope } from "@/features/community/api";
+import { useFriends, useIsAdmin, useLeaderboard, type Period, type RankRow, type Scope } from "@/features/community/api";
+import { RankAdminSheet } from "@/features/community/RankAdminSheet";
 import { boardMeta, periodLabel, PERIODS, SCOPES } from "@/features/community/boards";
 import { Avatar, CommunityHeader, K, MiniSegment, PeriodTabs, TitleBlock, titleName } from "@/features/community/ui";
 import { DEFAULT_CHARACTER, isCharacterId } from "@/lib/characters";
@@ -22,6 +23,8 @@ export default function RankingDetail() {
   const { data: account } = useAccount();
   const { data: fr } = useFriends();
   const { data: rows = [], isPending } = useLeaderboard(board.id, period, scope);
+  const { data: isAdmin } = useIsAdmin();
+  const [managing, setManaging] = useState<RankRow | null>(null);
 
   const me = account?.leaderboardOptIn ? account.userId : null;
   const shown = rows.slice(0, VISIBLE);
@@ -54,6 +57,12 @@ export default function RankingDetail() {
           <Text style={{ fontFamily: F.serif, fontSize: 18, color: C.ink }}>{r.value}</Text>
           <Text style={{ fontFamily: F.mono, fontSize: 9.5, color: K.inactive }}>{board.unit}</Text>
         </View>
+        {/* 관리자 — 부정한 기록이 의심되면 랭킹에서 정지 · 제외 */}
+        {isAdmin && r.user_id !== account?.userId && (
+          <Pressable onPress={() => setManaging(r)} hitSlop={10} accessibilityLabel={`${r.nickname} 랭킹 관리`} style={{ paddingLeft: 2 }}>
+            <Text style={{ fontFamily: F.sansBd, fontSize: 14, letterSpacing: 1, color: K.inactive }}>⋯</Text>
+          </Pressable>
+        )}
       </View>
     );
   };
@@ -88,6 +97,7 @@ export default function RankingDetail() {
           {row(mine!, true)}
         </View>
       )}
+      <RankAdminSheet row={managing} onClose={() => setManaging(null)} />
     </View>
   );
 }
