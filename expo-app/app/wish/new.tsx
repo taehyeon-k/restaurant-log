@@ -345,7 +345,7 @@ export default function WishForm() {
           </View>
 
           <View>
-            <Eyebrow>어떤 장소인가요?</Eyebrow>
+            <Eyebrow>어떤 장소인가요</Eyebrow>
             <TextInput
               value={note} onChangeText={setNote} multiline numberOfLines={6} textAlignVertical="top"
               placeholder="어디서 봤는지, 왜 가보고 싶은지 적어 두면 좋아요" placeholderTextColor="#b3ada1"
@@ -354,7 +354,7 @@ export default function WishForm() {
           </View>
 
           <View>
-            <Eyebrow>언제 갈 건가요?</Eyebrow>
+            <Eyebrow>언제 가실 예정인가요</Eyebrow>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
               <Pressable onPress={() => setPickDate(true)} style={[fieldStyle, { flex: 1, justifyContent: "center", borderRadius: 14, minHeight: 46 }]}>
                 <Text style={{ fontFamily: F.mono, fontSize: 13, color: planDate ? C.ink : "#b3ada1" }}>{planDate || "날짜 고르기"}</Text>
