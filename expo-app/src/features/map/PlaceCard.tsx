@@ -19,10 +19,13 @@ const coupleStatus = (c: CoupleCardInfo) => {
 /** 「기록 n」·「재방문」 배지 — 두 배지가 같은 높이로 서도록 상자 높이를 고정하고 글자를 가운데에 둡니다. */
 const badge: ViewStyle = { height: 18, paddingHorizontal: 7, paddingVertical: 0, borderRadius: 9, alignItems: "center", justifyContent: "center" };
 const badgeText: TextStyle = { lineHeight: 13, ...(Platform.OS === "android" ? { includeFontPadding: false, textAlignVertical: "center" } : null) };
+/** Android 는 lineHeight 가 없으면 Noto Sans KR 의 큰 글꼴 여백(약 2.9배)을 줄마다 더해 줄 사이가 벌어집니다 — 줄 높이를 고정하고 여백을 끕니다. */
+const tight: TextStyle | null = Platform.OS === "android" ? { includeFontPadding: false } : null;
 
 /** 같은 이름의 방문 기록을 하나로 묶은 카드. */
 export default function PlaceCard({ place, onOpen, couple }: { place: Place; onOpen: () => void; couple?: CoupleCardInfo }) {
-  const comment = place.latest.review || "기록을 아직 쓰지 않았습니다";
+  // 리뷰 맨 앞에 적힌 「재방문.」은 이름 옆 배지와 겹치니 빼고 한 줄평만 보입니다.
+  const comment = place.latest.review?.replace(/^재방문\s*[.·,:]\s*/, "") || "기록을 아직 쓰지 않았습니다";
   return (
     <Pressable
       onPress={onOpen}
@@ -37,7 +40,7 @@ export default function PlaceCard({ place, onOpen, couple }: { place: Place; onO
 
       <View style={{ flex: 1 }}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-          <Text numberOfLines={1} style={{ flexShrink: 1, fontFamily: F.serif, fontSize: 16, color: C.ink }}>{place.name}</Text>
+          <Text numberOfLines={1} style={[tight, { flexShrink: 1, fontFamily: F.serif, fontSize: 16, lineHeight: 22, color: C.ink }]}>{place.name}</Text>
           {place.visits.length > 1 && (
             <View style={[badge, { backgroundColor: "#efe9dc" }]}>
               <Text style={[badgeText, { fontFamily: F.mono, fontSize: 9, color: C.muted }]}>기록 {place.visits.length}</Text>
@@ -53,16 +56,17 @@ export default function PlaceCard({ place, onOpen, couple }: { place: Place; onO
           )}
         </View>
         {!!place.region && (
-          <Text numberOfLines={1} style={{ marginTop: 3, fontFamily: F.sans, fontSize: 11, color: C.faint }}>{place.region}</Text>
+          <Text numberOfLines={1} style={[tight, { marginTop: 3, fontFamily: F.sans, fontSize: 11, lineHeight: 16, color: C.faint }]}>{place.region}</Text>
         )}
         {!!(place.category || place.latest.menu) && (
           <View style={{ marginTop: 3, flexDirection: "row", alignItems: "center" }}>
-            {!!place.category && <Text numberOfLines={1} style={{ flexShrink: 0, fontFamily: F.sansMd, fontSize: 11.5, color: C.faint }}>{place.category}</Text>}
-            {!!place.category && !!place.latest.menu && <Text style={{ paddingHorizontal: 6, fontFamily: F.sans, fontSize: 11.5, color: "#cfc8ba" }}>|</Text>}
-            {!!place.latest.menu && <Text numberOfLines={1} style={{ flexShrink: 1, fontFamily: F.sans, fontSize: 11.5, color: "#4d4842" }}>{place.latest.menu}</Text>}
+            {!!place.category && <Text numberOfLines={1} style={[tight, { flexShrink: 0, fontFamily: F.sansMd, fontSize: 11.5, lineHeight: 17, color: C.faint }]}>{place.category}</Text>}
+            {!!place.category && !!place.latest.menu && <Text style={[tight, { paddingHorizontal: 6, fontFamily: F.sans, fontSize: 11.5, lineHeight: 17, color: "#cfc8ba" }]}>|</Text>}
+            {!!place.latest.menu && <Text numberOfLines={1} style={[tight, { flexShrink: 1, fontFamily: F.sans, fontSize: 11.5, lineHeight: 17, color: "#4d4842" }]}>{place.latest.menu}</Text>}
           </View>
         )}
-        <View style={{ marginTop: 1, flexDirection: "row", alignItems: "center", gap: 8 }}>
+        {/* 한글 글자는 줄 상자 안에서 위쪽 여백이 더 커서, 메뉴 줄 아래는 4 를 두어야 별점 ↔ 한 줄평 간격과 눈으로 같아집니다. */}
+        <View style={{ marginTop: 4, flexDirection: "row", alignItems: "center", gap: 8 }}>
           <MobileStars rating={place.rating} />
           <Text style={{ fontFamily: F.mono, fontSize: 10.5, color: C.muted }}>{place.rating?.toFixed(1) ?? "—"}</Text>
           <View style={{ width: 1, height: 11, backgroundColor: "#ded8cb" }} />
