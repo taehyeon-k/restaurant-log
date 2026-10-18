@@ -19,6 +19,7 @@ import { setState, useAppState } from "@/data/store";
 
 import { BuildingTagMarker, GhostMarker, NumberPin, RecordMarker, TapPointMarker, WishMarker } from "@/features/map/Markers";
 import { revealZooms } from "@/features/map/labelZoom";
+import { HereMarker } from "@/features/recommend/ui";
 import { Pair } from "@/features/couple/Avatars";
 import BookDrawer, { MenuLines } from "@/features/couple/BookDrawer";
 import PlaceCard, { type CoupleCardInfo } from "@/features/map/PlaceCard";
@@ -245,7 +246,9 @@ export default function MapTab() {
     Haptics.selectionAsync();
     const perm = await Location.requestForegroundPermissionsAsync();
     if (!perm.granted) return;
-    const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+    // 정확한 자리에 점을 찍으려고 High — Balanced 는 iOS 에서 100m 단위라 엉뚱한 블록에 섭니다. 위치 서비스가 꺼져 있으면 던집니다.
+    const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High }).catch(() => null);
+    if (!pos) return;
     setMe({ lat: pos.coords.latitude, lng: pos.coords.longitude });
     flyTo(pos.coords.latitude, pos.coords.longitude, 16);
   }
@@ -527,6 +530,8 @@ export default function MapTab() {
         {placesData?.mode === "radius" &&
           placesData.places.map((p, i) => <NumberPin key={p.id} n={i + 1} lat={p.lat} lng={p.lng} filled={recordedAt(p)} />)}
         {placesPoint && <TapPointMarker lat={placesPoint.lat} lng={placesPoint.lng} />}
+        {/* 「현재 위치」 단추로 찾은 내 자리. */}
+        {me && <HereMarker lat={me.lat} lng={me.lng} />}
       </PaperMap>
 
       {/* 위쪽을 눕히는 종이색 그라데이션 — 검색줄 아래에 깝니다 */}
