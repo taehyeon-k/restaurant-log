@@ -21,6 +21,9 @@ import { C, F } from "@/theme";
 
 const INK = "#1c1a17";
 const PAPER = "#f6f3ec";
+const MUTED = "#8a8377";
+const LINE = "#e2dccf";
+const LINE2 = "#d6cfc1";
 const NEEDS_BUILD = "새 개발 빌드가 필요해요";
 const BASE = process.env.EXPO_PUBLIC_API_BASE_URL ?? "";
 
@@ -39,7 +42,7 @@ const missingNative = (e: unknown) => e instanceof Error && /RNViewShot|native m
 const photoOf = (r: Restaurant) => r.photo_urls?.[0] ?? r.photo_url ?? null;
 
 /**
- * 라벨 리캡(지시서 3 §E-5) — 라벨을 받을 때마다 볼 수 있는 3장(라벨 · 받은 까닭 · 한눈에). 검정 바탕, 화면을 누르면 다음 장(왼쪽 30% 는 이전).
+ * 라벨 리캡(지시서 3 §E-5) — 라벨을 받을 때마다 볼 수 있는 3장(라벨 · 받은 까닭 · 한눈에). 아이보리 바탕, 화면을 누르면 다음 장(왼쪽 30% 는 이전).
  * 숫자는 내 기록 안의 값만 — 남과 견주지 않습니다. 3장째 「공유하기」는 공유 카드(§E-6).
  * extra: 인증 완료 화면에서 열 때, 아직 저장 전인 방금 그 기록(JSON).
  */
@@ -71,14 +74,14 @@ export default function LabelRecapScreen() {
   const [share, setShare] = useState(false);
   const close = () => router.back();
 
-  if (!isSuccess) return <View style={{ flex: 1, backgroundColor: INK }} />;
+  if (!isSuccess) return <View style={{ flex: 1, backgroundColor: PAPER }} />;
   if (!recap) {
     return (
-      <View style={{ flex: 1, backgroundColor: INK, alignItems: "center", justifyContent: "center", padding: 28 }}>
-        <StatusBar style="light" />
-        <Text style={{ fontFamily: F.serif, fontSize: 20, color: PAPER }}>아직 받지 않은 라벨이에요</Text>
-        <Pressable onPress={close} style={{ marginTop: 20, borderRadius: 20, backgroundColor: PAPER, paddingVertical: 12, paddingHorizontal: 22 }}>
-          <Text style={{ fontFamily: F.sansMd, fontSize: 13.5, color: INK }}>닫기</Text>
+      <View style={{ flex: 1, backgroundColor: PAPER, alignItems: "center", justifyContent: "center", padding: 28 }}>
+        <StatusBar style="dark" />
+        <Text style={{ fontFamily: F.serif, fontSize: 20, color: INK }}>아직 받지 않은 라벨이에요</Text>
+        <Pressable onPress={close} style={{ marginTop: 20, borderRadius: 20, backgroundColor: INK, paddingVertical: 12, paddingHorizontal: 22 }}>
+          <Text style={{ fontFamily: F.sansMd, fontSize: 13.5, color: PAPER }}>닫기</Text>
         </Pressable>
       </View>
     );
@@ -92,8 +95,8 @@ export default function LabelRecapScreen() {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: INK }}>
-      <StatusBar style="light" />
+    <View style={{ flex: 1, backgroundColor: PAPER }}>
+      <StatusBar style="dark" />
       <Pressable style={StyleSheet.absoluteFill} onPress={tap} accessible={false}>
         <View key={i} style={{ flex: 1, paddingTop: insets.top + 64, paddingBottom: insets.bottom + 24, paddingHorizontal: 28 }}>
           {i === 0 && <CoverSlide recap={recap} />}
@@ -104,13 +107,13 @@ export default function LabelRecapScreen() {
       <View pointerEvents="box-none" style={{ position: "absolute", top: insets.top + 6, left: 16, right: 16, gap: 12 }}>
         <View pointerEvents="none" style={{ flexDirection: "row", gap: 3 }}>
           {[0, 1, 2].map((k) => (
-            <View key={k} style={{ flex: 1, height: 3, borderRadius: 2, backgroundColor: PAPER, opacity: k <= i ? 1 : 0.25 }} />
+            <View key={k} style={{ flex: 1, height: 3, borderRadius: 2, backgroundColor: INK, opacity: k <= i ? 1 : 0.18 }} />
           ))}
         </View>
         <View pointerEvents="box-none" style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 6 }}>
-          <Text style={{ fontFamily: F.mono, fontSize: 10, letterSpacing: 2.2, color: PAPER }}>DINARY · LABEL</Text>
+          <Text style={{ fontFamily: F.mono, fontSize: 10, letterSpacing: 2.2, color: INK }}>DINARY · LABEL</Text>
           <Pressable onPress={close} hitSlop={14} accessibilityLabel="리캡 닫기">
-            <Text style={{ fontSize: 16, color: PAPER }}>✕</Text>
+            <Text style={{ fontSize: 16, color: INK }}>✕</Text>
           </Pressable>
         </View>
       </View>
@@ -131,8 +134,8 @@ function CoverSlide({ recap }: { recap: LabelRecap }) {
   return (
     <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
       <LabelMark def={recap.def} size={recap.def.group === "bowl" ? 150 : 176} animate />
-      <Text style={{ marginTop: 34, fontFamily: F.serif, fontSize: 34, color: PAPER, textAlign: "center" }}>{recap.def.name}</Text>
-      <Text style={{ marginTop: 10, fontFamily: F.mono, fontSize: 11, letterSpacing: 1, color: "#a29a8c" }}>{dottedDate(recap.earnedOn)} 받음</Text>
+      <Text style={{ marginTop: 34, fontFamily: F.serif, fontSize: 34, color: INK, textAlign: "center" }}>{recap.def.name}</Text>
+      <Text style={{ marginTop: 10, fontFamily: F.mono, fontSize: 11, letterSpacing: 1, color: MUTED }}>{dottedDate(recap.earnedOn)}</Text>
     </View>
   );
 }
@@ -149,14 +152,14 @@ function JourneySlide({ recap }: { recap: LabelRecap }) {
   return (
     <View style={{ flex: 1 }}>
       <Text style={s.kicker}>이렇게 받았어요</Text>
-      <View style={{ marginTop: 12 }}><LineText line={recap.how} size={24} color={PAPER} align="left" /></View>
-      <Text style={{ marginTop: 10, fontFamily: F.sans, fontSize: 12.5, color: "#a29a8c" }}>
+      <View style={{ marginTop: 12 }}><LineText line={recap.how} size={24} color={INK} align="left" /></View>
+      <Text style={{ marginTop: 10, fontFamily: F.sans, fontSize: 12.5, color: MUTED }}>
         {recap.def.desc} · {dottedDate(recap.earnedOn)}에 채웠어요
       </Text>
       <ScrollView style={{ marginTop: 20 }} contentContainerStyle={{ gap: 4 }} showsVerticalScrollIndicator={false}>
         {trimJourney(recap.journey).map((j) =>
           j.gap ? (
-            <Text key="gap" style={{ paddingVertical: 4, paddingLeft: 8, fontFamily: F.mono, fontSize: 12, color: "#6f685e" }}>⋯</Text>
+            <Text key="gap" style={{ paddingVertical: 4, paddingLeft: 8, fontFamily: F.mono, fontSize: 12, color: "#b3ab9c" }}>⋯</Text>
           ) : (
             <View key={j.row.id} style={{ flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 7 }}>
               {j.no === first || j.no === last ? (
@@ -164,12 +167,12 @@ function JourneySlide({ recap }: { recap: LabelRecap }) {
                   <Text style={{ fontFamily: F.mono, fontSize: 11, color: "#fff" }}>{j.no}</Text>
                 </View>
               ) : (
-                <View style={{ width: 28, height: 28, borderRadius: 14, borderWidth: 1, borderColor: "#4d4842", alignItems: "center", justifyContent: "center" }}>
-                  <Text style={{ fontFamily: F.mono, fontSize: 11, color: "#a29a8c" }}>{j.no}</Text>
+                <View style={{ width: 28, height: 28, borderRadius: 14, borderWidth: 1, borderColor: LINE2, alignItems: "center", justifyContent: "center" }}>
+                  <Text style={{ fontFamily: F.mono, fontSize: 11, color: MUTED }}>{j.no}</Text>
                 </View>
               )}
-              <Text numberOfLines={1} style={{ flex: 1, fontFamily: F.sans, fontSize: 14, color: PAPER }}>{j.row.name}</Text>
-              <Text style={{ fontFamily: F.mono, fontSize: 11, color: "#a29a8c" }}>{dottedDate(j.row.visited_at ?? j.row.created_at.slice(0, 10))}</Text>
+              <Text numberOfLines={1} style={{ flex: 1, fontFamily: F.sans, fontSize: 14, color: INK }}>{j.row.name}</Text>
+              <Text style={{ fontFamily: F.mono, fontSize: 11, color: MUTED }}>{dottedDate(j.row.visited_at ?? j.row.created_at.slice(0, 10))}</Text>
             </View>
           )
         )}
@@ -178,7 +181,7 @@ function JourneySlide({ recap }: { recap: LabelRecap }) {
   );
 }
 
-/** 라벨까지의 한 장 — 받은 라벨 · 발견 한 줄 · 숫자 셋 · 사진 · (그릇 수 라벨만) 다음 단계를 한눈에. */
+/** 라벨까지의 한 장 — 받은 라벨 · 무엇을 해냈는지 · 숫자 셋 · 사진 · (그릇 수 라벨만) 다음 단계. 공유 카드도 이 장을 따릅니다. */
 function SummarySlide({ recap, onShare, onClose }: { recap: LabelRecap; onShare?: () => void; onClose?: () => void }) {
   const { width: W } = useWindowDimensions();
   const n = recap.next;
@@ -191,24 +194,24 @@ function SummarySlide({ recap, onShare, onClose }: { recap: LabelRecap; onShare?
         <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
           <LabelMark def={recap.def} size={60} />
           <View style={{ flex: 1 }}>
-            <Text style={{ fontFamily: F.serif, fontSize: 24, color: PAPER }}>{recap.def.name}</Text>
-            <Text style={{ marginTop: 4, fontFamily: F.mono, fontSize: 10.5, letterSpacing: 0.8, color: "#a29a8c" }}>{dottedDate(recap.earnedOn)} 받음</Text>
+            <Text style={{ fontFamily: F.serif, fontSize: 24, color: INK }}>{recap.def.name}</Text>
+            <Text style={{ marginTop: 4, fontFamily: F.mono, fontSize: 10.5, letterSpacing: 0.8, color: MUTED }}>{dottedDate(recap.earnedOn)}</Text>
           </View>
         </View>
 
-        <View style={{ marginTop: 20 }}><LineText line={recap.discovery} size={17} color={PAPER} align="left" /></View>
+        <View style={{ marginTop: 20 }}><LineText line={recap.brag} size={17} color={INK} align="left" /></View>
 
-        <View style={{ marginTop: 20, flexDirection: "row", borderTopWidth: 1, borderBottomWidth: 1, borderColor: "#3a3631" }}>
-          <Stat k="걸린 날" v={`${recap.days}`} unit="일" accent />
+        <View style={{ marginTop: 20, flexDirection: "row", borderTopWidth: 1, borderBottomWidth: 1, borderColor: LINE }}>
+          <Stat k="기간" v={`${recap.days}`} unit="일" accent />
           <Stat k="다녀온 곳" v={`${recap.places}`} unit="곳" />
-          <Stat k="가장 많이" v={recap.topCategory ?? "—"} last />
+          <Stat k="최애 카테고리" v={recap.topCategory ?? "—"} last />
         </View>
 
         <View style={{ marginTop: 20, flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
           {tiles.map((j) => {
             const uri = photoOf(j.row);
             return (
-              <View key={j.row.id} style={{ width: tile, height: tile, borderRadius: 12, overflow: "hidden", backgroundColor: "#2a2723", alignItems: "center", justifyContent: "center" }}>
+              <View key={j.row.id} style={{ width: tile, height: tile, borderRadius: 12, overflow: "hidden", backgroundColor: "#ece7dc", alignItems: "center", justifyContent: "center" }}>
                 {uri ? <SignedImage uri={uri} style={StyleSheet.absoluteFill} /> : <Stamp n={j.no} size={tile * 0.42} tilt={stampTilt(j.no)} />}
                 <View style={{ position: "absolute", left: 0, right: 0, bottom: 0, paddingVertical: 4, paddingHorizontal: 7, backgroundColor: "rgba(20,18,16,.55)" }}>
                   <Text numberOfLines={1} style={{ fontFamily: F.sans, fontSize: 10, color: PAPER }}>{j.row.name}</Text>
@@ -223,26 +226,26 @@ function SummarySlide({ recap, onShare, onClose }: { recap: LabelRecap; onShare?
             <>
               <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "baseline" }}>
                 <Text style={s.kicker}>다음 라벨</Text>
-                <Text style={{ fontFamily: F.sans, fontSize: 13, color: PAPER }}>
+                <Text style={{ fontFamily: F.sans, fontSize: 13, color: INK }}>
                   {n.name}까지 <Text style={{ fontFamily: F.mono, color: C.brick }}>{n.left}</Text>
                 </Text>
               </View>
-              <View style={{ marginTop: 10, height: 5, borderRadius: 3, backgroundColor: "#3a3631", overflow: "hidden" }}>
+              <View style={{ marginTop: 10, height: 5, borderRadius: 3, backgroundColor: LINE, overflow: "hidden" }}>
                 <View style={{ width: `${pct * 100}%`, height: 5, borderRadius: 3, backgroundColor: C.brick }} />
               </View>
             </>
           ) : (
-            <Text style={{ fontFamily: F.serif, fontSize: 16, color: PAPER }}>모든 라벨을 받았어요</Text>
+            <Text style={{ fontFamily: F.serif, fontSize: 16, color: INK }}>모든 라벨을 받았어요</Text>
           )}
         </View>}
       </ScrollView>
       {(onShare || onClose) && (
         <View style={{ marginTop: 14, gap: 10 }}>
-          <Pressable onPress={onShare} style={{ height: 52, borderRadius: 26, backgroundColor: PAPER, alignItems: "center", justifyContent: "center" }}>
-            <Text style={{ fontFamily: F.sansMd, fontSize: 14, color: INK }}>공유하기</Text>
+          <Pressable onPress={onShare} style={{ height: 52, borderRadius: 26, backgroundColor: INK, alignItems: "center", justifyContent: "center" }}>
+            <Text style={{ fontFamily: F.sansMd, fontSize: 14, color: PAPER }}>공유하기</Text>
           </Pressable>
-          <Pressable onPress={onClose} style={{ height: 48, borderRadius: 24, borderWidth: 1, borderColor: "#4d4842", alignItems: "center", justifyContent: "center" }}>
-            <Text style={{ fontFamily: F.sans, fontSize: 13, color: PAPER }}>닫기</Text>
+          <Pressable onPress={onClose} style={{ height: 48, borderRadius: 24, borderWidth: 1, borderColor: LINE2, alignItems: "center", justifyContent: "center" }}>
+            <Text style={{ fontFamily: F.sans, fontSize: 13, color: INK }}>닫기</Text>
           </Pressable>
         </View>
       )}
@@ -251,9 +254,9 @@ function SummarySlide({ recap, onShare, onClose }: { recap: LabelRecap; onShare?
 }
 
 const Stat = ({ k, v, unit, accent, last }: { k: string; v: string; unit?: string; accent?: boolean; last?: boolean }) => (
-  <View style={{ flex: 1, paddingVertical: 14, paddingLeft: 12, borderRightWidth: last ? 0 : 1, borderRightColor: "#3a3631" }}>
+  <View style={{ flex: 1, paddingVertical: 14, paddingLeft: 12, borderRightWidth: last ? 0 : 1, borderRightColor: LINE }}>
     <Text style={s.kicker}>{k}</Text>
-    <Text numberOfLines={1} adjustsFontSizeToFit style={{ marginTop: 6, fontFamily: F.serif, fontSize: 28, color: accent ? C.brick : PAPER }}>
+    <Text numberOfLines={1} adjustsFontSizeToFit style={{ marginTop: 6, fontFamily: F.serif, fontSize: 28, color: accent ? C.brick : INK }}>
       {v}{unit && <Text style={{ fontSize: 14 }}>{unit}</Text>}
     </Text>
   </View>
@@ -280,7 +283,7 @@ function ShareCard({ recap, photos }: { recap: LabelRecap; photos: boolean }) {
         <LabelMark def={recap.def} size={recap.def.group === "bowl" ? 64 : 76} />
         <Text style={{ marginTop: 14, fontFamily: F.serif, fontSize: 30, color: INK }}>{recap.def.name}</Text>
       </View>
-      <View style={{ marginTop: 12 }}><LineText line={recap.discovery} /></View>
+      <View style={{ marginTop: 12 }}><LineText line={recap.brag} /></View>
 
       {photos ? (
         <View style={{ marginTop: 20, marginHorizontal: -14, flexDirection: "row", flexWrap: "wrap", columnGap: PHOTO_GAP, rowGap: 8 }}>
@@ -302,9 +305,9 @@ function ShareCard({ recap, photos }: { recap: LabelRecap; photos: boolean }) {
       )}
 
       <View style={{ marginTop: 22, borderTopWidth: 1, borderTopColor: "#e2dccf" }}>
-        <CardRow k="걸린 시간" v={`${recap.days}일`} />
+        <CardRow k="기간" v={`${recap.days}일`} />
         <CardRow k="다녀온 곳" v={`${recap.places}곳`} />
-        <CardRow k="가장 많이 먹은 것" v={recap.topCategory ?? "—"} last />
+        <CardRow k="최애 카테고리" v={recap.topCategory ?? "—"} last />
       </View>
     </View>
   );
@@ -379,13 +382,13 @@ function ShareView({ recap, onBack }: { recap: LabelRecap; onBack: () => void })
   ];
 
   return (
-    <View style={{ flex: 1, backgroundColor: INK }}>
+    <View style={{ flex: 1, backgroundColor: PAPER }}>
       <StatusBar style="light" />
       {/* 리캡 마지막 장이 흐리게 비칩니다. */}
       <View pointerEvents="none" style={[StyleSheet.absoluteFill, { opacity: 0.38, paddingTop: insets.top + 64, paddingBottom: insets.bottom + 24, paddingHorizontal: 28 }]}>
         <SummarySlide recap={recap} />
       </View>
-      <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(10,9,8,.35)" }]} />
+      <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(28,26,23,.55)" }]} />
 
       <View style={{ paddingTop: insets.top + 8, paddingHorizontal: 16, flexDirection: "row", justifyContent: "space-between" }}>
         <Pressable onPress={onBack} hitSlop={12} accessibilityLabel="리캡으로"><Text style={{ fontSize: 22, color: PAPER }}>‹</Text></Pressable>
@@ -455,7 +458,7 @@ const MoreGlyph = () => (
 );
 
 const s = StyleSheet.create({
-  kicker: { fontFamily: F.mono, fontSize: 10.5, letterSpacing: 1.6, color: "#a29a8c" },
+  kicker: { fontFamily: F.mono, fontSize: 10.5, letterSpacing: 1.6, color: MUTED },
   sheet: { position: "absolute", left: 0, right: 0, bottom: 0, borderTopLeftRadius: 26, borderTopRightRadius: 26, backgroundColor: C.paper, paddingTop: 18, paddingHorizontal: 22 },
   toast: { position: "absolute", alignSelf: "center", borderRadius: 16, backgroundColor: "rgba(23,22,20,.85)", paddingVertical: 10, paddingHorizontal: 16 },
 });
