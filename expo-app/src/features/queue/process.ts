@@ -1,10 +1,12 @@
+import { flushVisits, queueVisit, type VisitHint } from "@/features/recommend/log";
 import NetInfo from "@react-native-community/netinfo";
 import type { QueryClient } from "@tanstack/react-query";
 import { AppState } from "react-native";
 import { refreshAll } from "@/data/invalidate";
-import { uploadPhoto } from "@/lib/photos";
+import { uploadQueuePhoto } from "@/lib/photos";
 import { supabase } from "@/lib/supabase";
-import { db, listQueue, removeFromQueue, removePhoto, type QueueRow } from "./db";
+import { dataFailure, resumeJob, SessionChanged } from "@/lib/reliability/queue";
+import { db, listQueue, removeFromQueue, removePhoto, saveQueueStage, type QueueRow } from "./db";
 
 const MAX_ATTEMPTS = 3;
 /** 지수 백오프: 5s, 20s, 80s… */
@@ -19,27 +21,58 @@ export const onQueueChange = (f: () => void) => {
 export const notifyQueue = () => listeners.forEach((f) => f());
 
 /** 한 건을 올립니다: 사진 업로드 → restaurants insert → 짝 위시 delete → 로컬 파일 삭제. 새 기록 id 를 돌려줍니다. */
-async function processOne(row: QueueRow): Promise<number> {
-  const payload = JSON.parse(row.payload) as Record<string, unknown>;
-  const url = await uploadPhoto(row.photo_uri, "verified.jpg");
-  const { data, error } = await supabase
-    .from("restaurants")
-    .insert({ ...payload, photo_url: url, photo_urls: [url], cover_index: 0 })
-    .select("id")
-    .single();
-  if (error) throw new Error(error.message);
-  if (row.wish_id) await supabase.from("wishes").delete().eq("id", row.wish_id);
-  removePhoto(row.photo_uri);
-  await removeFromQueue(row.id);
-  return data.id as number;
+async function currentOwner() {
+  return (await supabase.auth.getSession()).data.session?.user.id ?? null;
 }
-
-async function markFailure(row: QueueRow) {
-  const d = await db();
-  const attempts = row.attempts + 1;
-  await d.runAsync(
-    "UPDATE pending_records SET attempts = ?, failed = ?, next_at = ? WHERE id = ?",
-    attempts, attempts >= MAX_ATTEMPTS ? 1 : 0, Date.now() + backoff(attempts), row.id
+async function processOne(row: QueueRow): Promise<number | null> {
+  const payload = JSON.parse(row.payload) as Record<string, unknown>;
+  if (payload.user_id !== row.owner_id) throw new SyntaxError("queue_owner_invalid");
+  const extras: string[] = JSON.parse(row.extra_photos ?? "[]");
+  const extraPaths = extras.map((_, i) => `${row.op_id}-${i + 1}.jpg`);
+  return resumeJob(row, {
+    owner: currentOwner,
+    save: (patch) => saveQueueStage(row.id, row.owner_id, patch),
+    findRecord: async (op) => {
+      const { data, error } = await supabase.from("restaurants").select("id").eq("client_op_id", op).eq("user_id", row.owner_id).maybeSingle();
+      if (error) throw error;
+      return data?.id ?? null;
+    },
+    upload: async (path) => {
+      await uploadQueuePhoto(row.photo_uri, path);
+      for (let i = 0; i < extras.length; i++) {
+        if (await currentOwner() !== row.owner_id) throw new SessionChanged();
+        await uploadQueuePhoto(extras[i], extraPaths[i]);
+      }
+    },
+    insert: async (op, path) => {
+      const paths = [path, ...extraPaths];
+      const cover = typeof payload.cover_index === "number" && Number.isInteger(payload.cover_index) ? Math.max(0, Math.min(paths.length - 1, payload.cover_index)) : 0;
+      const { data, error } = await supabase.from("restaurants").insert({ ...payload, client_op_id: op, photo_url: paths[cover], photo_urls: paths, cover_index: cover }).select("id").single();
+      if (!error) return data.id as number;
+      if (error.code !== "23505") throw error;
+      const existing = await supabase.from("restaurants").select("id").eq("client_op_id", op).eq("user_id", row.owner_id).single();
+      if (existing.error) throw existing.error;
+      return existing.data.id as number;
+    },
+    reconcileWish: async () => {
+      if (!row.wish_id) return;
+      const { error } = await supabase.from("wishes").delete().eq("id", row.wish_id);
+      if (error) throw error;
+    },
+    attribute: async (id) => queueVisit(row.attribution ? JSON.parse(row.attribution) as VisitHint : null, id, payload.verified === true),
+    cleanup: async () => {
+      removePhoto(row.photo_uri);
+      extras.forEach(removePhoto);
+      await removeFromQueue(row.id, row.owner_id);
+    },
+  });
+}
+async function markFailure(row: QueueRow, error: unknown) {
+  if (error instanceof SessionChanged) return;
+  const attempts = row.attempts + (dataFailure(error) ? 1 : 0);
+  await (await db()).runAsync(
+    "UPDATE pending_records SET attempts = ?, failed = ?, next_at = ? WHERE id = ? AND owner_id = ?",
+    attempts, attempts >= MAX_ATTEMPTS ? 1 : 0, Date.now() + backoff(Math.max(1, attempts)), row.id, row.owner_id
   );
 }
 
@@ -54,7 +87,11 @@ export function drainQueue(qc: QueryClient, only?: number): Promise<number | nul
     const net = await NetInfo.fetch();
     if (!net.isConnected) return null;
 
-    for (const row of await listQueue()) {
+    const ownerId = await currentOwner();
+    if (!ownerId) return null;
+    void flushVisits(ownerId).catch(() => {});
+    for (const row of await listQueue(ownerId)) {
+      if (await currentOwner() !== ownerId) break;
       if (only != null && row.id !== only) continue;
       if (row.failed && only == null) continue;
       if (row.next_at > Date.now() && only == null) continue;
@@ -63,7 +100,7 @@ export function drainQueue(qc: QueryClient, only?: number): Promise<number | nul
         if (only === row.id) doneId = id;
       } catch (e) {
         console.warn("큐 전송 실패", e);
-        await markFailure(row);
+        await markFailure(row, e);
       }
       notifyQueue();
     }
@@ -76,7 +113,7 @@ export function drainQueue(qc: QueryClient, only?: number): Promise<number | nul
 
 /** 앱 복귀·네트워크 연결 이벤트에서 큐 처리를 트리거합니다. */
 export function startQueueTriggers(qc: QueryClient) {
-  const run = () => void drainQueue(qc);
+  const run = () => { void drainQueue(qc).catch((error) => console.warn("큐 전송 실패", error)); };
   run();
   const app = AppState.addEventListener("change", (s) => s === "active" && run());
   const net = NetInfo.addEventListener((s) => s.isConnected && run());

@@ -1,3 +1,4 @@
+import { useSession } from "@/data/session";
 import * as Haptics from "expo-haptics";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Animated, Easing, Linking, Pressable, ScrollView, Text, View } from "react-native";
@@ -120,12 +121,13 @@ export default function RecommendTab() {
 
   // A book/context/feature change starts a fresh immutable logging snapshot, even with the same picks.
   const pickSig = result ? resultSignature(result, `${basis}|${!!recPlace}|${!!recAt}|${kakaoState}|${here?.name ?? ""}|${shown.length}`) : "";
+  const ownerId = useSession()?.user.id;
   const session: RecSession | null = useMemo(
-    () => (result && pickSig ? {
-      id: uuid(), bookId, result,
+    () => (result && pickSig && ownerId ? {
+      id: uuid(), ownerId, bookId, result,
       meta: { area: here?.name ?? null, customPoint: !!recPlace, customTime: !!recAt, refresh: shown.length, kakao: kakaoState === "loading" ? "unavailable" : kakaoState },
     } : null),
-    [pickSig] // eslint-disable-line react-hooks/exhaustive-deps
+    [pickSig, ownerId] // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   // 점심 · 저녁 — 오늘 그 끼니 시각(12:00 · 18:30)으로 기준 시각을 옮깁니다. 지금이 그 끼니면 지금으로.

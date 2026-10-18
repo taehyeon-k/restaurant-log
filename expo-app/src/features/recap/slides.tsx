@@ -334,6 +334,7 @@ export function Time({ data, season, L }: SlideProps) {
   return (
     <View style={[s.fill, { backgroundColor: INK }]}>
       <View style={{ position: "absolute", top: L.y(140), left: 28, right: 28 }}>
+        {data.timeStatsAvailable && <>
         <A k="up" d={120}><Text style={serif(22, CARD)}>가장 많이 기록한 시각</Text></A>
         <A k="up" d={210} style={{ marginTop: 8 }}><Text style={[serif(96, CARD), { lineHeight: 101, letterSpacing: -2 }]}>{t.peak}</Text></A>
         <View style={{ marginTop: 44, flexDirection: "row", alignItems: "flex-end", gap: 4, height: Math.round(150 * L.scale) }}>
@@ -355,12 +356,13 @@ export function Time({ data, season, L }: SlideProps) {
         <View style={{ marginTop: 8, flexDirection: "row", justifyContent: "space-between" }}>
           {["07", "12", "18", "24"].map((h) => <Text key={h} style={mono(10, "#8a8377")}>{h}</Text>)}
         </View>
+        </>}
         <View style={{ marginTop: 36, borderTopWidth: 1, borderTopColor: "#4a453d" }}>
           <A k="up" d={1100} style={s.timeRow}>
             <Text style={sans(13, "#cdc6b8")}>가장 많이 먹은 요일</Text>
             <Text style={serif(17, CARD)}>{t.day} · {t.dayCount}끼</Text>
           </A>
-          {t.midnight > 0 && (
+          {data.timeStatsAvailable && t.midnight > 0 && (
             <A k="up" d={1250} style={s.timeRow}>
               <Text style={sans(13, "#cdc6b8")}>자정 넘어 남긴 기록</Text>
               <Text style={serif(17, "#c07a2e")}>{t.midnight}개</Text>

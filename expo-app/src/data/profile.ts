@@ -1,4 +1,6 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
+import { useSession } from "@/data/session";
 import { usePersonalRows } from "@/data/queries";
 import { DEFAULT_CHARACTER, VERIFIED_PER_TICKET, isCharacterId, type CharacterId } from "@/lib/characters";
 import { earnedLabels, regionTitles, REGION_TIERS } from "@/lib/labels";
@@ -19,9 +21,11 @@ export type AccountInfo = {
   leaderboardOptIn: boolean;
 };
 
-export const useAccount = () =>
-  useQuery({
-    queryKey: ["account"],
+export const useAccount = () => {
+  const session = useSession();
+  return useQuery({
+    queryKey: ["account", session?.user.id ?? null],
+    enabled: session !== undefined,
     queryFn: async (): Promise<AccountInfo | null> => {
       // getUser 는 네트워크를 타서, 오프라인이면 세션이 있어도 null 을 줍니다 — 그러면 Gate 가 계정 정보를
       // 영영 기다리게 되니, 기기에 저장된 세션의 user 를 씁니다(프로필 조회는 어차피 RLS 가 막습니다).
@@ -35,7 +39,12 @@ export const useAccount = () =>
       const { data: profile, error } = await supabase.from("profiles").select("*").eq("id", user.id).single();
       // 마이그레이션이 밀렸을 때 닉네임이 "이름 없음"으로만 보이는 착오를 막기 위해 남깁니다.
       if (error) console.error("profiles 조회 실패 — 마이그레이션이 밀렸을 수 있습니다:", error);
-      return {
+      const cacheKey = `account.profile:${user.id}`;
+      if (error) {
+        const cached = await AsyncStorage.getItem(cacheKey).catch(() => null);
+        if (cached) { try { const value = JSON.parse(cached) as AccountInfo; if (value.userId === user.id) return value; } catch {} }
+      }
+      const account: AccountInfo = {
         userId: user.id,
         nickname: profile?.nickname ?? "",
         avatarUrl: profile?.avatar_url ?? null,
@@ -45,8 +54,11 @@ export const useAccount = () =>
         characterId: isCharacterId(profile?.character_id) ? profile.character_id : DEFAULT_CHARACTER,
         leaderboardOptIn: profile?.leaderboard_opt_in === true,
       };
+      if (!error) await AsyncStorage.setItem(cacheKey, JSON.stringify(account)).catch(() => {});
+      return account;
     },
   });
+};
 
 /* ───────────── 캐릭터 · 뽑기권 (HANDOFF-characters.md §2) ───────────── */
 
@@ -129,7 +141,7 @@ export function useSetCharacter() {
 async function setCharacter(qc: QueryClient, userId: string, id: CharacterId) {
   const owned = qc.getQueryData<OwnedCharacter[]>(["characters", "owned"]);
   if (owned && !owned.some((o) => o.id === id)) throw new Error("아직 없는 캐릭터입니다");
-  qc.setQueryData<AccountInfo | null>(["account"], (a) => (a ? { ...a, characterId: id } : a));
+  qc.setQueryData<AccountInfo | null>(["account", userId], (a) => (a ? { ...a, characterId: id } : a));
   const { error } = await supabase.from("profiles").update({ character_id: id }).eq("id", userId);
   if (error) {
     await qc.invalidateQueries({ queryKey: ["account"] });
@@ -141,7 +153,7 @@ async function setCharacter(qc: QueryClient, userId: string, id: CharacterId) {
 export function useSetLeaderboardOptIn() {
   const qc = useQueryClient();
   return async (userId: string, on: boolean) => {
-    qc.setQueryData<AccountInfo | null>(["account"], (a) => (a ? { ...a, leaderboardOptIn: on } : a));
+    qc.setQueryData<AccountInfo | null>(["account", userId], (a) => (a ? { ...a, leaderboardOptIn: on } : a));
     const { error } = await supabase.from("profiles").update({ leaderboard_opt_in: on }).eq("id", userId);
     await qc.invalidateQueries({ queryKey: ["account"] });
     await qc.invalidateQueries({ queryKey: ["community", "leaderboard"] });

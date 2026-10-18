@@ -1,24 +1,25 @@
+import { fetchAll } from "@/lib/reliability/pagination";
+import { useSession } from "@/data/session";
 import { useQuery } from "@tanstack/react-query";
 import { useActiveBook, usePersonalBook } from "@/data/books";
 import { supabase } from "@/lib/supabase";
 import type { Restaurant, Wish } from "@/lib/types";
 
 /**
- * 한 기록장의 기록. bookId 가 null 이면(마이그레이션 전) 기록장 구분 없이 읽습니다.
+ * 한 기록장의 기록. bookId 가 null 이면 읽지 않습니다.
  * 키가 ["restaurants", …] 라서 refreshAll 의 ["restaurants"] 무효화가 모든 기록장에 닿습니다.
  */
-export const useBookRows = (bookId: string | null, ready: boolean) =>
-  useQuery({
-    queryKey: ["restaurants", bookId],
-    enabled: ready,
+export const useBookRows = (bookId: string | null, ready: boolean) => {
+  const ownerId = useSession()?.user.id;
+  return useQuery({
+    queryKey: ["restaurants", bookId, ownerId],
+    enabled: ready && !!bookId && !!ownerId,
     queryFn: async () => {
-      let q = supabase.from("restaurants").select("*");
-      if (bookId) q = q.eq("book_id", bookId);
-      const { data, error } = await q.order("visited_at", { ascending: false, nullsFirst: false });
-      if (error) throw new Error(error.message);
-      return (data ?? []) as Restaurant[];
+      return fetchAll<Restaurant>((from, to) => supabase.from("restaurants").select("*").eq("book_id", bookId!)
+        .order("visited_at", { ascending: false, nullsFirst: false }).order("id", { ascending: false }).range(from, to));
     },
   });
+};
 
 /** 웹 MobileShell 이 들고 있던 rows 를 라우트 위로 올린 것 — 지금 고른 기록장(HANDOFF-couple §3-1)의 기록. */
 export const useRows = () => {
@@ -32,23 +33,17 @@ export const usePersonalRows = () => {
   return useBookRows(id, ready);
 };
 
-const useBookWishes = (bookId: string | null, ready: boolean) =>
-  useQuery({
-    queryKey: ["wishes", bookId],
-    enabled: ready,
+const useBookWishes = (bookId: string | null, ready: boolean) => {
+  const ownerId = useSession()?.user.id;
+  return useQuery({
+    queryKey: ["wishes", bookId, ownerId],
+    enabled: ready && !!bookId && !!ownerId,
     queryFn: async () => {
-      let q = supabase.from("wishes").select("*");
-      if (bookId) q = q.eq("book_id", bookId);
-      const { data, error } = await q
-        .order("plan_date", { ascending: true, nullsFirst: false })
-        .order("saved_at", { ascending: false });
-      if (error) {
-        console.error(error.message);
-        return [] as Wish[];
-      }
-      return (data ?? []) as Wish[];
+      return fetchAll<Wish>((from, to) => supabase.from("wishes").select("*").eq("book_id", bookId!)
+        .order("plan_date", { ascending: true, nullsFirst: false }).order("saved_at", { ascending: false }).order("id").range(from, to));
     },
   });
+};
 
 /** 지금 고른 기록장의 위시. 연인 기록장이면 둘이 함께 담은 목록입니다. */
 export const useWishes = () => {

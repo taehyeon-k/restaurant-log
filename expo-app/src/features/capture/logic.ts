@@ -7,7 +7,8 @@ import { findMatchingWish, WISH_NEAR_M, type Kind, type Restaurant, type Wish } 
 import { samePlace } from "@/lib/geo";
 import type { FoodPlace, NearbyPlace } from "@/lib/geocode";
 
-export const PICK_MAX_M = 50; // 인증 가능 최대 거리
+import { PICK_MAX_M } from "@/lib/reliability/guards";
+export { PICK_MAX_M };
 
 export type Geo = { lat: number; lng: number; acc: number };
 
@@ -106,10 +107,10 @@ export function pickCandidates(candidates: Candidate[], wishes: Wish[], geo: Geo
   return [...tagged.filter((c) => c.wish), ...tagged.filter((c) => !c.wish)];
 }
 
-/** 인증은 50m 안에서만 — 위치를 못 읽었으면 제한하지 않습니다. 강조는 고를 수 있는 첫 후보에게만. */
+/** 인증은 위치를 읽고 50m 안에서만 — 위치나 거리를 모르면 인증하지 않습니다. 강조는 고를 수 있는 첫 후보에게만. */
 export function pickList(list: ReturnType<typeof pickCandidates>, geo: Geo | null): PickItem[] {
   return list.map((c, i) => {
-    const far = !!geo && (c.distance ?? Infinity) > PICK_MAX_M;
+    const far = !geo || c.distance == null || !Number.isFinite(c.distance) || c.distance > PICK_MAX_M;
     return { ...c, far, hot: i === 0 && !far };
   });
 }

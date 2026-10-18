@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "lint": "expo lint",
     "test": "tsc -p tsconfig.test.json && node node_modules/.cache/rec-test/lib/rec/__tests__/all-tests.js",
-    "eval:rec": "tsc -p tsconfig.test.json && node node_modules/.cache/rec-test/lib/rec/__tests__/benchmark.js"
+    "eval:rec": "tsc -p tsconfig.test.json && node node_modules/.cache/rec-test/lib/rec/__tests__/benchmark.js",
+    "check": "npm run typecheck && npm test && npm run lint"
   },
   "dependencies": {
     "@expo-google-fonts/gowun-batang": "^0.4.1",
@@ -63,6 +64,8 @@
   },
   "devDependencies": {
     "@types/react": "~19.2.4",
+    "eslint": "9.39.5",
+    "eslint-config-expo": "57.0.0",
     "typescript": "~6.0.3"
   }
 }

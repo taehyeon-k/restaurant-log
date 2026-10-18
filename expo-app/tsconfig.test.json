@@ -6,6 +6,7 @@
     "lib": ["ES2023"],
     "types": ["node"],
     "strict": true,
+    "paths": { "@/*": ["./src/*"] },
     "skipLibCheck": true,
     "rootDir": "src",
     "outDir": "node_modules/.cache/rec-test"

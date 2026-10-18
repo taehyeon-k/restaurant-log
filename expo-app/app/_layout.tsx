@@ -1,15 +1,21 @@
+import { restoreShown } from "@/features/recommend/log";
 import { GowunBatang_700Bold } from "@expo-google-fonts/gowun-batang";
 import { NotoSansKR_400Regular, NotoSansKR_500Medium, NotoSansKR_700Bold } from "@expo-google-fonts/noto-sans-kr";
 import { JetBrainsMono_400Regular } from "@expo-google-fonts/jetbrains-mono";
 import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
-import type { Session } from "@supabase/supabase-js";
+import NetInfo, { useNetInfo } from "@react-native-community/netinfo";
+import { AppState } from "react-native";
+import { bootState } from "@/lib/reliability/boot";
+import { BootScreen } from "@/components/BootScreen";
+import { useBooks } from "@/data/books";
+import { useSession } from "@/data/session";
 import { useFonts } from "expo-font";
 import * as Notifications from "expo-notifications";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { useShareIntent } from "expo-share-intent";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { useAccount } from "@/data/profile";
@@ -19,23 +25,11 @@ import CommunityTransition from "@/features/community/Transition";
 import { startQueueTriggers } from "@/features/queue/process";
 // 이 import 가 백그라운드 지오펜스 태스크를 정의합니다 — 반드시 앱 진입점에서 불러야 합니다.
 import { syncWishGeofences } from "@/features/notify/geofence";
-import { supabase } from "@/lib/supabase";
 import { C } from "@/theme";
 
 SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient();
-
-/** undefined = 아직 모름, null = 로그아웃. */
-function useSession() {
-  const [session, setSession] = useState<Session | null | undefined>(undefined);
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => setSession(data.session));
-    const { data } = supabase.auth.onAuthStateChange((_e, s) => setSession(s));
-    return () => data.subscription.unsubscribe();
-  }, []);
-  return session;
-}
 
 function Gate({ fontsLoaded }: { fontsLoaded: boolean }) {
   const session = useSession();
@@ -47,10 +41,41 @@ function Gate({ fontsLoaded }: { fontsLoaded: boolean }) {
 
   // 로그인한 계정이 바뀌면 캐시를 새로 읽습니다.
   const userId = session?.user.id;
-  useEffect(() => { if (userId) void qc.invalidateQueries(); }, [userId, qc]);
+  useEffect(() => {
+    setState({ recShown: [], recHeading: null, recCourse: null, recHere: null, recPlace: null, recAt: null, recFilter: null, ghost: null, linkPick: null });
+    void restoreShown(userId ?? null);
+    void syncWishGeofences([]);
+    if (userId) void qc.invalidateQueries();
+  }, [userId, qc]);
 
   const { data: account, isPending: accountPending, isError: accountError } = useAccount();
   const { data: wishes } = useWishes();
+  const books = useBooks();
+  const net = useNetInfo();
+  const [boot, setBoot] = useState<{ owner: string | null | undefined; at: number; hidden: boolean }>(() => ({ owner: undefined, at: Date.now(), hidden: false }));
+  const [captureEscape, setCaptureEscape] = useState(false);
+  const [elapsed, setElapsed] = useState(0);
+  const bootOwner = session === undefined ? undefined : session?.user.id ?? null;
+  const bootCurrent = boot.owner === bootOwner;
+  useEffect(() => {
+    if (bootOwner === undefined || !fontsLoaded) return;
+    setBoot({ owner: bootOwner, at: Date.now(), hidden: false });
+    setElapsed(0);
+  }, [bootOwner, fontsLoaded]);
+  useEffect(() => {
+    if (boot.hidden) return;
+    const timer = setInterval(() => setElapsed(Date.now() - boot.at), 100);
+    return () => clearInterval(timer);
+  }, [boot.at, boot.hidden]);
+  const refetchBooks = books.refetch;
+  useEffect(() => {
+    if (!userId) return;
+    const retry = () => { void refetchBooks(); };
+    const off = NetInfo.addEventListener((n) => { if (n.isConnected && n.isInternetReachable !== false) retry(); });
+    const app = AppState.addEventListener("change", (s) => { if (s === "active") retry(); });
+    return () => { off(); app.remove(); };
+  }, [userId, refetchBooks]);
+  const hideBoot = useCallback(() => setBoot((b) => ({ ...b, hidden: true })), []);
 
   // 로그인 직후엔 로그아웃 때 받아 둔 캐시(null)가 남아 있습니다. 그걸로 분기하면 /welcome 으로 갔다가
   // 다시 읽은 뒤 홈으로 튕기므로, 지금 세션의 계정 정보가 올 때까지 기다립니다.
@@ -58,7 +83,13 @@ function Gate({ fontsLoaded }: { fontsLoaded: boolean }) {
   const ready = fontsLoaded && session !== undefined && (!session || accountFresh);
   const first = segments[0] as string | undefined;
 
-  useEffect(() => { if (ready) SplashScreen.hideAsync(); }, [ready]);
+  // Hand off the native splash even when the network/profile is unavailable.
+  useEffect(() => { if (fontsLoaded && session !== undefined) void SplashScreen.hideAsync(); }, [fontsLoaded, session]);
+  const booksResolved = !session || books.isSuccess;
+  const bootStatus = bootState({ elapsed, ready: ready && bootCurrent, resolved: booksResolved,
+    offline: net.isConnected === false || net.isInternetReachable === false, fetching: books.isFetching, error: books.isError });
+  useEffect(() => { if (first === "capture") setCaptureEscape(true); else if (first !== "record") setCaptureEscape(false); }, [first]);
+  const showBoot = (!bootCurrent || !boot.hidden) && first !== "capture" && !(captureEscape && first === "record" && segments[1] === "edit");
 
   // 로그인 · 닉네임(첫 로그인) 분기 — 웹의 proxy.ts / auth/callback 이 하던 일.
   useEffect(() => {
@@ -70,7 +101,7 @@ function Gate({ fontsLoaded }: { fontsLoaded: boolean }) {
   }, [ready, session, account?.nickname, first, router]);
 
   // 오프라인 큐 — 앱 복귀·연결 복구에서 비웁니다.
-  useEffect(() => (session ? startQueueTriggers(qc) : undefined), [session, qc]);
+  useEffect(() => (userId ? startQueueTriggers(qc) : undefined), [userId, qc]);
 
   // 위시가 바뀔 때마다 가까운 20곳으로 지오펜스를 다시 맞춥니다.
   useEffect(() => { if (session && wishes) void syncWishGeofences(wishes); }, [session, wishes]);
@@ -99,7 +130,7 @@ function Gate({ fontsLoaded }: { fontsLoaded: boolean }) {
     router.push({ pathname: "/wish/new", params: { share: pendingShare } });
   }, [signedIn, pendingShare, router]);
 
-  if (!ready) return null;
+  if (!fontsLoaded || session === undefined) return null;
 
   return (
     <>
@@ -122,6 +153,9 @@ function Gate({ fontsLoaded }: { fontsLoaded: boolean }) {
     </Stack>
     {/* 커뮤니티 들어가기 전환 판 — 상태 표시줄까지 모든 화면 위 */}
     <CommunityTransition />
+    {showBoot && <BootScreen key={bootOwner ?? "signed-out"} state={bootStatus} characterId={account && account.userId === userId ? account.characterId : undefined}
+      fetching={books.isFetching} onRetry={() => { void books.refetch(); }}
+      onCapture={session && account && account.userId === userId && account.nickname ? () => { setCaptureEscape(true); router.push("/capture"); } : undefined} onHidden={hideBoot} />}
     </>
   );
 }

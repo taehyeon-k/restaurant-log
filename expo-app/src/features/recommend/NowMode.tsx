@@ -1,7 +1,7 @@
 import * as Haptics from "expo-haptics";
 import { useIsFocused, useRouter } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Animated, Linking, PanResponder, Pressable, ScrollView, Text, View } from "react-native";
+import { ActivityIndicator, Animated, AppState, Linking, PanResponder, Pressable, ScrollView, Text, View } from "react-native";
 import { PaperMap } from "@/components/PaperMap";
 import { setState, type RecHere } from "@/data/store";
 import { formatDistance } from "@/lib/distance";
@@ -51,14 +51,20 @@ export function NowMode({
 
   // 보인 카드만 impression — 탭이 앞에 있고, 그 카드가 DWELL_MS 넘게 머물렀을 때.
   const focused = useIsFocused();
+  const [foreground, setForeground] = useState(AppState.currentState === "active");
   useEffect(() => {
-    if (!session || !focused || !picks[index]) return;
+    const sub = AppState.addEventListener("change", (state) => setForeground(state === "active"));
+    return () => sub.remove();
+  }, []);
+  useEffect(() => {
+    if (!session || !focused || !foreground || loading || !picks[index]) return;
     const t = setTimeout(() => {
-      void logRec(session, "impression", { key: picks[index].c.key, position: index + 1 });
-      rememberShown(session, index + 1);
+      void logRec(session, "impression", { key: picks[index].c.key, position: index + 1, payload: { impression_rule: 1 } }).then((ok) => {
+        if (ok) void rememberShown(session, index + 1).catch(() => {});
+      });
     }, DWELL_MS);
     return () => clearTimeout(t);
-  }, [session, focused, index, picks]);
+  }, [session, focused, foreground, loading, index, picks]);
 
   const count = filter.inc.length + filter.exc.length;
   const chip = (key: string, text: string, kind: "inc" | "exc", onRemove: () => void) => (

@@ -8,7 +8,9 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ThumbIcon, VerifiedMark } from "@/components/icons";
 import { Chip, Eyebrow, fieldStyle } from "@/components/ui";
-import { useActiveBook, useSaveNote } from "@/data/books";
+import { enqueue, persistPhoto, removePhoto } from "@/features/queue/db";
+import { drainQueue } from "@/features/queue/process";
+import { captureBookId, useActiveBook, useSaveNote } from "@/data/books";
 import { refreshAll } from "@/data/invalidate";
 import { useRows, useWishes } from "@/data/queries";
 import { samePlace } from "@/lib/geo";
@@ -23,7 +25,7 @@ import {
   CATEGORIES, findMatchingWish, KEYWORDS, verifiedDateTime, wishMetInfo, WISH_AUTO_M, type Kind, type MenuItem,
 } from "@/lib/types";
 import { C, F, SHADOW } from "@/theme";
-import { linkVisit } from "@/features/recommend/log";
+import { linkVisit, visitAttribution } from "@/features/recommend/log";
 
 const pad = (n: number) => String(n).padStart(2, "0");
 const isoOf = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -48,7 +50,7 @@ function parsePhotos(raw?: string): string[] {
 export default function EditRoute() {
   const p = useLocalSearchParams<{
     id?: string; kind?: Kind; name?: string; address?: string; lat?: string; lng?: string;
-    category?: string; revisit?: string; visitedAt?: string; photos?: string;
+    category?: string; revisit?: string; visitedAt?: string; photos?: string; capturedAt?: string;
   }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -195,6 +197,27 @@ export default function EditRoute() {
         // 정해지면 여기서 함께 저장하세요. 그 전까지는 기본값 private 이고, 시험할 때는 DB 에서 직접 바꿉니다.
       };
 
+      // A captured photo stays saveable without a network read, including the strict unverified path.
+      if (isNew && p.capturedAt && pics.length) {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) throw new Error("로그인이 필요합니다");
+        const targetBook = await captureBookId(session.user.id, bookId);
+        const lat = spot?.lat ?? twin?.lat ?? preLat;
+        const lng = spot?.lng ?? twin?.lng ?? preLng;
+        const files = pics.filter((pic) => pic.local).map((pic) => persistPhoto(pic.ref));
+        const hint = lat != null && lng != null ? await visitAttribution({ name: cleanName, lat, lng }, Date.parse(p.capturedAt)) : null;
+        const queueId = await enqueue({
+          ...shared, user_id: session.user.id, ...(targetBook ? { book_id: targetBook } : {}),
+          kind, captured_at: visitedAt === p.visitedAt ? p.capturedAt : null, region: regionFromAddress(cleanAddress) || null,
+          place_key: `${cleanName}|${cleanAddress}`.toLowerCase(), lat, lng, verified: false, acc: null,
+          pending: false, from_wish: null, price_range: null, cover_index: cover,
+        }, files[0], null, hint ? JSON.stringify(hint) : null, files.slice(1));
+        parsePhotos(p.photos).forEach(removePhoto);
+        void drainQueue(qc, queueId).catch((error) => console.warn("큐 전송 실패", error));
+        router.dismissAll();
+        return;
+      }
+
       // 앨범에서 고른 사진을 먼저 올립니다. 인증 여부(verified · verified_at)는 건드리지 않습니다.
       const refs: string[] = [];
       for (const pic of pics) {
@@ -245,7 +268,7 @@ export default function EditRoute() {
       }).select("id").single();
       if (error) throw new Error(error.message);
       if (isCouple && (shared.rating != null || shared.review)) await saveNote(user.id, inserted.id as number, shared.rating, shared.review, false);
-      if (kind === "restaurant") linkVisit({ recordId: inserted.id as number, name: cleanName, lat, lng, verified: false });
+      if (kind === "restaurant") void linkVisit({ recordId: inserted.id as number, name: cleanName, lat, lng, verified: false }).catch(() => {});
       if (matchedWish) {
         await supabase.from("wishes").delete().eq("id", matchedWish.id);
         if (matchedWish.capture_path) void removePhotoObjects([matchedWish.capture_path]);

@@ -1,4 +1,6 @@
-import { getState, setState } from "@/data/store";
+import { deliverOutbox } from "@/lib/reliability/outbox";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { getState, setState, type RecShown } from "@/data/store";
 import { metersBetweenLL, norm } from "@/lib/geo";
 import { REC_CONFIG } from "@/lib/rec/config";
 import { createDeliveryCache } from "@/lib/rec/delivery";
@@ -18,6 +20,7 @@ export type RecEvent =
 export type RecSession = {
   id: string;
   bookId: string | null;
+  ownerId: string;
   result: RecResult;
   /** 맥락 — 동네 이름 · 고른 기준인지 · 다시 추천 몇 번째인지(좌표 없음). */
   meta: { area: string | null; customPoint: boolean; customTime: boolean; refresh: number; kakao: "ok" | "partial" | "unavailable" };
@@ -38,7 +41,7 @@ const warn = (what: string, msg: string) => { if (__DEV__) console.warn(`추천 
 function persist(s: RecSession): Promise<boolean> {
   return persisted.run(s.id, async () => {
     const { data } = await supabase.auth.getSession();
-    if (!data.session) return false;
+    if (!data.session || data.session.user.id !== s.ownerId) return false;
     const r = s.result;
     const { error } = await supabase.from("rec_sessions").insert({
       id: s.id, user_id: data.session.user.id, book_id: s.bookId, algo_version: REC_CONFIG.version,
@@ -57,6 +60,7 @@ function persist(s: RecSession): Promise<boolean> {
       kakao_id: it.c.kakaoId, rec_category: it.c.cat.recCat, distance_m: Math.min(50000, Math.round(it.c.distance)),
       score: it.score, features: featureSnapshot(it), sources: it.c.sources,
     }));
+    if ((await supabase.auth.getSession()).data.session?.user.id !== s.ownerId) return false;
     const { error: e2 } = await supabase.from("rec_items").insert(items);
     if (e2 && e2.code !== "23505") { warn("items", e2.message); return false; }
     return true;
@@ -67,51 +71,112 @@ function persist(s: RecSession): Promise<boolean> {
 export async function logRec(
   s: RecSession | { id: string },
   type: RecEvent,
-  opts: { key?: string; position?: number; recordId?: number; wishId?: string; payload?: Record<string, unknown> } = {},
+  opts: { eventId?: string; ownerId?: string; key?: string; position?: number; recordId?: number; wishId?: string; payload?: Record<string, unknown> } = {},
 ) {
+  const eventId = opts.eventId ?? uuid();
+  const expectedOwner = opts.ownerId ?? ("ownerId" in s ? s.ownerId : undefined);
   const send = async () => {
     try {
       const ok = "result" in s ? await persist(s) : await (persisted.get(s.id) ?? Promise.resolve(true));
       if (!ok) return false;
       const { data } = await supabase.auth.getSession();
-      if (!data.session) return false;
+      if (!data.session || (expectedOwner && data.session.user.id !== expectedOwner)) return false;
       const { error } = await supabase.from("rec_events").insert({
-        session_id: s.id, user_id: data.session.user.id, candidate_key: opts.key?.slice(0, 300) ?? null, position: opts.position ?? null,
+        client_event_id: eventId, session_id: s.id, user_id: data.session.user.id, candidate_key: opts.key?.slice(0, 300) ?? null, position: opts.position ?? null,
         event_type: type, record_id: opts.recordId ?? null, wish_id: opts.wishId ?? null, payload: opts.payload ?? {},
       });
-      if (error) warn(type, error.message);
-      return !error;
+      if (error && error.code !== "23505") warn(type, error.message);
+      return !error || error.code === "23505";
     } catch (error) { warn(type, String(error)); return false; }
   };
-  if (type === "impression") await impressions.run(`${s.id}|${opts.key}`, send);
-  else await send();
+  if (type === "impression") return impressions.run(`${s.id}|${opts.key}`, send);
+  return send();
 }
 
-/** 화면에 보인 카드를 기억해 둡니다 — 나중에 그 가게를 인증하면 이 세션과 잇습니다(visit_confirmed). */
-export function rememberShown(s: RecSession, position: number) {
-  const p = s.result.picks[position - 1];
-  if (!p) return;
-  const prev = getState().recShown.filter((x) => Date.now() - x.at < SHOWN_TTL_MS && !(x.sessionId === s.id && x.key === p.c.key));
-  setState({ recShown: [...prev.slice(-29), { sessionId: s.id, key: p.c.key, position, name: p.c.name, lat: p.c.lat, lng: p.c.lng, at: Date.now() }] });
-}
-
-/** 보인 뒤 이 시간 안의 인증만 추천에서 온 방문으로 봅니다. */
 const SHOWN_TTL_MS = 12 * 60 * 60 * 1000;
-
-/**
- * 기록이 올라간 직후(촬영 인증) — 최근 보인 추천 카드 중 같은 가게(이름 + 100m)가 있으면 visit_confirmed.
- * 「여기로 갈게요」를 눌렀는지(navigate)는 payload.via 로 구분합니다. 만족도는 record_id 로 기록의 별점과 나중에 잇습니다.
- */
-export function linkVisit(rec: { recordId: number; name: string; lat: number | null; lng: number | null; verified: boolean }) {
-  const { recShown, recHeading } = getState();
-  const hit = [...recShown].reverse().find((x) =>
-    Date.now() - x.at < SHOWN_TTL_MS && norm(x.name) === norm(rec.name) &&
-    (rec.lat == null || rec.lng == null || metersBetweenLL(x.lat, x.lng, rec.lat, rec.lng) <= REC_CONFIG.sameBranchM));
-  if (!hit) return;
-  const via = recHeading?.sessionId === hit.sessionId && recHeading.placeKey === hit.key ? "navigate" : "shown";
-  void logRec({ id: hit.sessionId }, "visit_confirmed", {
-    key: hit.key, position: hit.position, recordId: rec.recordId,
-    payload: { via, verified: rec.verified, hours_since_shown: Math.round(((Date.now() - hit.at) / 3600000) * 10) / 10 },
+let shownOwner: string | null = null;
+let writes: Promise<unknown> = Promise.resolve();
+const serial = <T>(task: () => Promise<T>): Promise<T> => {
+  const result = writes.then(task, task);
+  writes = result.catch(() => {});
+  return result;
+};
+const shownKey = (owner: string) => `rec.shown:${owner}`;
+const visitsKey = (owner: string) => `rec.pending-visits:${owner}`;
+async function readShown(owner: string): Promise<RecShown[]> {
+  try {
+    const raw = JSON.parse(await AsyncStorage.getItem(shownKey(owner)) ?? "[]") as RecShown[];
+    return Array.isArray(raw) ? raw.filter((r) => typeof r.sessionId === "string" && typeof r.key === "string" && typeof r.name === "string" && Number.isFinite(r.lat) && Number.isFinite(r.lng) && Number.isFinite(r.at) && Date.now() - r.at >= 0 && Date.now() - r.at < SHOWN_TTL_MS).slice(-30) : [];
+  } catch { return []; }
+}
+export async function restoreShown(owner: string | null) {
+  shownOwner = owner;
+  setState({ recShown: [] });
+  if (!owner) return;
+  const rows = await serial(() => readShown(owner));
+  if (shownOwner === owner) setState({ recShown: rows });
+}
+export async function rememberShown(s: RecSession, position: number) {
+  const p = s.result.picks[position - 1];
+  const owner = (await supabase.auth.getSession()).data.session?.user.id;
+  if (!p || !owner || s.ownerId !== owner || shownOwner !== owner) return;
+  await serial(async () => {
+    const previous = await readShown(owner);
+    const rows = [...previous.filter((x) => !(x.sessionId === s.id && x.key === p.c.key)).slice(-29), { sessionId: s.id, key: p.c.key, position, name: p.c.name, lat: p.c.lat, lng: p.c.lng, at: Date.now() }];
+    await AsyncStorage.setItem(shownKey(owner), JSON.stringify(rows));
+    if (shownOwner === owner) setState({ recShown: rows });
   });
-  setState({ recShown: recShown.filter((x) => x !== hit) });
+}
+export type VisitHint = { ownerId: string; eventId: string; sessionId: string; key: string; position: number; shownAt: number; capturedAt: number; via: string };
+export async function visitAttribution(rec: { name: string; lat: number | null; lng: number | null }, at = Date.now()): Promise<VisitHint | null> {
+  const ownerId = (await supabase.auth.getSession()).data.session?.user.id;
+  if (!ownerId) return null;
+  const rows = await serial(() => readShown(ownerId));
+  const hit = [...rows].reverse().find((x) => at >= x.at && at - x.at < SHOWN_TTL_MS && norm(x.name) === norm(rec.name) &&
+    rec.lat != null && rec.lng != null && metersBetweenLL(x.lat, x.lng, rec.lat, rec.lng) <= REC_CONFIG.sameBranchM);
+  if (!hit) return null;
+  const heading = getState().recHeading;
+  return { ownerId, eventId: uuid(), sessionId: hit.sessionId, key: hit.key, position: hit.position, shownAt: hit.at, capturedAt: at,
+    via: heading?.sessionId === hit.sessionId && heading.placeKey === hit.key ? "navigate" : "shown" };
+}
+type PendingVisit = { hint: VisitHint; recordId: number; verified: boolean };
+async function readVisits(owner: string): Promise<PendingVisit[]> {
+  const raw = JSON.parse(await AsyncStorage.getItem(visitsKey(owner)) ?? "[]");
+  if (!Array.isArray(raw)) throw new Error("invalid_pending_visits");
+  return raw;
+}
+/** Persist a small visit-delivery outbox before capture queue cleanup. Other event types remain best-effort. */
+export async function queueVisit(hint: VisitHint | null, recordId: number, verified: boolean) {
+  if (!hint) return true;
+  if ((await supabase.auth.getSession()).data.session?.user.id !== hint.ownerId) return false;
+  await serial(async () => {
+    const rows = await readVisits(hint.ownerId);
+    if (!rows.some((r) => r.hint.eventId === hint.eventId)) rows.push({ hint, recordId, verified });
+    await AsyncStorage.setItem(visitsKey(hint.ownerId), JSON.stringify(rows));
+  });
+  void flushVisits(hint.ownerId).catch(() => {});
+  return true;
+}
+export async function flushVisits(owner: string) {
+  return serial(() => deliverOutbox<PendingVisit>({
+    read: () => readVisits(owner),
+    write: (rows) => AsyncStorage.setItem(visitsKey(owner), JSON.stringify(rows)),
+    key: (visit) => visit.hint.eventId,
+    send: async (visit) => {
+      if ((await supabase.auth.getSession()).data.session?.user.id !== owner) return false;
+      const h = visit.hint;
+      return logRec({ id: h.sessionId }, "visit_confirmed", { eventId: h.eventId, ownerId: owner, key: h.key, position: h.position, recordId: visit.recordId,
+        payload: { via: h.via, verified: visit.verified, hours_since_shown: Math.round((h.capturedAt - h.shownAt) / 360000) / 10 } });
+    },
+    delivered: async (visit) => {
+      const h = visit.hint;
+      const shown = (await readShown(owner)).filter((r) => !(r.sessionId === h.sessionId && r.key === h.key));
+      await AsyncStorage.setItem(shownKey(owner), JSON.stringify(shown));
+      if (shownOwner === owner) setState({ recShown: shown });
+    },
+  }));
+}
+export async function linkVisit(rec: { recordId: number; name: string; lat: number | null; lng: number | null; verified: boolean }) {
+  const hint = await visitAttribution(rec);
+  return queueVisit(hint, rec.recordId, rec.verified);
 }

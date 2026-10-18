@@ -62,10 +62,10 @@ npm start
    ```bash
    cd expo-app
    node --experimental-strip-types --env-file=.env scripts/import-stores.ts "<폴더>/소상공인시장진흥공단_상가(상권)정보_서울_YYYYMM.csv" --sido 11 --dry-run
-   node --experimental-strip-types --env-file=.env scripts/import-stores.ts "<폴더>/소상공인시장진흥공단_상가(상권)정보_서울_YYYYMM.csv" --sido 11
+   node --experimental-strip-types --env-file=.env scripts/import-stores.ts "<폴더>/소상공인시장진흥공단_상가(상권)정보_서울_YYYYMM.csv" --sido 11 --full
    ```
    - 음식 업종만, `--sido` 의 시도코드(서울 11 · 경기 41 · 부산 26 …)만 넣습니다. 폴더를 주면 그 안 CSV 를 모두 읽고 시도코드로 거릅니다.
-   - `store_id`(상가업소번호) 기준 upsert. 새 파일에 없는 같은 시도 가게는 `closed_at` 이 찍히고 지워지지 않습니다.
+   - `store_id`(상가업소번호) 기준 upsert. 기본은 부분 적재이며 폐업 표시는 하지 않습니다. 완전한 시도 스냅숏에만 `--full` 을 붙이세요. 입력이 기존 영업점 수의 90% 미만이면 폐업 표시를 중단합니다(`--force` 로만 재정의). `--full --dry-run` 은 읽기만 하고 폐업 예정 수를 보여줍니다.
    - 유흥 주점·구내식당은 뺍니다. 층정보는 `B1`·`1F` 꼴로 고쳐 넣습니다(모르면 빈 값 → 앱에서 「기타」).
 4. 서울 한 번에 약 14만 곳, 2~3분 걸립니다.
 
@@ -162,3 +162,7 @@ References: [NAVER Map Expo plugin setup](https://rnnavermap.mjstudio.net/docs/i
 [NAVER application registration](https://guide.ncloud-docs.com/docs/en/maps-app/),
 [EAS environment visibility](https://docs.expo.dev/eas/environment-variables/manage/),
 [EAS CLI commands](https://docs.expo.dev/eas/cli/).
+
+## Technical remediation
+
+Implementation status, migration order, regression checks, and device acceptance checklist: [technical remediation implementation](docs/technical-remediation-implementation.md). Do not publish the client before applying and verifying the three nullable-column migrations listed there.

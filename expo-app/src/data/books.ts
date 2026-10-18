@@ -1,6 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { useEffect, useSyncExternalStore } from "react";
+import { useSession } from "@/data/session";
 import { useAccount } from "@/data/profile";
 import type { AnniversaryPick } from "@/lib/anniversary";
 import { DEFAULT_CHARACTER, isCharacterId, type CharacterId } from "@/lib/characters";
@@ -40,19 +41,18 @@ export const ME_COLOR = "#b4552d";
 export const PARTNER_COLOR = "#4f6b7a";
 export const EMPTY_AVATAR = "#cfc8ba";
 
-export const useBooks = () =>
-  useQuery({
-    queryKey: ["books"],
-    queryFn: async (): Promise<Books | null> => {
+export const useBooks = () => {
+  const session = useSession();
+  const userId = session?.user.id;
+  return useQuery({
+    queryKey: ["books", userId],
+    enabled: !!userId,
+    queryFn: async (): Promise<Books> => {
       const { data, error } = await supabase
         .from("books")
         .select("id, kind, started_on, created_by, closed_at, created_at, book_members(user_id)")
         .order("created_at", { ascending: false });
-      // 마이그레이션 전이면 null — 화면은 예전처럼 기록장 구분 없이 돕니다.
-      if (error) {
-        console.error("books 조회 실패 — 마이그레이션이 밀렸을 수 있습니다:", error.message);
-        return null;
-      }
+      if (error) throw error;
       const ids = [...new Set((data ?? []).flatMap((b) => (b.book_members as { user_id: string }[]).map((m) => m.user_id)))];
       const { data: profiles } = ids.length
         ? await supabase.from("profiles").select("id, nickname, avatar_url, character_id").in("id", ids)
@@ -71,6 +71,7 @@ export const useBooks = () =>
           characterId: isCharacterId(byId.get(m.user_id)?.character_id) ? (byId.get(m.user_id)!.character_id as CharacterId) : DEFAULT_CHARACTER,
         })),
       }));
+      if (!all.some((b) => b.kind === "personal")) throw new Error("personal_book_missing");
       return {
         personal: all.find((b) => b.kind === "personal") ?? null,
         couple: all.find((b) => b.kind === "couple" && !b.closedAt) ?? all.find((b) => b.kind === "couple") ?? null,
@@ -78,6 +79,7 @@ export const useBooks = () =>
       };
     },
   });
+};
 
 /* ───────────── 지금 고른 기록장 ───────────── */
 
@@ -112,7 +114,8 @@ export function setActiveBook(id: string) {
 export type ActiveBook = {
   /** 기록장 정보를 다 읽었는지 — 이 전에는 기록을 읽지 않습니다(다른 기록장이 잠깐 비치지 않게). */
   ready: boolean;
-  /** 지금 기록장 id. 마이그레이션 전이면 null(기록장 구분 없이 읽습니다). */
+  error: boolean;
+  /** Resolved book only; null disables book-scoped queries. */
   id: string | null;
   book: Book | null;
   books: Books | null;
@@ -126,7 +129,8 @@ export type ActiveBook = {
 
 export function useActiveBook(): ActiveBook {
   const { data: account } = useAccount();
-  const userId = account?.userId ?? null;
+  const session = useSession();
+  const userId = session?.user.id ?? null;
   useEffect(() => { if (userId) load(userId); }, [userId]);
   const s = useSyncExternalStore(
     (f) => { subs.add(f); return () => subs.delete(f); },
@@ -135,19 +139,22 @@ export function useActiveBook(): ActiveBook {
   );
   const { data: books, isSuccess, isError } = useBooks();
   const loaded = s.userId === userId && s.loaded;
-  const ready = !!userId && loaded && (isSuccess || isError);
+  const ready = !!userId && loaded && isSuccess;
   const picked = books?.all.find((b) => b.id === s.id && (b.kind === "personal" || b.id === books.couple?.id));
   const book = picked ?? books?.personal ?? null;
+  useEffect(() => {
+    if (ready && book?.id && userId) void AsyncStorage.setItem(storeKey(userId), book.id).catch(() => {});
+  }, [ready, book?.id, userId]);
   const isCouple = book?.kind === "couple";
   const me = book?.members.find((m) => m.userId === userId) ?? (userId ? { userId, nickname: account?.nickname || "나", avatarUrl: account?.avatarUrl ?? null, characterId: account?.characterId ?? DEFAULT_CHARACTER } : null);
   const partner = isCouple ? book!.members.find((m) => m.userId !== userId) ?? null : null;
-  return { ready, id: book?.id ?? null, book, books: books ?? null, isCouple, readOnly: isCouple && !!book?.closedAt, me, partner };
+  return { ready, error: isError, id: book?.id ?? null, book, books: books ?? null, isCouple, readOnly: isCouple && !!book?.closedAt, me, partner };
 }
 
 /** 개인 기록장 id — 라벨·캐릭터·리캡은 개인 기록으로만 셉니다. */
 export function usePersonalBook() {
   const { data: books, isSuccess, isError } = useBooks();
-  return { ready: isSuccess || isError, id: books?.personal?.id ?? null };
+  return { ready: isSuccess && !!books?.personal?.id, error: isError, id: books?.personal?.id ?? null };
 }
 
 /* ───────────── 만들기 · 초대 · 참여 · 끊기 ───────────── */
@@ -308,4 +315,9 @@ export async function copyToPersonal(qc: QueryClient, recordId: number): Promise
   if (error) throw friendly(error.message);
   await qc.invalidateQueries({ queryKey: ["restaurants"] });
   return data as number;
+}
+
+/** Local-only capture fallback: never require a network lookup to enqueue a photo. */
+export async function captureBookId(userId: string, resolved: string | null) {
+  return resolved ?? await AsyncStorage.getItem(storeKey(userId)).catch(() => null);
 }

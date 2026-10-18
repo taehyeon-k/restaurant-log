@@ -59,7 +59,7 @@ async function hasGeofencePermissions() {
 }
 
 /** 알림을 켜 둔 위시 중 가까운 20곳을 감시 대상으로 등록합니다. 켜 둔 위시가 없으면 감시를 멈춥니다. */
-export async function syncWishGeofences(wishes: Wish[]) {
+async function syncWishGeofencesNow(wishes: Wish[]) {
   try {
     const targets = wishes.filter((w) => w.notify && w.lat != null && w.lng != null);
     const started = await Location.hasStartedGeofencingAsync(TASK).catch(() => false);
@@ -92,4 +92,12 @@ export async function syncWishGeofences(wishes: Wish[]) {
   } catch (e) {
     console.warn("지오펜스 등록 실패", e);
   }
+}
+
+// Account changes and query updates must not race native registrations.
+let geofenceSync: Promise<void> = Promise.resolve();
+export function syncWishGeofences(wishes: Wish[]) {
+  const job = geofenceSync.then(() => syncWishGeofencesNow(wishes));
+  geofenceSync = job.catch(() => {});
+  return job;
 }

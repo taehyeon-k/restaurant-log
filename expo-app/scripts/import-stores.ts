@@ -3,7 +3,7 @@
  * 소상공인시장진흥공단 상가(상권)정보 CSV → Supabase public_stores 적재.
  * 앱 밖에서(노트북·codespace) 분기마다 한 번 돌립니다 — README 「상가 데이터 적재」 참고.
  *
- *   node --experimental-strip-types --env-file=.env scripts/import-stores.ts <csv 또는 csv 폴더> [--sido 11] [--dry-run]
+ *   node --experimental-strip-types --env-file=.env scripts/import-stores.ts <csv 또는 csv 폴더> [--sido 11] [--dry-run] [--full] [--force]
  *
  * - 음식 업종(상권업종대분류명 = 음식)만, 시도코드(--sido, 기본 11 = 서울)만 넣습니다.
  * - store_id(상가업소번호) 기준 upsert. 이번 파일에 없는 같은 시도 가게는 closed_at 을 찍고 지우지 않습니다.
@@ -15,6 +15,7 @@ import { createReadStream, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
 import { createClient } from "@supabase/supabase-js";
+import { closureAllowed, requireHeaders } from "../src/lib/reliability/import.ts";
 
 const SKIP_SMALL = new Set(["일반 유흥 주점", "무도 유흥 주점", "구내식당"]);
 const BATCH = 1000;
@@ -73,11 +74,12 @@ async function* rows(file: string, sido: string, runAt: string): AsyncGenerator<
   for await (const raw of lines) {
     const line = head ? raw : raw.replace(/^﻿/, "");
     const cells = splitCsv(line);
-    if (!head) { head = cells; continue; }
+    if (!head) { requireHeaders(cells); head = cells; continue; }
     const get = (k: string) => (cells[head!.indexOf(k)] ?? "").trim();
     if (get("시도코드") !== sido || get("상권업종대분류명") !== "음식") continue;
     if (SKIP_SMALL.has(get("상권업종소분류명"))) continue;
     const lng = Number(get("경도")), lat = Number(get("위도"));
+    if (!get("상가업소번호") || !get("상호명")) throw new Error(`CSV 식별자 누락: ${file}`);
     if (!Number.isFinite(lat) || !Number.isFinite(lng) || !lat || !lng) continue;
     yield {
       store_id: get("상가업소번호"),
@@ -101,16 +103,31 @@ async function* rows(file: string, sido: string, runAt: string): AsyncGenerator<
 
 async function main() {
   const args = process.argv.slice(2);
-  const path = args.find((a) => !a.startsWith("--"));
+  const positionals: string[] = [];
+  for (let i = 0; i < args.length; i++) { if (args[i] === "--sido") { i++; continue; } if (!args[i].startsWith("--")) positionals.push(args[i]); }
+  const path = positionals[0];
   const sidoAt = args.indexOf("--sido");
   const sido = sidoAt >= 0 ? args[sidoAt + 1] : "11";
   const dry = args.includes("--dry-run");
+  const full = args.includes("--full");
+  const force = args.includes("--force");
   if (!path) throw new Error("CSV 파일(또는 폴더) 경로를 주세요");
 
   const url = process.env.SUPABASE_URL ?? process.env.EXPO_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!dry && (!url || !key)) throw new Error("SUPABASE_URL(EXPO_PUBLIC_SUPABASE_URL)·SUPABASE_SERVICE_ROLE_KEY 가 필요합니다");
-  const db = dry ? null : createClient(url!, key!, { auth: { persistSession: false } });
+  if (!url || !key) throw new Error("SUPABASE_URL(EXPO_PUBLIC_SUPABASE_URL)·SUPABASE_SERVICE_ROLE_KEY 가 필요합니다");
+  const db = createClient(url!, key!, { auth: { persistSession: false } });
+  const files = csvFiles(path);
+  // Validate every file before the first write, including later files in a directory.
+  for (const file of files) {
+    const lines = createInterface({ input: createReadStream(file, { encoding: "utf8" }), crlfDelay: Infinity });
+    let valid = false;
+    for await (const line of lines) { requireHeaders(splitCsv(line.replace(/^﻿/, ""))); valid = true; break; }
+    if (!valid) throw new Error(`빈 CSV: ${file}`);
+  }
+  const before = await db.from("public_stores").select("store_id", { count: "exact", head: true }).eq("sido_code", sido).is("closed_at", null);
+  if (before.error) throw before.error;
+  const openBefore = before.count ?? 0;
 
   const runAt = new Date().toISOString();
   let batch: Row[] = [];
@@ -119,7 +136,7 @@ async function main() {
 
   const flush = async () => {
     if (!batch.length) return;
-    if (db) {
+    if (!dry) {
       for (let attempt = 1; ; attempt++) {
         const { error } = await db.from("public_stores").upsert(batch, { onConflict: "store_id" });
         if (!error) break;
@@ -132,7 +149,7 @@ async function main() {
     batch = [];
   };
 
-  for (const file of csvFiles(path)) {
+  for (const file of files) {
     for await (const row of rows(file, sido, runAt)) {
       if (seen.has(row.store_id)) continue; // 파일 안 중복 — 한 upsert 묶음에 같은 키가 둘이면 실패합니다.
       seen.add(row.store_id);
@@ -145,17 +162,26 @@ async function main() {
 
   if (!total) throw new Error(`시도코드 ${sido} 의 음식 업종 행이 없습니다 — 파일이 맞는지 보세요`);
 
-  if (db) {
-    // 이번 파일에 없던 같은 시도 가게 = 폐업(또는 이전). 지우지 않고 표시만.
-    const { count, error } = await db
-      .from("public_stores")
-      .update({ closed_at: runAt }, { count: "exact" })
-      .eq("sido_code", sido)
-      .lt("updated_at", runAt)
-      .is("closed_at", null);
-    if (error) throw new Error(`closed_at 표시 실패: ${error.message}`);
-    console.log(`폐업 표시 ${count ?? 0}곳`);
-  }
+  console.log(`기존 영업 ${openBefore}곳, 입력 ${total}곳, 비율 ${openBefore ? (100 * total / openBefore).toFixed(1) : "신규"}%`);
+  if (full) {
+    if (!closureAllowed(total, openBefore, full, force)) throw new Error("폐업 표시 중단: 기존 영업점의 90% 미만입니다. 전체 파일을 확인하거나 --force 를 명시하세요. 적재한 행은 유지됩니다.");
+    if (dry) {
+      let wouldClose = 0;
+      for (let offset = 0; ; ) {
+        const page = await db.from("public_stores").select("store_id").eq("sido_code", sido).is("closed_at", null).order("store_id").range(offset, offset + 999);
+        if (page.error) throw page.error;
+        const items = page.data ?? [];
+        wouldClose += items.filter((row) => !seen.has(row.store_id)).length;
+        if (!items.length) break;
+        offset += items.length;
+      }
+      console.log(`(dry-run) 폐업 표시 예정 ${wouldClose}곳 — 쓰기 없음`);
+    } else {
+      const { count, error } = await db.from("public_stores").update({ closed_at: runAt }, { count: "exact" }).eq("sido_code", sido).lt("updated_at", runAt).is("closed_at", null);
+      if (error) throw new Error(`closed_at 표시 실패: ${error.message}`);
+      console.log(`폐업 표시 ${count ?? 0}곳`);
+    }
+  } else console.log("부분 적재: 폐업 표시 생략 (--full 필요)");
   console.log(`${dry ? "(dry-run) " : ""}시도 ${sido}: ${total.toLocaleString()}곳`);
 }
 

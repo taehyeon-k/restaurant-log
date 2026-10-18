@@ -20,6 +20,19 @@ export async function uploadPhoto(uri: string, filename: string) {
   return path;
 }
 
+/** Stable queue path: retry immutable uploads without requiring an UPDATE storage policy. */
+export async function uploadQueuePhoto(uri: string, path: string) {
+  const body = await fetch(uri).then((r) => r.arrayBuffer());
+  const { error } = await supabase.storage.from(BUCKET).upload(path, body, { contentType: "image/jpeg", upsert: false });
+  if (error) {
+    const duplicate = ["Duplicate", "ResourceAlreadyExists", "KeyAlreadyExists"].includes(("code" in error ? String(error.code) : "")) || Number(error.statusCode) === 409 || /already exists/i.test(error.message);
+    if (!duplicate) throw error;
+    // Confirm the existing object is readable under the current account's policy.
+    const { error: readError } = await supabase.storage.from(BUCKET).createSignedUrl(path, 60);
+    if (readError) throw readError;
+  }
+}
+
 /** 기록 하나에 붙일 수 있는 사진 수 */
 export const MAX_PHOTOS = 10;
 

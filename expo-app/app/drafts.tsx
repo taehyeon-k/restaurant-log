@@ -69,13 +69,13 @@ export default function Drafts() {
                   <Text style={{ fontFamily: F.mono, fontSize: 10.5, color: failed ? "#a8412a" : C.faint }}>{failed ? "올리지 못함" : "올리는 중 · 연결되면 이어서 올라갑니다"}</Text>
                 </View>
                 <View style={{ marginTop: 8, flexDirection: "row", gap: 8 }}>
-                  <Pressable onPress={async () => { await resetFailed(q.id); notifyQueue(); drainQueue(qc); }} style={{ borderRadius: 15, backgroundColor: C.ink, paddingHorizontal: 14, paddingVertical: 8 }}>
+                  <Pressable onPress={async () => { await resetFailed(q.id, q.owner_id); notifyQueue(); drainQueue(qc); }} style={{ borderRadius: 15, backgroundColor: C.ink, paddingHorizontal: 14, paddingVertical: 8 }}>
                     <Text style={{ fontFamily: F.sans, fontSize: 12, color: C.card }}>{failed ? "다시 올리기" : "지금 올리기"}</Text>
                   </Pressable>
                   <Pressable
                     onPress={() => Alert.alert("이 인증을 버릴까요?", "올라가지 않은 사진과 기록이 지워집니다.", [
                       { text: "취소", style: "cancel" },
-                      { text: "버리기", style: "destructive", onPress: async () => { removePhoto(q.photo_uri); await removeFromQueue(q.id); notifyQueue(); } },
+                      { text: "버리기", style: "destructive", onPress: async () => { await removeFromQueue(q.id, q.owner_id); removePhoto(q.photo_uri); (JSON.parse(q.extra_photos ?? "[]") as string[]).forEach(removePhoto); notifyQueue(); } },
                     ])}
                     style={{ paddingHorizontal: 4, paddingVertical: 8 }}
                   >

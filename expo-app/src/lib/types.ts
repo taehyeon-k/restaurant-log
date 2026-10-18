@@ -40,6 +40,8 @@ export type Restaurant = {
   acc: number | null;
   /** 위치 인증이 실제로 통과한 순간(UTC) — DB 트리거가 서버 시각으로 찍습니다. */
   verified_at: string | null;
+  /** Client capture time for meal analysis, never an authorization signal. */
+  captured_at?: string | null;
   /** 「내 기록에도 남기기」로 만든 복사본이면 연인 기록 원본 id(원본이 지워지면 null). */
   source_record_id: number | null;
   /** 복사본을 남긴 시각 — 복사본이 아니면 null. */

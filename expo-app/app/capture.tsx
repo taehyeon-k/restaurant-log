@@ -16,7 +16,8 @@ import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
 import {
   BellIcon, BookmarkIcon, CameraIcon, DownloadIcon, FlashIcon, FlipIcon, MapPinIcon, RefreshIcon, VerifiedMark,
 } from "@/components/icons";
-import { useActiveBook } from "@/data/books";
+import { boundedFix, verificationAllowed } from "@/lib/reliability/guards";
+import { captureBookId, useActiveBook } from "@/data/books";
 import { usePersonalRows, useRows, useWishes } from "@/data/queries";
 import { useAppState } from "@/data/store";
 import {
@@ -30,7 +31,7 @@ import { AfterCapture } from "@/features/recommend/AfterCapture";
 import { StampBoard } from "@/features/stamps/Stamp";
 import { earnedLabels, stampRows, stampSlot, STAMPS_PER_BOARD } from "@/lib/labels";
 import { enqueue, persistPhoto } from "@/features/queue/db";
-import { linkVisit } from "@/features/recommend/log";
+import { visitAttribution } from "@/features/recommend/log";
 import { MAX_PHOTOS, pickAlbumUris } from "@/lib/photos";
 import { supabase } from "@/lib/supabase";
 import {
@@ -77,7 +78,7 @@ export default function Capture() {
   const offline = net.isConnected === false;
   const [camPerm, requestCam] = useCameraPermissions();
   const [locPerm, requestLoc] = Location.useForegroundPermissions();
-  const permsGranted = !!camPerm?.granted && !!locPerm?.granted;
+  const permsGranted = !!camPerm?.granted && (!!locPerm?.granted || locPerm?.status === "denied");
   const permsKnown = camPerm !== null && locPerm !== null;
 
   const [step, setStep] = useState<Step>("permission");
@@ -96,6 +97,7 @@ export default function Capture() {
   const [query, setQuery] = useState("");
   const [apiHits, setApiHits] = useState<FoodPlace[]>([]);
   const [saving, setSaving] = useState(false);
+  const [waitingForGeo, setWaitingForGeo] = useState(false);
   const [error, setError] = useState("");
   const cameraRef = useRef<CameraView>(null);
   const [busy, setBusy] = useState(false);
@@ -104,6 +106,8 @@ export default function Capture() {
   const [toast, setToast] = useState<string | null>(null);
   /** 셔터를 누를 때마다 올라갑니다 — 다시 찍은 뒤 늦게 도착한 이전 위치를 버리는 데 씁니다. */
   const shotSeq = useRef(0);
+  const geoJob = useRef<Promise<Geo | null> | null>(null);
+  const savingLock = useRef(false);
 
   useEffect(() => {
     AsyncStorage.getItem(SAVE_KEY).then((v) => setSaveToGallery(v === "1")).catch(() => {});
@@ -138,20 +142,23 @@ export default function Capture() {
   async function allow() {
     if (denied) return Linking.openSettings();
     const cam = await requestCam();
-    const loc = await requestLoc();
-    if (cam.granted && loc.granted) setStep("shoot");
+    await requestLoc();
+    if (cam.granted) setStep("shoot");
   }
 
-  async function readGeo(seq: number) {
+  async function readGeo(seq: number): Promise<Geo | null> {
     setGeo(null);
     setGeoErr(null);
     try {
       const p = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
-      if (seq !== shotSeq.current) return;
-      setGeo({ lat: p.coords.latitude, lng: p.coords.longitude, acc: Math.round(p.coords.accuracy ?? 0) });
+      if (seq !== shotSeq.current) return null;
+      const fix = { lat: p.coords.latitude, lng: p.coords.longitude, acc: Math.round(p.coords.accuracy ?? 0) };
+      setGeo(fix);
+      return fix;
     } catch {
-      if (seq !== shotSeq.current) return;
-      setGeoErr("위치 권한이 없어 좌표를 읽지 못했습니다.");
+      if (seq !== shotSeq.current) return null;
+      setGeoErr("위치를 읽지 못했어요");
+      return null;
     }
   }
 
@@ -161,7 +168,7 @@ export default function Capture() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
       const at = new Date();
-      void readGeo(++shotSeq.current); // 동시에 위치 1회 읽기
+      geoJob.current = readGeo(++shotSeq.current); // 동시에 위치 1회 읽기
       const photo = await cameraRef.current.takePictureAsync({ quality: 0.9, skipProcessing: true });
       const out = await ImageManipulator.manipulateAsync(photo.uri, [{ resize: { width: 900 } }], {
         compress: 0.72,
@@ -180,6 +187,7 @@ export default function Capture() {
   /** 사진과 그 순간 읽은 위치를 버리고 촬영으로 돌아갑니다 — 가게 찾기도 함께 멈춥니다(geo 가 비면서). */
   function retake() {
     shotSeq.current++;
+    geoJob.current = null;
     setShot(null);
     setShotAt(null);
     setGeo(null);
@@ -228,8 +236,12 @@ export default function Capture() {
   }
 
   /** 인증 없이 기록만 남깁니다 — 이름·종류를 채워 기록 입력을 엽니다. */
-  function onUnverified(name?: string, k?: Kind) {
-    router.replace({ pathname: "/record/edit", params: { kind: k ?? pickKind, name: name ?? "" } });
+  function onUnverified(name?: string, k?: Kind, place?: Candidate) {
+    const photos = shot ? [persistPhoto(shot.uri)] : [];
+    router.replace({ pathname: "/record/edit", params: { kind: k ?? pickKind, name: name ?? "", photos: JSON.stringify(photos),
+      visitedAt: isoDate(shotAt ?? new Date()), capturedAt: shotAt?.toISOString(),
+      address: place?.address ?? undefined, category: place?.category ?? undefined,
+      lat: place?.lat != null ? String(place.lat) : undefined, lng: place?.lng != null ? String(place.lng) : undefined } });
   }
 
   /* ── 후보 ─────────────────────────────────────── */
@@ -277,7 +289,7 @@ export default function Capture() {
     if (step !== "pick" || !geo || !verifyWish || picked) return;
     if (verifyWish.lat == null || verifyWish.lng == null) return;
     const d = metersBetween(geo, verifyWish.lat, verifyWish.lng);
-    if (d > WISH_AUTO_M) return;
+    if (!Number.isFinite(d) || d > PICK_MAX_M) return;
     const wk = wishKind(verifyWish);
     setPicked({
       id: `wish:${verifyWish.id}`, name: verifyWish.name, kind: wk, category: verifyWish.category,
@@ -294,11 +306,19 @@ export default function Capture() {
    * 연결돼 있으면 바로 올려 새 기록으로 이어가고, 아니면 큐에 남겨 두고 연결되면 올라갑니다.
    */
   async function commit(writeNow: boolean) {
-    if (!picked || !shot) return;
+    if (!picked || !shot || savingLock.current) return;
+    savingLock.current = true;
     setSaving(true);
     setError("");
 
     try {
+      setWaitingForGeo(!geo);
+      const fix = geo ?? await boundedFix(geoJob.current);
+      setWaitingForGeo(false);
+      if (!verificationAllowed(fix, picked)) {
+        onUnverified(picked.name, picked.kind, picked);
+        return;
+      }
       const at = shotAt ?? new Date();
       // 같은 건물의 다른 가게·같은 이름의 다른 지점을 재방문으로 잡지 않게 이름과 자리를 함께 봅니다.
       const twin = rows.find((r) => r.kind === picked.kind && samePlace(r, picked));
@@ -310,9 +330,10 @@ export default function Capture() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("로그인이 필요합니다");
 
+      const targetBook = await captureBookId(session.user.id, bookId);
       const payload = {
         user_id: session.user.id,
-        ...(bookId ? { book_id: bookId } : {}),
+        ...(targetBook ? { book_id: targetBook } : {}),
         kind: picked.kind,
         name: picked.name,
         category: twin?.category ?? picked.category,
@@ -326,17 +347,17 @@ export default function Capture() {
         revisit: Boolean(twin),
         visited_at: isoDate(at),
         verified: true,
-        acc: geo?.acc ?? null,
+        captured_at: at.toISOString(),
+        acc: fix?.acc ?? null,
         pending: !writeNow,
         from_wish: fromWish,
       };
 
-      const queueId = await enqueue(payload, persistPhoto(shot.uri), matchedWish?.id ?? null);
+      const hint = await visitAttribution({ name: picked.name, lat: payload.lat ?? null, lng: payload.lng ?? null }, at.getTime());
+      const queueId = await enqueue(payload, persistPhoto(shot.uri), matchedWish?.id ?? null, hint ? JSON.stringify(hint) : null);
       const newId = await drainQueue(qc, queueId);
 
       if (newId != null) {
-        // 최근 보인 추천 카드의 가게면 그 추천 세션과 잇습니다(visit_confirmed).
-        linkVisit({ recordId: newId, name: picked.name, lat: payload.lat ?? null, lng: payload.lng ?? null, verified: true });
         if (writeNow) router.replace({ pathname: "/record/edit", params: { id: String(newId) } });
         else router.back();
         return;
@@ -351,7 +372,7 @@ export default function Capture() {
     } catch (e) {
       setError(e instanceof Error ? e.message : "기록을 저장하지 못했습니다");
       setSaving(false);
-    }
+    } finally { savingLock.current = false; setWaitingForGeo(false); }
   }
 
   const close = () => router.back();
@@ -549,18 +570,21 @@ export default function Capture() {
               c={c}
               onPress={() => {
                 Haptics.selectionAsync();
-                if (searching && c.distance != null && c.distance > PICK_MAX_M) return onUnverified(c.name, c.kind);
+                if (searching && (c.distance == null || !Number.isFinite(c.distance) || c.distance > PICK_MAX_M)) return onUnverified(c.name, c.kind, c);
                 setPicked(c);
                 setStep("done");
               }}
             />
           )}
           ListFooterComponent={
-            searching ? null : (
-              <Pressable style={s.manual} onPress={() => setStep("search")}>
+            <>
+              {!searching && <Pressable style={s.manual} onPress={() => setStep("search")}>
                 <Text style={s.manualText}>여기 없어요 · 직접 찾기</Text>
-              </Pressable>
-            )
+              </Pressable>}
+              {(!geo || !items.length || offline) && <Pressable style={{ padding: 14, alignItems: "center", marginTop: 8 }} onPress={() => onUnverified(searching ? query.trim() : undefined)}>
+                <Text style={s.ghost}>인증 없이 기록만 남길게요</Text>
+              </Pressable>}
+            </>
           }
         />
 
@@ -647,7 +671,7 @@ export default function Capture() {
           <View style={s.upload}>
             <ActivityIndicator color={C.brick} />
             <View>
-              <Text style={s.uploadMain}>{offline ? "연결을 기다리는 중 · 1 / 1" : "사진 올리는 중 · 1 / 1"}</Text>
+              <Text style={s.uploadMain}>{waitingForGeo ? "위치 읽는 중…" : offline ? "연결을 기다리는 중 · 1 / 1" : "사진 올리는 중 · 1 / 1"}</Text>
               <Text style={s.uploadSub}>앱을 닫아도 이어서 올라갑니다.</Text>
             </View>
           </View>
@@ -656,7 +680,7 @@ export default function Capture() {
       </ScrollView>
       <View style={{ paddingBottom: insets.bottom + 10 }}>
         <Pressable style={[s.dark, { paddingVertical: 17 }, saving && { opacity: 0.5 }]} disabled={saving} onPress={() => commit(true)}>
-          <Text style={s.darkText}>이어서 기록 쓰기</Text>
+          <Text style={s.darkText}>{waitingForGeo ? "위치 읽는 중…" : "이어서 기록 쓰기"}</Text>
         </Pressable>
         <Pressable style={{ padding: 14, alignItems: "center", marginTop: 8 }} disabled={saving} onPress={() => commit(false)}>
           <Text style={s.ghost}>나중에 쓸게요</Text>

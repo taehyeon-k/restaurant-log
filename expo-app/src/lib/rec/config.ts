@@ -4,7 +4,7 @@
  * Rationale and calibration: docs/recommendation-hybrid-v4.md.
  */
 export const REC_CONFIG = {
-  version: "hybrid-v4.0",
+  version: "hybrid-v4.1",
 
   /** Stage A — 후보 반경(m). 1.5km 에서 시작해, 걸러진 뒤 후보가 minPool 보다 적으면 3km. */
   radii: [1500, 3000] as const,

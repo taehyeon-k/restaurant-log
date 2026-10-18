@@ -1,3 +1,4 @@
+import { usableMealTime } from "../reliability/guards";
 import type { RecCategory } from "../recommend";
 import type { Restaurant, Wish } from "../types";
 import { norm } from "../geo";
@@ -37,9 +38,9 @@ export type TasteProfile = {
   ratingOf: (r: Restaurant) => number | null;
 };
 
-/** 기록장 하나로 좁힙니다. bookId 가 null 이면(마이그레이션 전) 그대로. */
+/** 기록장 하나로 좁힙니다. bookId 가 null 이면 빈 목록. */
 export const bookScoped = <T extends { book_id?: string | null }>(list: T[], bookId: string | null) =>
-  bookId ? list.filter((x) => x.book_id === bookId) : list;
+  bookId ? list.filter((x) => x.book_id === bookId) : [];
 
 /**
  * 별점 — 연인 기록장이면 두 사람 메모(record_notes)의 평균(둘의 공통 취향), 없으면 기록의 별점.
@@ -144,9 +145,10 @@ export function buildTaste(opts: {
         recency * conf * cfg.dishVote.weight, values.reduce((a, b) => a + b, 0) / values.length, true, false);
     } else accumulate(dishAcc, dishKey(info), place, w, y, rating != null, r.revisit);
 
-    // 식사 시간대는 서버가 찍은 인증 시각만 믿습니다 — visited_at 은 날짜뿐입니다.
-    if (r.verified_at) {
-      const slot = mealSlotOf(seoulClock(new Date(r.verified_at)).minutes);
+    // Capture time describes the meal; legacy verified records fall back to the server stamp. Date-only entries are excluded.
+    const mealTime = usableMealTime(r);
+    if (mealTime) {
+      const slot = mealSlotOf(seoulClock(new Date(mealTime)).minutes);
       slotAll[slot] += 1;
       const s = slotBy.get(c) ?? { lunch: 0, dinner: 0, other: 0 };
       s[slot] += 1;

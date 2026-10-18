@@ -1,5 +1,8 @@
+import { supabase } from "@/lib/supabase";
 import { File, Paths } from "expo-file-system";
 import * as SQLite from "expo-sqlite";
+import { migrateQueue } from "@/lib/reliability/queueMigration";
+import { SessionChanged, legacyOwner, operationId } from "@/lib/reliability/queue";
 
 /**
  * 오프라인 큐(핸드오프 §6) — 지하 식당에서도 인증이 끊기지 않게, 촬영 직후 사진과 insert 페이로드를
@@ -7,6 +10,13 @@ import * as SQLite from "expo-sqlite";
  */
 export type QueueRow = {
   id: number;
+  owner_id: string;
+  op_id: string;
+  photo_path: string | null;
+  stage: string;
+  record_id: number | null;
+  attribution: string | null;
+  extra_photos: string | null;
   /** restaurants.insert 에 그대로 들어갈 필드(photo_url 은 업로드 뒤에 채웁니다). user_id 포함. */
   payload: string;
   /** documentDirectory 에 복사해 둔 사진 */
@@ -36,8 +46,9 @@ export function db() {
         created_at INTEGER NOT NULL
       );
     `);
+    await migrateQueue(d);
     return d;
-  });
+  }).catch((error) => { dbPromise = null; throw error; });
   return dbPromise;
 }
 
@@ -57,26 +68,40 @@ export function removePhoto(uri: string) {
   }
 }
 
-export async function enqueue(payload: object, photoUri: string, wishId: string | null) {
+export async function enqueue(payload: object, photoUri: string, wishId: string | null, attribution: string | null = null, extraPhotos: string[] = []) {
   const d = await db();
+  const serialized = JSON.stringify(payload);
+  const owner = legacyOwner(serialized);
+  if (!owner) throw new Error("queue_owner_missing");
   const res = await d.runAsync(
-    "INSERT INTO pending_records (payload, photo_uri, wish_id, created_at) VALUES (?, ?, ?, ?)",
-    JSON.stringify(payload), photoUri, wishId, Date.now()
+    "INSERT INTO pending_records (payload, photo_uri, wish_id, created_at, owner_id, op_id, attribution, extra_photos) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+    serialized, photoUri, wishId, Date.now(), owner, operationId(), attribution, JSON.stringify(extraPhotos)
   );
   return res.lastInsertRowId;
 }
 
-export async function listQueue(): Promise<QueueRow[]> {
+export async function listQueue(ownerId: string): Promise<QueueRow[]> {
   const d = await db();
-  return d.getAllAsync<QueueRow>("SELECT * FROM pending_records ORDER BY created_at ASC");
+  return d.getAllAsync<QueueRow>("SELECT * FROM pending_records WHERE owner_id = ? ORDER BY created_at ASC", ownerId);
 }
 
-export async function removeFromQueue(id: number) {
+export async function removeFromQueue(id: number, ownerId: string) {
+  if ((await supabase.auth.getSession()).data.session?.user.id !== ownerId) throw new SessionChanged();
   const d = await db();
-  await d.runAsync("DELETE FROM pending_records WHERE id = ?", id);
+  await d.runAsync("DELETE FROM pending_records WHERE id = ? AND owner_id = ?", id, ownerId);
 }
 
-export async function resetFailed(id: number) {
+export async function resetFailed(id: number, ownerId: string) {
+  if ((await supabase.auth.getSession()).data.session?.user.id !== ownerId) throw new SessionChanged();
   const d = await db();
-  await d.runAsync("UPDATE pending_records SET failed = 0, attempts = 0, next_at = 0 WHERE id = ?", id);
+  await d.runAsync("UPDATE pending_records SET failed = 0, attempts = 0, next_at = 0 WHERE id = ? AND owner_id = ?", id, ownerId);
+}
+
+export async function saveQueueStage(id: number, ownerId: string, patch: { photo_path?: string | null; stage?: string; record_id?: number | null }) {
+  const entries = Object.entries(patch);
+  if (!entries.length) return;
+  const allowed = new Set(["photo_path", "stage", "record_id"]);
+  if (entries.some(([k]) => !allowed.has(k))) throw new Error("invalid_queue_patch");
+  const result = await (await db()).runAsync(`UPDATE pending_records SET ${entries.map(([k]) => `${k} = ?`).join(", ")} WHERE id = ? AND owner_id = ?`, ...entries.map(([,v]) => v ?? null), id, ownerId);
+  if (result.changes !== 1) throw new SessionChanged("queue_entry_removed");
 }

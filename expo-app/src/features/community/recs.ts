@@ -1,8 +1,10 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useEffect, useState } from "react";
-import { metersBetweenLL, norm } from "@/lib/geo";
+import { useSession } from "@/data/session";
+import { communityEvidence } from "@/lib/reliability/community";
+import { metersBetweenLL, samePlace } from "@/lib/geo";
 import { regionFromAddress } from "@/lib/regions";
-import { coverPhoto, matchWish, type Kind, type Restaurant, type Wish } from "@/lib/types";
+import { coverPhoto, type Kind, type Restaurant, type Wish } from "@/lib/types";
 import type { PublicProfile, SharedRecord } from "./api";
 
 /**
@@ -32,22 +34,36 @@ export type Rec = {
 export type Dislikes = { places: string[]; categories: Record<string, number> };
 const KEY = "community.recs.dislikes";
 
+const EMPTY_DISLIKES: Dislikes = { places: [], categories: {} };
 export function useDislikes() {
-  const [d, setD] = useState<Dislikes>({ places: [], categories: {} });
+  const userId = useSession()?.user.id;
+  const [state, setState] = useState<{ owner?: string; value: Dislikes }>({ value: EMPTY_DISLIKES });
   useEffect(() => {
-    AsyncStorage.getItem(KEY).then((v) => { if (v) try { setD(JSON.parse(v)); } catch {} }).catch(() => {});
-  }, []);
+    let alive = true;
+    if (!userId) return;
+    const key = `${KEY}:${userId}`;
+    void (async () => {
+      let raw = await AsyncStorage.getItem(key);
+      if (!raw) {
+        raw = await AsyncStorage.getItem(KEY);
+        if (raw) { await AsyncStorage.setItem(key, raw); await AsyncStorage.removeItem(KEY); }
+      }
+      let value = EMPTY_DISLIKES;
+      try { const parsed = JSON.parse(raw ?? "null"); if (Array.isArray(parsed?.places) && parsed?.categories && typeof parsed.categories === "object") value = parsed; } catch {}
+      if (alive) setState({ owner: userId, value });
+    })().catch(() => {});
+    return () => { alive = false; };
+  }, [userId]);
   const dislike = (r: Rec) => {
-    setD((prev) => {
-      const next: Dislikes = {
-        places: [...new Set([...prev.places, r.place])],
-        categories: r.category ? { ...prev.categories, [r.category]: (prev.categories[r.category] ?? 0) + 1 } : prev.categories,
-      };
-      AsyncStorage.setItem(KEY, JSON.stringify(next)).catch(() => {});
-      return next;
+    if (!userId) return;
+    setState((previous) => {
+      const prev = previous.owner === userId ? previous.value : EMPTY_DISLIKES;
+      const next: Dislikes = { places: [...new Set([...prev.places, r.place])], categories: r.category ? { ...prev.categories, [r.category]: (prev.categories[r.category] ?? 0) + 1 } : prev.categories };
+      void AsyncStorage.setItem(`${KEY}:${userId}`, JSON.stringify(next)).catch(() => {});
+      return { owner: userId, value: next };
     });
   };
-  return { dislikes: d, dislike };
+  return { dislikes: state.owner === userId ? state.value : EMPTY_DISLIKES, dislike };
 }
 
 const lastToken = (gu: string) => gu.split(" ").pop() ?? gu;
@@ -61,12 +77,12 @@ export function buildRecs(opts: {
   me: { lat: number; lng: number } | null;
 }): Rec[] {
   const { shared, mine, wishes, friends, dislikes, me } = opts;
-  const myNames = new Set(mine.map((r) => norm(r.name)));
+
   const myPlaces = new Set(mine.map((r) => r.place_key).filter(Boolean));
   const catCount = new Map<string, number>();
   const guCount = new Map<string, number>();
   for (const r of mine) {
-    if (r.category) catCount.set(r.category, (catCount.get(r.category) ?? 0) + 1);
+    if ((r.rating != null ? Number(r.rating) >= 4 : r.revisit) && r.category) catCount.set(r.category, (catCount.get(r.category) ?? 0) + 1);
     const gu = regionFromAddress(r.address);
     if (gu) guCount.set(gu, (guCount.get(gu) ?? 0) + 1);
   }
@@ -75,7 +91,7 @@ export function buildRecs(opts: {
   for (const r of shared) {
     if (!r.verified) continue;
     if (dislikes.places.includes(r.place)) continue;
-    if (myNames.has(norm(r.name)) || (r.place_key && myPlaces.has(r.place_key)) || matchWish(wishes, r.name)) continue;
+    if (mine.some((m) => samePlace(m, r)) || (r.place_key && myPlaces.has(r.place_key)) || wishes.some((w) => samePlace({ ...w, address: w.where_text }, r))) continue;
     const g = groups.get(r.place);
     if (g) g.push(r); else groups.set(r.place, [r]);
   }
@@ -84,22 +100,22 @@ export function buildRecs(opts: {
   for (const [place, list] of groups) {
     const top = list.find((r) => coverPhoto(r)) ?? list[0];
     const friendIds = [...new Set(list.filter((r) => r.by_friend && friends.has(r.user_id)).map((r) => r.user_id))];
-    const ratings = list.map((r) => r.rating).filter((v): v is number => v != null);
-    const avgRating = ratings.length ? Math.round((ratings.reduce((a, b) => a + b, 0) / ratings.length) * 10) / 10 : null;
+    const evidence = communityEvidence(list);
+    const avgRating = evidence.ratedContributors ? Math.round(evidence.average * 10) / 10 : null;
     const sameCategory = top.category ? catCount.get(top.category) ?? 0 : 0;
     const gu = regionFromAddress(top.address);
     const myGu = gu ? guCount.get(gu) ?? 0 : 0;
     const distanceM = me && top.lat != null && top.lng != null ? metersBetweenLL(me.lat, me.lng, top.lat, top.lng) : null;
 
     const reasons: string[] = [];
-    if (friendIds.length) reasons.push(avgRating != null ? `친구 ${friendIds.length}명 인증 · 평균 ${avgRating.toFixed(1)}` : `친구 ${friendIds.length}명 인증`);
+    if (friendIds.length) reasons.push(avgRating != null ? `친구 ${friendIds.length}명 인증 · 보정 평점 ${avgRating.toFixed(1)}` : `친구 ${friendIds.length}명 인증`);
     if (sameCategory >= 3) reasons.push(`${top.category} 기록 ${sameCategory}건과 비슷`);
     if (myGu >= 3 && gu) reasons.push(`자주 가는 동네 · ${lastToken(gu)}`);
-    if (!friendIds.length) reasons.push(avgRating != null ? `DINARY 인증 ${list.length}건 · 평균 ${avgRating.toFixed(1)}` : `DINARY 인증 ${list.length}건`);
+    if (!friendIds.length) reasons.push(avgRating != null ? `DINARY 인증 ${evidence.contributors}명 · 보정 평점 ${avgRating.toFixed(1)}` : `DINARY 인증 ${evidence.contributors}명`);
 
     const penalty = top.category ? dislikes.categories[top.category] ?? 0 : 0;
     const score =
-      friendIds.length * 3 + (avgRating ?? 3) + Math.min(sameCategory, 10) * 0.3 + (myGu >= 3 ? 1.2 : 0) + list.length * 0.2 - penalty * 1.5
+      friendIds.length * 3 + evidence.average + Math.min(sameCategory, 10) * 0.3 + (myGu >= 3 ? 1.2 : 0) + evidence.popularity - penalty * 1.5
       + (distanceM != null ? Math.max(0, 2 - distanceM / 2000) : 0);
 
     out.push({

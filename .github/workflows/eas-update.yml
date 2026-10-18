@@ -34,7 +34,8 @@ jobs:
 
       - run: npm ci
 
-      - run: npm run typecheck
+      - name: Verify app before publishing
+        run: npm run check
 
       - name: Publish OTA update
         run: eas update --channel production --environment production --non-interactive --message "${{ github.event.head_commit.message || 'manual update' }}"

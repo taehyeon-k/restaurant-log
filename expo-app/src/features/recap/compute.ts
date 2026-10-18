@@ -1,5 +1,6 @@
-import { LABELS, regionTitles, type LabelDef, type RegionTier } from "@/lib/labels";
-import { ALL_CATEGORIES, coverPhoto, pinColor, type Restaurant, type Wish } from "@/lib/types";
+import { usableMealTime } from "../../lib/reliability/guards";
+import { LABELS, regionTitles, type LabelDef, type RegionTier } from "../../lib/labels";
+import { ALL_CATEGORIES, coverPhoto, pinColor, type Restaurant, type Wish } from "../../lib/types";
 import {
   currentQuarter, eulReul, ieosseoyo, mmdd, nativeCount, quarterOfDate, quarterRange, seasonOf, seoulParts, seoulToday,
   shiftQuarter, type QuarterId,
@@ -27,7 +28,8 @@ const dishOf = (r: Restaurant) => r.menu?.trim() || r.menus?.[0]?.name?.trim() |
 const isSoup = (r: Restaurant) => SOUP.test(`${r.name} ${dishOf(r)} ${(r.menus ?? []).map((m) => m.name).join(" ")}`);
 
 /** 기록 시각 — 인증 시각이 있으면 그것, 없으면 만든 시각(한국 시간). */
-const stampOf = (r: Restaurant) => seoulParts(r.verified_at ?? r.created_at);
+export const MIN_TIME_RECORDS = 5;
+const stampOf = (r: Restaurant) => { const at = usableMealTime(r); return at ? seoulParts(at) : null; };
 
 const WEEKDAY = ["일요일", "월요일", "화요일", "수요일", "목요일", "금요일", "토요일"];
 
@@ -124,6 +126,7 @@ export type RecapData = {
     palate: { have: number; need: number; earned: boolean };
     word: string;
   };
+  timeStatsAvailable: boolean;
   time: { peak: string; hist: number[]; peakIndex: number; day: string; dayCount: number; midnight: number };
   persona: { explorer: boolean; ratio: number; newCount: number; repeatCount: number; regular: string | null; prevRatio: number | null };
   memo: { id: number; text: string; place: string; date: string; rating: number | null; photo: string | null; category: string | null } | null;
@@ -298,15 +301,16 @@ export function computeRecap(allRows: Restaurant[], wishes: Wish[], quarter: Qua
   let midnight = 0;
   const wd = new Array(7).fill(0) as number[];
   for (const r of records) {
+    wd[new Date(`${r.visited_at}T00:00:00Z`).getUTCDay()]++;
     const t = stampOf(r);
+    if (!t) continue;
     const k = `${String(t.hour).padStart(2, "0")}:${String(Math.floor(t.minute / 10) * 10).padStart(2, "0")}`;
     buckets.set(k, (buckets.get(k) ?? 0) + 1);
     // 07시 … 23시 + 마지막 칸은 자정 이후(00–06시)
     hist[t.hour >= 7 ? t.hour - 7 : 17]++;
     if (t.hour < 4) midnight++;
-    wd[new Date(`${r.visited_at}T00:00:00Z`).getUTCDay()]++;
   }
-  const peak = [...buckets.entries()].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1))[0][0];
+  const peak = [...buckets.entries()].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1))[0]?.[0] ?? "";
   const peakIndex = hist.indexOf(Math.max(...hist));
   const dayIdx = wd.indexOf(Math.max(...wd));
 
@@ -434,6 +438,7 @@ export function computeRecap(allRows: Restaurant[], wishes: Wish[], quarter: Qua
     top5Insight,
     districts,
     taste,
+    timeStatsAvailable: records.filter((r) => usableMealTime(r)).length >= MIN_TIME_RECORDS,
     time: { peak, hist, peakIndex, day: WEEKDAY[dayIdx], dayCount: wd[dayIdx], midnight },
     persona: {
       explorer: ratio >= 0.5,
