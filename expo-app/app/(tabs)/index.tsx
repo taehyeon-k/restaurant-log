@@ -541,7 +541,7 @@ export default function MapTab() {
             rating={p.rating} active={false} planned={!!matchWish(wishes, p.name)} showLabel={showLabel(`r:${p.key}`)} badge={placeTag(p)}
             onTap={() => {
               Haptics.selectionAsync();
-              // 이름표가 보이든 안 보이든 요약 카드(이름 · 별점)부터 — 「지난 기록 보기」로 기록 화면에 들어갑니다.
+              // 이름표가 보이든 안 보이든 요약 카드(이름 · 별점)부터 — 「기록 보기」로 기록 화면에 들어갑니다.
               setFoundHit({ restaurant: p.latest, place: p, fromPin: true });
             }}
           />

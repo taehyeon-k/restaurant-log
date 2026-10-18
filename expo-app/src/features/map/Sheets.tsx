@@ -71,7 +71,7 @@ export function FoundSheet(p: {
             <Pressable onPress={p.onWish} accessibilityLabel="위시리스트에 담기" style={{ width: 48, height: 48, borderRadius: 16, borderWidth: 1, borderColor: "#e4dfd3", alignItems: "center", justifyContent: "center" }}>
               <BookmarkIcon size={16} stroke={C.muted} />
             </Pressable>
-            <Button kind="line" label="지난 기록 보기" onPress={p.onOpen} style={{ minHeight: 48, borderRadius: 16, borderColor: "#e4dfd3" }} />
+            <Button kind="line" label="기록 보기" onPress={p.onOpen} style={{ minHeight: 48, borderRadius: 16, borderColor: "#e4dfd3" }} />
           </View>
         </>
   );
