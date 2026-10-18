@@ -315,8 +315,7 @@ export default function RecordRoute() {
         )}
 
         <View style={{ paddingHorizontal: 22, paddingTop: 20 }}>
-          <Eyebrow>NO. {String(record.id).padStart(3, "0")}</Eyebrow>
-          <Text style={{ marginTop: 8, fontFamily: F.serif, fontSize: 25, color: C.ink }}>{record.name}</Text>
+          <Text style={{ fontFamily: F.serif, fontSize: 25, color: C.ink }}>{record.name}</Text>
           <Text style={{ marginTop: 7, fontFamily: F.sans, fontSize: 12, color: C.faint }}>
             {[record.category, record.region].filter(Boolean).join(" · ")}
           </Text>

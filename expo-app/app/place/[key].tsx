@@ -61,8 +61,7 @@ export default function PlaceRoute() {
         </PhotoBox>
 
         <View style={{ paddingHorizontal: 22, paddingTop: 22 }}>
-          <Eyebrow>NO. {String(place.latest.id).padStart(3, "0")}</Eyebrow>
-          <Text style={{ marginTop: 9, fontFamily: F.serif, fontSize: 27, color: C.ink }}>{place.name}</Text>
+          <Text style={{ fontFamily: F.serif, fontSize: 27, color: C.ink }}>{place.name}</Text>
           <Text style={{ marginTop: 8, fontFamily: F.sans, fontSize: 12, color: C.faint }}>
             {[place.category, place.region].filter(Boolean).join(" · ")}
           </Text>
