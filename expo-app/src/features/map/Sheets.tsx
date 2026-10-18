@@ -1,6 +1,6 @@
 import { Text, View } from "react-native";
 import { BookmarkIcon } from "@/components/icons";
-import { BottomSheetModal, Button, Chip, Eyebrow } from "@/components/ui";
+import { BottomSheetModal, Button, Chip, Eyebrow, PhotoBox } from "@/components/ui";
 import { dottedDate, type Kind, type Restaurant } from "@/lib/types";
 import type { Place } from "@/lib/places";
 import { Pressable } from "react-native";
@@ -59,12 +59,19 @@ export function FoundSheet(p: {
     <BottomSheetModal visible={!!p.hit} onClose={p.onClose}>
       {r && p.hit && (
         <>
-          <Eyebrow wide>{p.hit.fromPin ? "내 기록" : "찾았습니다"}</Eyebrow>
-          <Text style={{ marginTop: 6, fontFamily: F.serif, fontSize: 22, color: C.ink }}>{r.name}</Text>
-          <Text style={{ marginTop: 4, fontFamily: F.sans, fontSize: 11.5, color: C.faint }}>{[r.category, r.region].filter(Boolean).join(" · ")}</Text>
-          <Text style={{ marginTop: 6, fontFamily: F.mono, fontSize: 10.5, color: "#a29a8c" }}>
-            ★ {p.hit.place.rating == null ? "—" : p.hit.place.rating.toFixed(1)} · 기록 {p.hit.place.visits.length}건 · 마지막 {dottedDate(p.hit.place.latest.visited_at)}
-          </Text>
+          {!p.hit.fromPin && <Eyebrow wide>찾았습니다</Eyebrow>}
+          <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 12 }}>
+            <View style={{ flex: 1 }}>
+              <Text style={{ marginTop: p.hit.fromPin ? 0 : 6, fontFamily: F.serif, fontSize: 22, color: C.ink }}>{r.name}</Text>
+              <Text style={{ marginTop: 4, fontFamily: F.sans, fontSize: 11.5, color: C.faint }}>{[r.category, r.region].filter(Boolean).join(" · ")}</Text>
+              <Text style={{ marginTop: 6, fontFamily: F.mono, fontSize: 10.5, color: "#a29a8c" }}>
+                {[`★ ${p.hit.place.rating == null ? "—" : p.hit.place.rating.toFixed(1)}`, `기록 ${p.hit.place.visits.length}건`,
+                  p.hit.place.latest.visited_at && `${dottedDate(p.hit.place.latest.visited_at)} 방문`].filter(Boolean).join(" · ")}
+              </Text>
+            </View>
+            {/* 대표 사진 — 사진을 붙인 가장 최근 기록의 커버. 없으면 비워 둡니다. */}
+            {p.hit.place.photo && <PhotoBox src={p.hit.place.photo} category={r.category} size={64} radius={14} />}
+          </View>
           <View style={{ marginTop: 14, flexDirection: "row", gap: 8 }}>
             <Button label="기록 추가" onPress={p.onRevisit} style={{ flex: 1, minHeight: 48, borderRadius: 16 }} />
             <Pressable onPress={p.onWish} accessibilityLabel="위시리스트에 담기" style={{ width: 48, height: 48, borderRadius: 16, borderWidth: 1, borderColor: "#e4dfd3", alignItems: "center", justifyContent: "center" }}>
