@@ -491,8 +491,8 @@ export default function MapTab() {
       {chipItems.length > 0 && (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingHorizontal: 20, paddingBottom: 10, alignItems: "center" }}>
           {chipItems.map((c) => (
-            <Pressable key={c.key} onPress={c.onClear} style={{ borderRadius: 15, backgroundColor: c.key === "bounds" ? C.card : "#f2e0d5", borderWidth: c.key === "bounds" ? 1 : 0, borderColor: C.line, paddingHorizontal: 10, paddingVertical: 5 }}>
-              <Text style={{ fontFamily: F.sans, fontSize: 11, color: c.key === "bounds" ? C.muted : "#a34d27" }}>{c.label} ✕</Text>
+            <Pressable key={c.key} onPress={c.onClear} style={{ borderRadius: 15, backgroundColor: c.key === "bounds" ? C.card : "#f2e0d5", borderWidth: c.key === "bounds" ? 1 : 0, borderColor: C.line, paddingHorizontal: 10, paddingVertical: 3 }}>
+              <Text style={{ fontFamily: F.sans, fontSize: 11, lineHeight: 15, color: c.key === "bounds" ? C.muted : "#a34d27" }}>{c.label} ✕</Text>
             </Pressable>
           ))}
           <Pressable onPress={clearAll}><Text style={{ fontFamily: F.sans, fontSize: 11, color: C.faint }}>모두 지우기</Text></Pressable>
@@ -785,7 +785,7 @@ const s = StyleSheet.create({
     position: "absolute", top: -3, right: -3, minWidth: 21, height: 21, borderRadius: 11, borderWidth: 2, borderColor: C.paper,
     backgroundColor: C.brick, alignItems: "center", justifyContent: "center", paddingHorizontal: 4,
   },
-  headRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 20, paddingBottom: 10 },
+  headRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 14, paddingBottom: 10 },
   compactRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8, paddingHorizontal: 20, paddingBottom: 12 },
   h: { fontFamily: F.serif, fontSize: 18, color: C.ink },
   filterBtn: { height: 40, borderRadius: 20, borderWidth: 1, borderColor: "#ded8cb", backgroundColor: C.card, paddingHorizontal: 12, flexDirection: "row", alignItems: "center", gap: 5 },
