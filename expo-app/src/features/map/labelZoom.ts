@@ -4,9 +4,12 @@ import { LABEL_BOTTOM, tagHeight, tagWidth } from "./Markers";
  * 마커마다 「이름표를 언제부터 보여줄지」 줌을 따로 정합니다.
  * 이름표가 다른 이름표·핀과 겹치지 않게 되는 가장 낮은 줌을 구하고, MIN_ZOOM~MAX_ZOOM 으로 묶습니다.
  * 한산한 곳은 일찍, 붐비는 곳은 더 당겨야 보이고, MAX_ZOOM 부터는 겹쳐도 모두 보입니다.
+ * 다 떨어질 때까지 기다리면 너무 늦게 보여서, EARLY 만큼 먼저 — 이웃과 살짝 겹치는 건 받아들입니다.
  */
-export const MIN_ZOOM = 13;
-export const MAX_ZOOM = 16;
+export const MIN_ZOOM = 12;
+export const MAX_ZOOM = 15;
+/** 겹치지 않는 줌보다 이만큼 먼저 보여 줍니다. */
+const EARLY = 0.7;
 /** 이름표 둘레 여유(dp). */
 const GAP = 4;
 
@@ -65,5 +68,5 @@ export function revealZooms(items: LabelItem[]): Map<string, number> {
       need[j] = Math.max(need[j], both, clearScale(b.label, a.pin, -dx, -dy));
     }
   }
-  return new Map(items.map((it, i) => [it.id, Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, need[i] > 0 ? Math.log2(need[i]) : MIN_ZOOM))]));
+  return new Map(items.map((it, i) => [it.id, Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, need[i] > 0 ? Math.log2(need[i]) - EARLY : MIN_ZOOM))]));
 }
