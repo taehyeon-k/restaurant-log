@@ -489,9 +489,9 @@ export default function MapTab() {
       </View>
 
       {chipItems.length > 0 && (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingHorizontal: 20, paddingBottom: 6, alignItems: "center" }}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingHorizontal: 20, paddingBottom: 3, alignItems: "center" }}>
           {chipItems.map((c) => (
-            <Pressable key={c.key} onPress={c.onClear} style={{ borderRadius: 15, backgroundColor: c.key === "bounds" ? C.card : "#f2e0d5", borderWidth: c.key === "bounds" ? 1 : 0, borderColor: C.line, paddingHorizontal: 10, paddingVertical: 4 }}>
+            <Pressable key={c.key} onPress={c.onClear} style={{ borderRadius: 15, backgroundColor: c.key === "bounds" ? C.card : "#f2e0d5", borderWidth: c.key === "bounds" ? 1 : 0, borderColor: C.line, paddingHorizontal: 10, paddingVertical: 5 }}>
               <Text style={{ fontFamily: F.sans, fontSize: 11, lineHeight: 15, color: c.key === "bounds" ? C.muted : "#a34d27" }}>{c.label} ✕</Text>
             </Pressable>
           ))}
