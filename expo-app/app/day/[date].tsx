@@ -2,11 +2,13 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useMemo, useState } from "react";
 import { Modal, Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { BookmarkIcon, VerifiedMark } from "@/components/icons";
-import { ShareButton, ShareSheet } from "@/components/ShareSheet";
-import { BackButton, MobileStars, PhotoBox } from "@/components/ui";
+import { BookmarkIcon } from "@/components/icons";
+import { ShareSheet } from "@/components/ShareSheet";
+import { BackButton } from "@/components/ui";
 import { useRows, useWishes } from "@/data/queries";
-import { coverPhoto, dottedDate, verifiedTime, type Restaurant, type Wish } from "@/lib/types";
+import PlaceCard from "@/features/map/PlaceCard";
+import { groupPlaces } from "@/lib/places";
+import { dottedDate, type Restaurant, type Wish } from "@/lib/types";
 import { C, F, SHADOW } from "@/theme";
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -93,7 +95,8 @@ export default function DayRoute() {
           </View>
         ) : (
           <>
-            {visits.map((v) => <VisitCard key={v.id} record={v} onOpen={() => router.push({ pathname: "/record/[id]", params: { id: String(v.id) } })} onShare={() => setSharing(v)} />)}
+            {/* 지도 기록 시트와 같은 카드 — 그날 기록 하나가 카드 하나. */}
+            {visits.map((v) => <PlaceCard key={v.id} place={groupPlaces([v])[0]} onOpen={() => router.push({ pathname: "/record/[id]", params: { id: String(v.id) } })} onShare={() => setSharing(v)} />)}
             {dayWishes.length > 0 && (
               <View style={{ marginTop: visits.length ? 8 : 0, gap: 10 }}>
                 {visits.length > 0 && <Text style={{ paddingHorizontal: 4, fontFamily: F.mono, fontSize: 10, letterSpacing: 1.6, color: C.faint }}>예정</Text>}
@@ -105,34 +108,6 @@ export default function DayRoute() {
       </ScrollView>
       {sharing && <ShareSheet record={sharing} visible onClose={() => setSharing(null)} />}
     </View>
-  );
-}
-
-function VisitCard({ record, onOpen, onShare }: { record: Restaurant; onOpen: () => void; onShare: () => void }) {
-  const photo = coverPhoto(record);
-  return (
-    <Pressable onPress={onOpen} style={{ flexDirection: "row", alignItems: "flex-start", gap: 12, borderRadius: 22, borderWidth: 1, borderColor: record.verified ? "#e0c3b1" : "#e4dfd3", backgroundColor: C.card, padding: 12 }}>
-      <View>
-        <PhotoBox src={photo} category={record.category} size={72} radius={18}>
-          {!photo && <Text style={{ fontFamily: F.mono, fontSize: 9, letterSpacing: 0.7, color: "rgba(251,250,246,.9)" }}>PHOTO</Text>}
-        </PhotoBox>
-        {record.verified && <View style={{ position: "absolute", right: -3, bottom: -3 }}><VerifiedMark size={24} /></View>}
-      </View>
-      <View style={{ flex: 1 }}>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-          <Text numberOfLines={1} style={{ flexShrink: 1, fontFamily: F.serif, fontSize: 16, color: C.ink }}>{record.name}</Text>
-          {record.revisit && <Text style={{ borderRadius: 9, backgroundColor: C.brickSoft, paddingHorizontal: 7, paddingVertical: 2, fontFamily: F.sans, fontSize: 9.5, color: C.brick, overflow: "hidden" }}>재방문</Text>}
-        </View>
-        <Text style={{ marginTop: 4, fontFamily: F.sans, fontSize: 11, color: C.faint }}>{[record.category, record.region].filter(Boolean).join(" · ")}</Text>
-        <View style={{ marginTop: 6, flexDirection: "row", alignItems: "center", gap: 8 }}>
-          <MobileStars rating={record.rating} />
-          <Text style={{ fontFamily: F.mono, fontSize: 10.5, color: C.muted }}>{record.rating?.toFixed(1) ?? "—"}</Text>
-          {record.verified && record.verified_at && <Text style={{ fontFamily: F.mono, fontSize: 10.5, color: C.brick }}>{verifiedTime(record.verified_at)}</Text>}
-        </View>
-        <Text numberOfLines={2} style={{ marginTop: 6, fontFamily: F.sans, fontSize: 11.5, lineHeight: 18, color: "#4d4842" }}>{record.review || record.menu || "메모가 비어 있습니다"}</Text>
-      </View>
-      {!record.pending && <View style={{ alignSelf: "flex-end" }}><ShareButton onPress={onShare} /></View>}
-    </Pressable>
   );
 }
 
