@@ -247,10 +247,7 @@ export default function RecordRoute() {
       },
     });
 
-  const verifyNote =
-    "그 자리에서 찍은 사진으로 인증되었습니다." +
-    (record.acc ? ` 촬영 시 위치 정확도 약 ${record.acc}m.` : "") +
-    " 좌표는 기록에 남지 않습니다.";
+  const verifyNote = "가게에서 찍은 사진으로 인증된 기록입니다.";
 
   return (
     <View style={{ flex: 1, backgroundColor: C.paper }}>
