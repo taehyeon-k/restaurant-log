@@ -5,7 +5,7 @@ import type { Restaurant } from "@/lib/types";
  *
  *  · 도장 — 인증된 기록(verified, 보관함 아님) 1건 = 도장 1개. 10칸 = 도장판 1장, 판을 채울 때마다 뽑기권 1장.
  *  · 그릇 수 라벨 — 인증 기록 수 8단계(1 · 5 · 10 · 30 · 50 · 100 · 200 · 300).
- *  · 이야기 라벨 — 원래 있던 라벨 14개(첫 한 끼 · 백 그릇은 그릇 수 단계로).
+ *  · 이야기 라벨 — 원래 있던 라벨 13개(첫 한 끼 · 백 그릇은 그릇 수 단계로, 만원의 행복은 뺌) + 새 라벨 5개.
  *  · 동네 칭호(동 · 은 · 금)는 아래 REGION_TIERS 그대로.
  */
 export type LabelGroup = "bowl" | "story";
@@ -124,7 +124,38 @@ const weekendRows = (rows: Restaurant[]) =>
 const albumRows = (rows: Restaurant[]) => live(rows).filter((r) => (r.photo_urls?.length ?? (r.photo_url ? 1 : 0)) >= 3);
 const longformRows = (rows: Restaurant[]) => live(rows).filter((r) => (r.review ?? "").length > 100);
 const morningRows = (rows: Restaurant[]) => stampRows(rows).filter((r) => r.verified_at && new Date(r.verified_at).getHours() < 11);
-const thriftRows = (rows: Restaurant[]) => live(rows).filter((r) => r.price_range != null && r.price_range < 10000);
+const soloRows = (rows: Restaurant[]) => live(rows).filter((r) => r.keywords?.includes("혼밥"));
+const wishRows = (rows: Restaurant[]) => live(rows).filter((r) => r.from_wish);
+
+/** 한 해에 계절(분기 — 1분기 겨울 · 2분기 봄 · 3분기 여름 · 4분기 가을)을 가장 많이 채운 해의, 계절마다 첫 기록. */
+const seasonRows = (rows: Restaurant[]) => {
+  const byYear = new Map<string, Restaurant[]>();
+  for (const r of firstOf(rows, (r) => r.visited_at && `${r.visited_at.slice(0, 4)}-${Math.ceil(Number(r.visited_at.slice(5, 7)) / 3)}`)) {
+    const y = r.visited_at!.slice(0, 4);
+    if (!byYear.has(y)) byYear.set(y, []);
+    byYear.get(y)!.push(r);
+  }
+  let best: Restaurant[] = [];
+  for (const list of byYear.values()) if (list.length > best.length) best = list;
+  return best;
+};
+
+/** 방문일이 든 주(월요일 시작) 번호 — 1970-01-01 이 목요일이라 3일을 더해 월요일에 끊습니다. */
+const weekOf = (day: string) => Math.floor((Date.parse(`${day}T00:00:00Z`) / 86400000 + 3) / 7);
+
+/** 기록이 있는 주가 몇 주까지 이어졌는지 — 그 연속한 주들의 첫 기록. */
+const weekStreakRows = (rows: Restaurant[]) => {
+  const firsts = firstOf(rows, (r) => r.visited_at && String(weekOf(r.visited_at))).sort((a, b) => weekOf(a.visited_at!) - weekOf(b.visited_at!));
+  let best: Restaurant[] = [];
+  let run: Restaurant[] = [];
+  for (const r of firsts) {
+    const w = weekOf(r.visited_at!);
+    const prev = run.length ? weekOf(run[run.length - 1].visited_at!) : null;
+    run = prev !== null && w === prev + 1 ? [...run, r] : [r];
+    if (run.length > best.length) best = run;
+  }
+  return best;
+};
 const decemberRows = (rows: Restaurant[]) => live(rows).filter((r) => (r.visited_at ?? "").slice(5, 7) === "12");
 
 /** 그 목록의 길이를 세고, 앞에서 need 개를 리캡 목록으로. */
@@ -149,7 +180,11 @@ const STORIES: LabelDef[] = [
   story({ id: "album", icon: "M4.5 6h15v12.5h-15Z M4.5 15.5l4.5-4.5 4 4 2-2 4.5 4.5 M15 8.6a1.3 1.3 0 1 0 .01 0", color: "#5f7a8a", name: "사진첩", desc: "사진 세 장 이상 10개", need: 10 }, albumRows),
   story({ id: "longform", icon: "M5.5 18.5l1-3.8 9.6-9.6 2.8 2.8-9.6 9.6Z M14 7.2l2.8 2.8", color: "#7a5c42", name: "긴 이야기", desc: "100자 넘는 메모 5개", need: 5 }, longformRows),
   story({ id: "morning", icon: "M12 8a4 4 0 1 0 .01 0 M12 3v2 M12 19v2 M3 12h2 M19 12h2 M5.7 5.7l1.4 1.4 M16.9 16.9l1.4 1.4 M5.7 18.3l1.4-1.4 M16.9 7.1l1.4-1.4", color: "#c07a2e", name: "아침의 사람", desc: "오전 기록 10개", need: 10 }, morningRows),
-  story({ id: "thrift", icon: "M12 4a8 8 0 1 0 .01 0 M8.6 9l1.6 6 1.8-4.6 1.8 4.6 1.6-6 M8 12h8", color: "#6f7350", name: "만원의 행복", desc: "만원 아래 20그릇", need: 20 }, thriftRows),
+  story({ id: "planner", icon: "M7 4.5h10v15l-5-3.6-5 3.6Z M9.3 10.2l1.9 1.9 3.6-3.8", color: "#5f6b8a", name: "확신의 J", desc: "위시에서 온 기록 10개", need: 10 }, wishRows),
+  story({ id: "seasons", icon: "M12 4a8 8 0 1 0 .01 0 M12 4v16 M4 12h16", color: "#8f5a26", name: "사계절 식탁", desc: "한 해에 사계절 모두", need: 4 }, seasonRows),
+  story({ id: "solo", icon: "M12 5a3 3 0 1 0 .01 0 M6.5 19.5a5.5 5.5 0 0 1 11 0", color: "#4a6670", name: "혼자의 식탁", desc: "혼밥 기록 10개", need: 10 }, soloRows),
+  story({ id: "weeks", icon: "M5 6.5h14v13H5Z M5 10.5h14 M9 4.5v4 M15 4.5v4 M8 15h1.5 M11.25 15h1.5 M14.5 15h1.5", color: "#9a4a52", name: "한 달의 식탁", desc: "4주 연속 매주 기록", need: 4 }, weekStreakRows),
+  story({ id: "explorer", icon: "M12 4a8 8 0 1 0 .01 0 M14.8 9.2l-1.6 4-4 1.6 1.6-4Z", color: "#3d6b7a", name: "맛집 콜럼버스", desc: "서로 다른 가게 50곳", need: 50 }, (rows) => firstOf(rows, placeKeyOf)),
   story({ id: "december", icon: "M12 3.5v17 M4.6 7.75l14.8 8.5 M4.6 16.25l14.8-8.5", color: "#a8412a", name: "연말의 식탁", desc: "12월 기록 10개", need: 10 }, decemberRows),
 ];
 

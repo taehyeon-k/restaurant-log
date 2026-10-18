@@ -130,7 +130,11 @@ function howOf(def: LabelDef, journey: Restaurant[]): Line {
     case "album": return [{ t: "사진을 세 장 넘게 담은 기록이 " }, ...many(`${n} 개`), { t: " 되네요?" }];
     case "longform": return [{ t: "100자 넘는 메모를 " }, ...many(`${n} 번`), { t: " 쓰셨네요?" }];
     case "morning": return [{ t: "오전 11시 전에 인증을 " }, ...many(`${n} 번`), { t: " 하셨네요?" }];
-    case "thrift": return [{ t: "만 원 아래로 " }, ...many(`${n} 그릇`), { t: " 드셨네요?" }];
+    case "planner": return [{ t: "위시에 담아 둔 곳을 " }, ...many(`${n} 곳`), { t: " 실제로 가셨네요?" }];
+    case "seasons": return [{ t: `${journey[0]?.visited_at ? `${journey[0].visited_at.slice(0, 4)}년` : "한 해"}에 ` }, { t: "봄 · 여름 · 가을 · 겨울", em: true }, { t: "을 모두 기록하셨네요!" }];
+    case "solo": return [{ t: "혼자 먹은 기록이 " }, ...many(`${n} 개`), { t: " 되네요?" }];
+    case "weeks": return [{ t: `${n} 주`, em: true }, { t: " 연속으로 매주 기록을 남기셨네요?" }];
+    case "explorer": return [{ t: "서로 다른 가게를 " }, ...many(`${n} 곳`), { t: " 찾아내셨네요?" }];
     case "december": return [{ t: "12월에 남긴 기록이 " }, ...many(`${n} 개`), { t: " 되네요?" }];
     default: return [{ t: def.desc, em: true }, { t: `${josa(def.desc, eulReul)} 채우셨네요!` }];
   }
