@@ -168,17 +168,17 @@ const story = (d: Omit<LabelDef, "group" | "count" | "contrib">, list: (rows: Re
 
 /** 이야기 라벨 — 그릇 수 라벨이 생기기 전부터 있던 라벨(첫 한 끼 · 백 그릇은 그릇 수로 옮겨 감). */
 const STORIES: LabelDef[] = [
-  story({ id: "verified", icon: "M6.5 12.5l3.5 3.5 7.5-8", color: "#b4552d", name: "인증 기록자", desc: "인증 기록 40개", need: 40 }, stampRows),
-  story({ id: "gold", icon: "M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.9L12 17l-5.2 2.7 1-5.9-4.3-4.1 5.9-.8Z", color: "#b58a2b", name: "골드 라벨", desc: "5.0을 준 집 열 곳", need: 10 }, goldRows),
-  story({ id: "regular", icon: "M12 19.5s-7-4.3-7-9.6a3.9 3.9 0 0 1 7-2.4 3.9 3.9 0 0 1 7 2.4c0 5.3-7 9.6-7 9.6Z", color: "#a8412a", name: "레드 라벨", desc: "한 가게에 다섯 번", need: 5 }, topPlace),
+  story({ id: "verified", icon: "M6.5 12.5l3.5 3.5 7.5-8", color: "#b4552d", name: "프로기록러", desc: "인증 기록 40개", need: 40 }, stampRows),
+  story({ id: "gold", icon: "M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.9L12 17l-5.2 2.7 1-5.9-4.3-4.1 5.9-.8Z", color: "#b58a2b", name: "오점 없는 사람", desc: "5.0을 준 집 열 곳", need: 10 }, goldRows),
+  story({ id: "regular", icon: "M12 19.5s-7-4.3-7-9.6a3.9 3.9 0 0 1 7-2.4 3.9 3.9 0 0 1 7 2.4c0 5.3-7 9.6-7 9.6Z", color: "#a8412a", name: "삼고초려", desc: "한 가게에 세 번", need: 3 }, topPlace),
   story({ id: "midnight", icon: "M18.5 14.5A7 7 0 1 1 9.5 5.5a5.6 5.6 0 0 0 9 9Z", color: "#3d4a6b", name: "한밤의 기록", desc: "자정 이후 10개", need: 10 }, midnightRows),
   story({ id: "regions", icon: "M12 20.5s-6-6-6-10.8a6 6 0 0 1 12 0c0 4.8-6 10.8-6 10.8Z M12 7.7a2 2 0 1 0 .01 0", color: "#7a5c42", name: "열 동네", desc: "지역 10곳", need: 10 }, (rows) => firstOf(rows, (r) => r.region)),
   story({ id: "years", icon: "M5 6.5h14v13H5Z M5 10.5h14 M9 4.5v4 M15 4.5v4", color: "#4f7a6a", name: "세 해의 기록", desc: "3년 연속", need: 3 }, streakRows),
   story({ id: "revisit", icon: "M18.5 12a6.5 6.5 0 1 1-1.9-4.6 M18.5 4.5v3.5H15", color: "#b4552d", name: "다시 그 집", desc: "재방문 20곳", need: 20 }, (rows) => firstOf(rows.filter((r) => r.revisit), placeKeyOf)),
   story({ id: "palate", icon: "M7.5 4v5.5a2 2 0 0 0 4 0V4 M9.5 4v16 M16.5 20V4c1.8 1 2.8 3.6 2.8 7.5h-2.8", color: "#6f8455", name: "고루 먹는 입", desc: "분류 8가지", need: 8 }, (rows) => firstOf(rows, (r) => r.category)),
   story({ id: "weekend", icon: "M8 4h8c0 4.8-1.6 7.5-4 7.5S8 8.8 8 4Z M12 11.5v8 M8.5 19.5h7", color: "#7a6a9a", name: "주말의 식탁", desc: "토·일 기록 20개", need: 20 }, weekendRows),
-  story({ id: "album", icon: "M4.5 6h15v12.5h-15Z M4.5 15.5l4.5-4.5 4 4 2-2 4.5 4.5 M15 8.6a1.3 1.3 0 1 0 .01 0", color: "#5f7a8a", name: "사진첩", desc: "사진 세 장 이상 10개", need: 10 }, albumRows),
-  story({ id: "longform", icon: "M5.5 18.5l1-3.8 9.6-9.6 2.8 2.8-9.6 9.6Z M14 7.2l2.8 2.8", color: "#7a5c42", name: "긴 이야기", desc: "100자 넘는 메모 5개", need: 5 }, longformRows),
+  story({ id: "album", icon: "M4.5 6h15v12.5h-15Z M4.5 15.5l4.5-4.5 4 4 2-2 4.5 4.5 M15 8.6a1.3 1.3 0 1 0 .01 0", color: "#5f7a8a", name: "포토그래퍼", desc: "사진 세 장 이상 10개", need: 10 }, albumRows),
+  story({ id: "longform", icon: "M5.5 18.5l1-3.8 9.6-9.6 2.8 2.8-9.6 9.6Z M14 7.2l2.8 2.8", color: "#7a5c42", name: "투머치토커", desc: "100자 넘는 메모 5개", need: 5 }, longformRows),
   story({ id: "morning", icon: "M12 8a4 4 0 1 0 .01 0 M12 3v2 M12 19v2 M3 12h2 M19 12h2 M5.7 5.7l1.4 1.4 M16.9 16.9l1.4 1.4 M5.7 18.3l1.4-1.4 M16.9 7.1l1.4-1.4", color: "#c07a2e", name: "아침의 사람", desc: "오전 기록 10개", need: 10 }, morningRows),
   story({ id: "planner", icon: "M7 4.5h10v15l-5-3.6-5 3.6Z M9.3 10.2l1.9 1.9 3.6-3.8", color: "#5f6b8a", name: "확신의 J", desc: "위시에서 온 기록 10개", need: 10 }, wishRows),
   story({ id: "seasons", icon: "M12 4a8 8 0 1 0 .01 0 M12 4v16 M4 12h16", color: "#8f5a26", name: "사계절 식탁", desc: "한 해에 사계절 모두", need: 4 }, seasonRows),
