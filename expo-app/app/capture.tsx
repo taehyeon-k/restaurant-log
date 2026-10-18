@@ -363,16 +363,15 @@ export default function Capture() {
       <View style={[s.light, { paddingTop: insets.top + 8 }]}>
         <Pressable style={s.closeLight} onPress={close}><Text style={s.closeX}>✕</Text></Pressable>
         <View style={{ paddingHorizontal: 28, marginTop: 44 }}>
-          <Text style={s.permTitle}>{"그 자리에 있었다는 것,\n사진과 위치로 남깁니다"}</Text>
-          <Text style={s.permDesc}>DINARY 의 인증은 가게 앞에서 찍은 사진에만 붙습니다. 그래서 두 가지가 필요합니다.</Text>
+          <Text style={s.permTitle}>{"사진을 찍으시면 위치를 읽고\n방문하신 가게를 입력해드릴게요"}</Text>
         </View>
         <View style={{ paddingHorizontal: 24, marginTop: 40, gap: 12 }}>
           <PermCard icon={<CameraIcon size={21} stroke={C.brick} />} title="카메라"
-            body="인증 사진을 찍는 데에만 씁니다. 갤러리에서 고른 사진에는 인증이 붙지 않습니다." />
+            body="인증 사진을 찍는 데에 이용됩니다." />
           <PermCard icon={<MapPinIcon size={21} stroke={C.brick} />} title="위치"
-            body="사진 찍는 순간 한 번만 읽어 50m 안의 가게를 찾습니다. 좌표는 기록에 남기지 않습니다." />
+            body="사진 찍는 순간 위치를 읽어 50m 안의 가게를 찾습니다." />
           <PermCard dashed icon={<BellIcon size={19} stroke={C.faint} />} title="알림 · 나중에 물어봅니다"
-            body="담아둔 곳 근처에 왔을 때 알려 드립니다. 첫 위시를 저장하는 순간 여쭙습니다." />
+            body="담아둔 곳 근처에 왔을 때 알려드립니다." />
         </View>
         <View style={{ flex: 1 }} />
         <View style={{ paddingHorizontal: 24, paddingBottom: insets.bottom + 10 }}>
@@ -761,7 +760,6 @@ const s = StyleSheet.create({
   closeX: { fontSize: 17, color: C.ink },
   back: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
   permTitle: { fontFamily: F.serif, fontSize: 27, lineHeight: 38, color: C.ink },
-  permDesc: { marginTop: 14, fontFamily: F.sans, fontSize: 13, lineHeight: 24, color: C.muted },
   perm: {
     flexDirection: "row", gap: 14, padding: 18, borderRadius: 22, borderWidth: 1, borderColor: C.lineSoft, backgroundColor: C.card,
   },
