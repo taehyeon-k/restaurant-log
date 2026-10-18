@@ -247,8 +247,6 @@ export default function RecordRoute() {
       },
     });
 
-  const verifyNote = "가게에서 찍은 사진으로 인증된 기록입니다.";
-
   return (
     <View style={{ flex: 1, backgroundColor: C.paper }}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingTop: insets.top + 60, paddingBottom: insets.bottom + 40 }}>
@@ -390,12 +388,6 @@ export default function RecordRoute() {
               {record.keywords.map((k) => (
                 <Text key={k} style={{ borderRadius: 14, borderWidth: 1, borderColor: "#e2dccf", paddingHorizontal: 10, paddingVertical: 4, fontFamily: F.sans, fontSize: 11, color: C.muted, overflow: "hidden" }}>{k}</Text>
               ))}
-            </View>
-          )}
-
-          {record.verified && (
-            <View style={{ marginTop: 20, borderRadius: 18, borderWidth: 1, borderColor: "#e4dfd3", backgroundColor: C.card, paddingHorizontal: 16, paddingVertical: 14 }}>
-              <Text style={{ fontFamily: F.sans, fontSize: 11.5, lineHeight: 20, color: C.muted }}>{verifyNote}</Text>
             </View>
           )}
 
