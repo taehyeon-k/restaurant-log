@@ -145,7 +145,6 @@ export default function MapTab() {
   const [revisitOnly, setRevisitOnly] = useState(false);
   const [verifiedOnly, setVerifiedOnly] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [mapMoved, setMapMoved] = useState(false);
   const [viewBounds, setViewBounds] = useState<Bounds | null>(null);
   const shownWishes = useMemo(() => (viewBounds ? wishes.filter((w) => inBounds(viewBounds, w.lat, w.lng)) : wishes), [wishes, viewBounds]);
   const wishItems = useWishItems(wishes, shownWishes);
@@ -215,7 +214,7 @@ export default function MapTab() {
         (r.user_id === m.userId && (r.rating != null || !!r.review)));
     return { me: meMember, partner, meWrote: wrote(meMember), partnerWrote: wrote(partner), tag: placeTag(p) };
   }, [isCouple, notes, meMember, partner, placeTag]);
-  const activeFilters = categories.length + keywords.length + (revisitOnly ? 1 : 0) + (verifiedOnly ? 1 : 0);
+  const activeFilters = categories.length + keywords.length + (revisitOnly ? 1 : 0) + (verifiedOnly ? 1 : 0) + (viewBounds ? 1 : 0);
   const overlayOpen = filtersOpen || foundHit !== null || ghost !== null || regionView !== null || placesAt.state.status !== "idle";
 
   /* ── 지도 이동 ──────────────────────────────── */
@@ -268,7 +267,6 @@ export default function MapTab() {
     if (!regionRef.current) return;
     holdFit.current = true;
     setViewBounds(regionRef.current);
-    setMapMoved(false);
     if (sheetIndex.current <= 3) sheetRef.current?.snapToPosition("35%");
   };
 
@@ -363,7 +361,7 @@ export default function MapTab() {
 
   function enterRegionView(name: string, rowsInRegion: Restaurant[], fallback?: { lat: number; lng: number }) {
     setFoundHit(null); setPlusOpen(false); setState({ ghost: null });
-    setMapQuery(""); setQ(""); clearAll(); setMapMoved(false);
+    setMapQuery(""); setQ(""); clearAll();
     setRegionView({ name, count: rowsInRegion.length });
     const pts = rowsInRegion.filter((r) => r.lat != null && r.lng != null).map((r) => [r.lat as number, r.lng as number] as Pt);
     if (pts.length) fitTo(pts, 14);
@@ -425,12 +423,6 @@ export default function MapTab() {
     ...(verifiedOnly ? [{ key: "verified", label: "인증된 기록", onClear: () => setVerifiedOnly(false) }] : []),
   ];
 
-  const boundsChip = (small: boolean) => (
-    <Pressable onPress={applyViewBounds} style={[s.boundsChip, small && { minHeight: 26, borderRadius: 13, paddingHorizontal: 9 }]}>
-      <RefreshIcon size={small ? 10 : 11} />
-      <Text style={{ fontFamily: F.sans, fontSize: small ? 10.5 : 11, color: C.brick }}>현 지도에 있는 기록만</Text>
-    </Pressable>
-  );
   // 종류·낱말은 맛집과 카페가 달라 바꿀 때 비웁니다.
   const changeKind = (k: Kind) => {
     if (k === kind) return;
@@ -439,7 +431,6 @@ export default function MapTab() {
     setCategories([]);
     setKeywords([]);
   };
-  const chipVisible = mapMoved && !overlayOpen;
   const title = isCouple ? "우리 기록" : kind === "cafe" ? "카페 기록" : "맛집 기록";
 
   // 시트가 낮으면(peek) 한 줄 요약만 — 검색·칩·정렬은 숨깁니다(웹과 같음).
@@ -458,7 +449,6 @@ export default function MapTab() {
       <Text numberOfLines={1} style={{ flexShrink: 1, fontFamily: F.mono, fontSize: 11.5, color: C.faint }}>
         {mapSegment === "wish" ? `위시리스트 · ${wishes.length}곳` : `${title} · 가게 ${filtered.length} · 기록 ${visitCount}`}
       </Text>
-      {chipVisible && mapSegment === "records" && boundsChip(true)}
     </View>
   ) : mapSegment === "wish" ? (
     segmentSwitch
@@ -478,14 +468,6 @@ export default function MapTab() {
           <SearchIcon size={14} />
           <BottomSheetTextInput value={q} onChangeText={setQ} placeholder="내 기록에서 찾기" placeholderTextColor="#a8a196" style={{ flex: 1, padding: 0, fontFamily: F.sans, fontSize: 12.5, color: C.ink }} />
         </View>
-        <Pressable
-          onPress={() => setFiltersOpen(true)}
-          accessibilityLabel="필터"
-          style={[s.filterBtn, activeFilters ? { backgroundColor: C.ink, borderWidth: 0 } : null]}
-        >
-          <FilterLinesIcon stroke={activeFilters ? C.card : C.muted} />
-          <Text style={{ fontFamily: F.sans, fontSize: 12.5, color: activeFilters ? C.card : C.muted }}>{activeFilters ? activeFilters : "필터"}</Text>
-        </Pressable>
       </View>
 
       {chipItems.length > 0 && (
@@ -505,8 +487,16 @@ export default function MapTab() {
             <Text numberOfLines={1} style={{ fontFamily: sort === o.value ? F.sansMd : F.sans, fontSize: 12.5, color: sort === o.value ? C.ink : "#a8a196" }}>{o.label}</Text>
           </Pressable>
         ))}
-        {/* 「현 지도에 있는 기록만」은 정렬과 같은 줄 오른쪽 끝에 둡니다 */}
-        {chipVisible && <View style={{ marginLeft: "auto", flexShrink: 0 }}>{boundsChip(false)}</View>}
+        {/* 필터 단추는 정렬과 같은 줄 오른쪽 끝에 둡니다 — 위 줄은 검색창이 넓게 씁니다. */}
+        <Pressable
+          onPress={() => setFiltersOpen(true)}
+          accessibilityLabel="필터"
+          hitSlop={{ top: 6, bottom: 6 }}
+          style={[s.filterBtn, activeFilters ? { backgroundColor: C.ink, borderWidth: 0 } : null]}
+        >
+          <FilterLinesIcon stroke={activeFilters ? C.card : C.muted} />
+          <Text style={{ fontFamily: F.sans, fontSize: 12, color: activeFilters ? C.card : C.muted }}>{activeFilters ? `필터 ${activeFilters}` : "필터"}</Text>
+        </Pressable>
       </View>
     </View>
   );
@@ -521,7 +511,6 @@ export default function MapTab() {
         logoMargin={{ top: 20, left: 6, right: 0, bottom: 0 }}
         onCameraChanged={(e) => {
           if (e.reason !== "Gesture") return;
-          setMapMoved(true);
           // 핀 요약 카드는 지도를 밀자마자 내립니다 — 같은 값을 돌려주면 다시 그리지 않습니다.
           setFoundHit((h) => (h?.fromPin ? null : h));
         }}
@@ -691,12 +680,14 @@ export default function MapTab() {
         selectedKeywords={keywords}
         revisitOnly={revisitOnly}
         verifiedOnly={verifiedOnly}
+        boundsOnly={!!viewBounds}
         count={filtered.length}
         onToggleCategory={(c) => setCategories((l) => (l.includes(c) ? l.filter((v) => v !== c) : [...l, c]))}
         onToggleKeyword={(k) => setKeywords((l) => (l.includes(k) ? l.filter((v) => v !== k) : [...l, k]))}
         onToggleRevisit={() => setRevisitOnly((v) => !v)}
         onToggleVerified={() => setVerifiedOnly((v) => !v)}
-        onReset={() => { setCategories([]); setKeywords([]); setRevisitOnly(false); setVerifiedOnly(false); }}
+        onToggleBounds={() => (viewBounds ? setViewBounds(null) : applyViewBounds())}
+        onReset={clearAll}
         onClose={() => setFiltersOpen(false)}
       />
 
@@ -748,14 +739,6 @@ const FilterLinesIcon = ({ stroke }: { stroke: string }) => (
   </Svg>
 );
 
-/** 「현 지도에 있는 기록만」 칩의 새로고침 화살표. */
-const RefreshIcon = ({ size }: { size: number }) => (
-  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={C.brick} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-    <Path d="M20.5 12a8.5 8.5 0 1 1-2.6-6.1" />
-    <Path d="M20.5 4.5v4.2h-4.2" />
-  </Svg>
-);
-
 const shadow = (opacity: number, radius: number, y: number, elevation: number): ViewStyle =>
   Platform.select<ViewStyle>({ ios: { shadowColor: C.ink, shadowOpacity: opacity, shadowRadius: radius, shadowOffset: { width: 0, height: y } }, default: { elevation } })!;
 /** 웹 0 6px 18px rgba(28,26,23,.16) — 보관함·+·메뉴. */
@@ -788,11 +771,10 @@ const s = StyleSheet.create({
   headRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 14, paddingBottom: 10 },
   compactRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8, paddingHorizontal: 20, paddingBottom: 12 },
   h: { fontFamily: F.serif, fontSize: 18, color: C.ink },
-  filterBtn: { height: 40, borderRadius: 20, borderWidth: 1, borderColor: "#ded8cb", backgroundColor: C.card, paddingHorizontal: 12, flexDirection: "row", alignItems: "center", gap: 5 },
+  filterBtn: { marginLeft: "auto", height: 30, borderRadius: 15, borderWidth: 1, borderColor: "#ded8cb", backgroundColor: C.card, paddingHorizontal: 11, flexDirection: "row", alignItems: "center", gap: 5 },
   searchIn: {
     flex: 1, minWidth: 0, height: 40, borderRadius: 20, borderWidth: 1, borderColor: "#ded8cb", backgroundColor: C.card,
     paddingHorizontal: 12, flexDirection: "row", alignItems: "center", gap: 8,
   },
-  boundsChip: { minHeight: 28, borderRadius: 14, borderWidth: 1, borderColor: "#e0c3b1", backgroundColor: "#f9f0e9", paddingHorizontal: 10, flexDirection: "row", alignItems: "center", gap: 5 },
   sortRow: { flexDirection: "row", alignItems: "center", minHeight: 28, gap: 12, paddingHorizontal: 20, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: "#e6e0d3", marginBottom: 12 },
 });

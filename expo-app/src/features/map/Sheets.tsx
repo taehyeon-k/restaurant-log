@@ -7,17 +7,17 @@ import type { Place } from "@/lib/places";
 import { Pressable } from "react-native";
 import { C, F, SHADOW } from "@/theme";
 
-/** 「골라 보기」 시트. */
+/** 「필터」 시트. */
 export function FilterSheet(p: {
   visible: boolean; categories: string[]; keywords: string[];
-  selectedCategories: string[]; selectedKeywords: string[]; revisitOnly: boolean; verifiedOnly: boolean; count: number;
+  selectedCategories: string[]; selectedKeywords: string[]; revisitOnly: boolean; verifiedOnly: boolean; boundsOnly: boolean; count: number;
   onToggleCategory: (c: string) => void; onToggleKeyword: (k: string) => void; onToggleRevisit: () => void;
-  onToggleVerified: () => void; onReset: () => void; onClose: () => void;
+  onToggleVerified: () => void; onToggleBounds: () => void; onReset: () => void; onClose: () => void;
 }) {
   return (
     <BottomSheetModal visible={p.visible} onClose={p.onClose}>
       <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-        <Text style={{ fontFamily: F.serif, fontSize: 18, color: C.ink }}>골라 보기</Text>
+        <Text style={{ fontFamily: F.serif, fontSize: 18, color: C.ink }}>필터</Text>
         <Pressable onPress={p.onReset} style={{ paddingVertical: 6 }}><Text style={{ fontFamily: F.sans, fontSize: 12, color: C.faint }}>모두 지우기</Text></Pressable>
       </View>
 
@@ -37,9 +37,10 @@ export function FilterSheet(p: {
           </View>
         </>
       )}
-      <View style={{ marginTop: 18, flexDirection: "row", gap: 7 }}>
+      <View style={{ marginTop: 18, flexDirection: "row", flexWrap: "wrap", gap: 7 }}>
         <Chip label="재방문한 곳만" active={p.revisitOnly} onPress={p.onToggleRevisit} />
         <Chip label="인증된 기록만" active={p.verifiedOnly} onPress={p.onToggleVerified} />
+        <Chip label="현 지도에 있는 기록만" active={p.boundsOnly} onPress={p.onToggleBounds} />
       </View>
       <Button label={`${p.count}곳 보기`} onPress={p.onClose} style={{ marginTop: 22, minHeight: 54, borderRadius: 20 }} />
     </BottomSheetModal>
