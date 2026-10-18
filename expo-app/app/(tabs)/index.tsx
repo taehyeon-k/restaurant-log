@@ -117,9 +117,6 @@ export default function MapTab() {
     return sheetSnaps.reduce((best, y, i) => (Math.abs(y - target) < Math.abs(sheetSnaps[best] - target) ? i : best), 0);
   }, [sheetSnaps, layoutH, windowH]);
   const sheetIndex = useRef(sheetStartIndex);
-  // 시트는 늘 최대 높이로 그려 두고 아래로 밀어 내립니다 — 내려간 만큼 목록 끝이 화면 밖이라, 그만큼 바닥을 더 비워 끝까지 스크롤되게 합니다.
-  const [sheetVisible, setSheetVisible] = useState<number | null>(null);
-  const sheetHidden = Math.max(0, sheetSnaps[sheetSnaps.length - 1] - (sheetVisible ?? sheetSnaps[sheetStartIndex]));
 
   // 지도 위 단추들은 시트 윗변을 따라 오르내립니다. 검색줄 위로는 올라가지 않습니다.
   const minTop = insets.top + 8 + 46 + 12;
@@ -637,9 +634,7 @@ export default function MapTab() {
         handleIndicatorStyle={{ width: 42, height: 4, borderRadius: 2, backgroundColor: "#cfc8ba" }}
         handleStyle={{ paddingTop: 11, paddingBottom: 9 }}
         animatedPosition={sheetTop}
-        onChange={(i, pos) => { sheetIndex.current = i; setSheetVisible((layoutH || windowH) - pos); Haptics.selectionAsync(); }}
-        // 시트는 위의 손잡이 바를 끌 때만 오르내리고, 목록을 밀면 어느 높이에서든 목록만 스크롤됩니다.
-        enableContentPanningGesture={false}
+        onChange={(i) => { sheetIndex.current = i; Haptics.selectionAsync(); }}
       >
         {mapSegment === "wish" ? (
           <BottomSheetFlatList
@@ -647,7 +642,7 @@ export default function MapTab() {
             keyExtractor={(w: WishItem) => w.key}
             ListHeaderComponent={header}
             ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
-            contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24 + sheetHidden }}
+            contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24 }}
             renderItem={({ item }: { item: WishItem }) => <WishRow item={item} />}
           />
         ) : (
@@ -656,7 +651,7 @@ export default function MapTab() {
           keyExtractor={(p: Place) => p.key}
           ListHeaderComponent={header}
           ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
-          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24 + sheetHidden }}
+          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24 }}
           renderItem={({ item }: { item: Place }) => <PlaceCard place={item} onOpen={() => openPlace(item)} couple={coupleInfo(item)} />}
           ListEmptyComponent={
             <Text style={{ paddingHorizontal: 20, paddingVertical: 44, textAlign: "center", fontFamily: F.sans, fontSize: 12.5, lineHeight: 22, color: C.faint }}>
