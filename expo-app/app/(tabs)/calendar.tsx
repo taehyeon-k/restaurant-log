@@ -202,7 +202,9 @@ export default function CalendarTab() {
         {WEEKDAYS.map((w) => <Text key={w} style={s.weekday}>{w}</Text>)}
       </View>
 
-      <Animated.View {...pan.panHandlers} style={{ flex: 1, paddingHorizontal: 12, paddingTop: 6, paddingBottom: 74 + insets.bottom + 12, gap: 4, opacity: fade, transform: [{ translateX: tx }] }}>
+      {/* 탭바는 화면 아래에 따로 놓여서(절대 위치 아님) 이 화면은 이미 탭바 위에서 끝납니다. Android 는 화면이 짧아
+          탭바 높이를 또 비우면 칸에 칩 2개가 안 들어가므로, 솟은 카메라 버튼(22) 만큼만 비웁니다. iOS 는 그대로. */}
+      <Animated.View {...pan.panHandlers} style={{ flex: 1, paddingHorizontal: 12, paddingTop: 6, paddingBottom: Platform.OS === "android" ? 30 : 74 + insets.bottom + 12, gap: 4, opacity: fade, transform: [{ translateX: tx }] }}>
         {weeks.map((week, i) => (
           <View key={i} style={{ flex: 1, flexDirection: "row", gap: 4 }}>
             {week.map((date) => {
