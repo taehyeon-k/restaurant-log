@@ -26,7 +26,7 @@ private var kst: Calendar {
 }
 
 struct MonthProvider: TimelineProvider {
-  let d = UserDefaults(suiteName: "group.app.dinary.shared")
+  let d = UserDefaults(suiteName: "group.app.dinary")
 
   func entry(at date: Date) -> MonthEntry {
     let m = kst.component(.month, from: date)
