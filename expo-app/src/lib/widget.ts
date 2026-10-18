@@ -42,7 +42,7 @@ async function photoBase64(ref: string): Promise<string> {
   }
 }
 
-/** 지금 기록장의 기록으로 위젯을 새로 씁니다 — 기록 목록을 새로 받을 때마다(저장 · 삭제 뒤 포함) 부릅니다. */
+/** 개인 기록장의 기록으로 위젯을 새로 씁니다 — 기록 목록을 새로 받을 때마다(저장 · 삭제 뒤 포함) 부릅니다. */
 export async function syncMonthWidget(rows: Restaurant[]) {
   if (Platform.OS !== "ios") return;
   const my = ++seq;

@@ -19,7 +19,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { useAccount } from "@/data/profile";
-import { useRows, useWishes } from "@/data/queries";
+import { usePersonalRows, useWishes } from "@/data/queries";
 import { setState, useAppState } from "@/data/store";
 import CommunityTransition from "@/features/community/Transition";
 import { startQueueTriggers } from "@/features/queue/process";
@@ -117,8 +117,9 @@ function Gate({ fontsLoaded }: { fontsLoaded: boolean }) {
   // 오프라인 큐 — 앱 복귀·연결 복구에서 비웁니다.
   useEffect(() => (userId ? startQueueTriggers(qc) : undefined), [userId, qc]);
 
-  // 홈 화면 「이번 달 인증」 위젯 — 기록 목록을 새로 받을 때마다(저장 · 삭제 뒤 다시 읽을 때 포함) 다시 쓰고, 로그아웃 · 탈퇴하면 비웁니다.
-  const { data: rows } = useRows();
+  // 홈 화면 「이번 달 인증」 위젯 — 개인 기록장만 셉니다(연인 기록과 섞지 않음). 기록 목록을 새로 받을 때마다(저장 · 삭제 뒤 다시 읽을 때 포함)
+  // 다시 쓰고, 로그아웃 · 탈퇴하면 비웁니다.
+  const { data: rows } = usePersonalRows();
   useEffect(() => { if (session && rows) void syncMonthWidget(rows); }, [session, rows]);
   useEffect(() => { if (session === null) clearMonthWidget(); }, [session]);
 
