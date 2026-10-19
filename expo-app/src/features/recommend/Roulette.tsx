@@ -8,12 +8,27 @@ import type { Scored } from "@/lib/rec/score";
 import { C, F } from "@/theme";
 import { REC, SectionHead } from "./ui";
 
-const SIZE = 236;
+const SIZE = 252;
 const R = SIZE / 2;
-const SPIN_MS = 3200;
-/** 칸 색 — 종이 · 연벽돌을 번갈아, 칸이 홀수면 마지막 칸만 한 톤 다르게(같은 색이 맞붙지 않게). */
-const FILLS = [C.card, C.brickSoft];
-const ODD_FILL = "#f1ece3";
+/** 검정 테두리 두께 · 안쪽 바퀴 반지름 · 테두리 점 수 · 가운데 단추 지름. */
+const RIM = 14;
+const RI = R - RIM;
+const BULBS = 20;
+const HUB = 66;
+const SPIN_MS = 3400;
+/** 칸 색 — 벽돌 · 살구 · 종이 · 모래를 돌려 씁니다. 글자색은 바탕마다. */
+const TONES = [
+  { bg: C.brick, ink: "#fbf3ec" },
+  { bg: "#f2ddcf", ink: "#8f4323" },
+  { bg: "#fbf8f2", ink: C.ink },
+  { bg: "#e9dcc8", ink: "#4d4842" },
+];
+/** 이웃 칸(처음 · 끝 포함)이 같은 색이 되지 않게 칸마다 톤을 고릅니다. */
+function tonesFor(n: number) {
+  const out = Array.from({ length: n }, (_, i) => i % TONES.length);
+  if (n > 1 && out[n - 1] === out[0]) out[n - 1] = [1, 2, 3].find((t) => t !== out[n - 2] && t !== out[0]) ?? 2;
+  return out.map((t) => TONES[t]);
+}
 /** 칸 수 · 적어 넣는 글자 수 · 직접 선택을 기기에 남겨 두는 키. */
 const CUSTOM_MAX = 12;
 const CUSTOM_LEN = 12;
@@ -39,13 +54,13 @@ const euro = (w: string) => {
 const short = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 
 /** 0° = 위, 시계 방향. */
-const pointAt = (a: number, r = R) => {
+const pointAt = (a: number, r: number) => {
   const t = ((a - 90) * Math.PI) / 180;
   return { x: R + r * Math.cos(t), y: R + r * Math.sin(t) };
 };
-function slicePath(a0: number, a1: number) {
-  const p0 = pointAt(a0), p1 = pointAt(a1);
-  return `M${R} ${R} L${p0.x} ${p0.y} A${R} ${R} 0 ${a1 - a0 > 180 ? 1 : 0} 1 ${p1.x} ${p1.y} Z`;
+function slicePath(a0: number, a1: number, r: number) {
+  const p0 = pointAt(a0, r), p1 = pointAt(a1, r);
+  return `M${R} ${R} L${p0.x} ${p0.y} A${r} ${r} 0 ${a1 - a0 > 180 ? 1 : 0} 1 ${p1.x} ${p1.y} Z`;
 }
 
 /**
@@ -137,7 +152,9 @@ export function Roulette({ picks, exclude, onPlace, onCategory }: {
     });
   };
 
-  const fontSize = live.length > 8 ? 11 : 12.5;
+  const ready = live.length >= 2;
+  const fills = tonesFor(live.length);
+  const fontSize = live.length > 8 ? 11.5 : 13.5;
   const maxChars = live.length > 8 ? 5 : 6;
   const empty =
     tab === "custom" && live.length === 0 ? "+ 를 눌러 메뉴나 가게를 넣어 보세요"
@@ -217,48 +234,61 @@ export function Roulette({ picks, exclude, onPlace, onCategory }: {
           </View>
         )}
 
-        {/* 바퀴 */}
-        <View style={{ marginTop: 20, alignItems: "center" }}>
-          <Svg width={18} height={14} viewBox="0 0 18 14" style={{ marginBottom: -6, zIndex: 2 }}>
-            <Path d="M1.5 1.5 H16.5 L9 12.5 Z" fill={C.brick} stroke={REC.paper} strokeWidth={1.5} strokeLinejoin="round" />
-          </Svg>
-          <Pressable onPress={spin} disabled={live.length < 2} accessibilityRole="button" accessibilityLabel="룰렛 돌리기">
-            <Animated.View style={{ width: SIZE, height: SIZE, opacity: live.length < 2 ? 0.45 : 1, transform: [{ rotate: rot.interpolate({ inputRange: [0, 360], outputRange: ["0deg", "360deg"] }) }] }}>
-              <Svg width={SIZE} height={SIZE}>
-                {live.length < 2 ? (
-                  <Circle cx={R} cy={R} r={R - 1} fill={C.card} />
-                ) : live.map((o, i) => {
-                  const fill = live.length % 2 === 1 && i === live.length - 1 ? ODD_FILL : FILLS[i % 2];
-                  return <Path key={o.key} d={slicePath(i * seg, (i + 1) * seg)} fill={fill} />;
-                })}
-                {live.length >= 2 && live.map((o, i) => {
-                  const p = pointAt(i * seg, R - 1);
-                  return <Line key={`l${o.key}`} x1={R} y1={R} x2={p.x} y2={p.y} stroke={C.lineSoft} strokeWidth={1} />;
-                })}
-                {live.length >= 2 && live.map((o, i) => (
-                  <G key={`t${o.key}`} transform={`rotate(${(i + 0.5) * seg} ${R} ${R})`}>
-                    <SvgText x={R} y={R - R * 0.66} textAnchor="middle" alignmentBaseline="middle" fontFamily={F.sansMd} fontSize={fontSize} fill={C.ink}>
-                      {short(o.label, maxChars)}
-                    </SvgText>
-                  </G>
-                ))}
-                <Circle cx={R} cy={R} r={R - 1} fill="none" stroke={C.brick} strokeWidth={1.5} />
+        {/* 바퀴 — 검정 테두리에 작은 점(전구)들, 안쪽은 벽돌 · 살구 · 종이 · 모래 네 톤. 바늘은 위에 고정. */}
+        <View style={{ marginTop: 22, alignItems: "center" }}>
+          <View style={{ width: SIZE, height: SIZE + 10 }}>
+            <Pressable onPress={spin} disabled={!ready} accessibilityRole="button" accessibilityLabel="룰렛 돌리기" style={{ marginTop: 10 }}>
+              <View style={{ width: SIZE, height: SIZE, borderRadius: R, backgroundColor: C.ink, shadowColor: C.ink, shadowOpacity: 0.22, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: 8 }}>
+                <Animated.View style={{ width: SIZE, height: SIZE, transform: [{ rotate: rot.interpolate({ inputRange: [0, 360], outputRange: ["0deg", "360deg"] }) }] }}>
+                  <Svg width={SIZE} height={SIZE}>
+                    <Circle cx={R} cy={R} r={R} fill={C.ink} />
+                    {Array.from({ length: BULBS }, (_, i) => {
+                      const p = pointAt((360 / BULBS) * i + 360 / BULBS / 2, R - RIM / 2);
+                      return <Circle key={`b${i}`} cx={p.x} cy={p.y} r={2.3} fill={i % 2 ? "#f2ddcf" : "#e08a63"} />;
+                    })}
+                    {ready ? live.map((o, i) => (
+                      <Path key={o.key} d={slicePath(i * seg, (i + 1) * seg, RI)} fill={fills[i].bg} />
+                    )) : <Circle cx={R} cy={R} r={RI} fill="#efe9df" />}
+                    {ready && live.map((o, i) => {
+                      const p = pointAt(i * seg, RI);
+                      return <Line key={`l${o.key}`} x1={R} y1={R} x2={p.x} y2={p.y} stroke={REC.paper} strokeWidth={1.5} />;
+                    })}
+                    {ready && live.map((o, i) => (
+                      <G key={`t${o.key}`} transform={`rotate(${(i + 0.5) * seg} ${R} ${R})`}>
+                        <SvgText x={R} y={R - RI * 0.66} textAnchor="middle" alignmentBaseline="middle" fontFamily={F.serif} fontSize={fontSize} fill={fills[i].ink}>
+                          {short(o.label, maxChars)}
+                        </SvgText>
+                      </G>
+                    ))}
+                    <Circle cx={R} cy={R} r={RI} fill="none" stroke={REC.paper} strokeWidth={1.5} />
+                  </Svg>
+                </Animated.View>
+              </View>
+              {/* 가운데 단추 — 바퀴와 같이 돌지 않게 위에 따로 */}
+              <View pointerEvents="none" style={{ position: "absolute", left: R - HUB / 2, top: R - HUB / 2, width: HUB, height: HUB, borderRadius: HUB / 2, backgroundColor: ready ? C.ink : "#a8a196", borderWidth: 3, borderColor: REC.paper, alignItems: "center", justifyContent: "center", shadowColor: C.ink, shadowOpacity: 0.25, shadowRadius: 6, shadowOffset: { width: 0, height: 2 } }}>
+                <Text style={{ fontFamily: F.serif, fontSize: 13.5, color: REC.paper }}>{spinning ? "· · ·" : "돌리기"}</Text>
+              </View>
+            </Pressable>
+            {/* 바늘 — 검정 물방울 + 벽돌 점, 테두리에 걸쳐 아래를 가리킵니다. */}
+            <View pointerEvents="none" style={{ position: "absolute", top: 0, left: R - 13, shadowColor: C.ink, shadowOpacity: 0.25, shadowRadius: 3, shadowOffset: { width: 0, height: 2 } }}>
+              <Svg width={26} height={34} viewBox="0 0 26 34">
+                <Path d="M13 33 C9 26 2 20 2 12.5 A11 11 0 0 1 24 12.5 C24 20 17 26 13 33 Z" fill={C.ink} stroke={REC.paper} strokeWidth={2} />
+                <Circle cx={13} cy={12.5} r={4.2} fill={C.brick} />
               </Svg>
-            </Animated.View>
-            {/* 가운데 단추 — 바퀴와 같이 돌지 않게 위에 따로 */}
-            <View pointerEvents="none" style={{ position: "absolute", left: R - 29, top: R - 29, width: 58, height: 58, borderRadius: 29, backgroundColor: live.length < 2 ? "#bdb6a9" : C.brick, borderWidth: 4, borderColor: REC.paper, alignItems: "center", justifyContent: "center" }}>
-              <Text style={{ fontFamily: F.sansMd, fontSize: 12.5, color: C.card }}>{spinning ? "…" : "돌리기"}</Text>
             </View>
-          </Pressable>
+          </View>
         </View>
 
         {/* 결과 */}
-        <View style={{ marginTop: 16, minHeight: 62, alignItems: "center", justifyContent: "center" }}>
+        <View style={{ marginTop: 18, minHeight: 70, alignItems: "center", justifyContent: "center" }}>
           {empty ? (
             <Text style={{ fontFamily: F.sans, fontSize: 12.5, color: C.faint }}>{empty}</Text>
           ) : won ? (
             <View style={{ alignItems: "center", gap: 10 }}>
-              <Text style={{ fontFamily: F.serif, fontSize: 22, color: C.ink, textAlign: "center" }}>{won.label}</Text>
+              <View style={{ alignItems: "center", gap: 4 }}>
+                <Text style={{ fontFamily: F.mono, fontSize: 10, letterSpacing: 2, color: C.brick }}>오늘은 이걸로</Text>
+                <Text style={{ fontFamily: F.serif, fontSize: 24, color: C.ink, textAlign: "center" }}>{won.label}</Text>
+              </View>
               {((tab === "place" && !won.key.startsWith("+")) || (tab === "category" && (REC_CATEGORIES as readonly string[]).includes(won.label))) && (
                 <Pressable
                   onPress={() => {
@@ -274,7 +304,7 @@ export function Roulette({ picks, exclude, onPlace, onCategory }: {
               )}
             </View>
           ) : (
-            <Text style={{ fontFamily: F.mono, fontSize: 10.5, letterSpacing: 1, color: C.faint }}>{live.length}칸</Text>
+            <Text style={{ fontFamily: F.sans, fontSize: 12, color: C.faint }}>가운데를 눌러 돌려 보세요</Text>
           )}
         </View>
       </View>
