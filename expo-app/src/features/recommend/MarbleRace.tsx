@@ -8,11 +8,11 @@ import { REC } from "./ui";
 /**
  * 구슬 경주(마블 레이스) — 칸마다 색이 다른 구슬 하나. 위에서 하나씩 떨어져 핀 · 비탈 · 도는 막대에 부딪히며 내려가고,
  * 결승선을 가장 먼저 지난 구슬이 이깁니다. 결과를 미리 뽑지 않고 작은 물리(중력 · 튕김 · 구슬끼리 부딪힘)로 정합니다.
- * 코스는 300 × 480 좌표로 두고 화면 폭에 맞춰 늘립니다.
+ * 코스는 300 × 572 좌표로 두고 화면 폭에 맞춰 늘립니다. 결승선 바로 앞은 「마지막 관문」 — 구슬 두 개 폭의 구멍 위에서 막대가 돌며 쳐냅니다.
  */
 
 const CW = 300;
-const CH = 480;
+const CH = 572;
 const PAD = 10;
 const BALL_R = 7;
 const PEG_R = 3.2;
@@ -53,9 +53,18 @@ const SEGS: Seg[] = [
   { a: { x: 96, y: 446 }, b: { x: 140, y: 452 } },
   { a: { x: CW - 96, y: 446 }, b: { x: CW - 140, y: 452 } },
 ];
+/** 마지막 관문 — 양쪽에서 내려오는 깔때기, 가운데 구멍은 구슬 두 개 폭이 안 됩니다. */
+const GATE_Y = 528;
+const GATE_GAP = 15;
+const GATE: Seg[] = [
+  { a: { x: 0, y: 466 }, b: { x: CW / 2 - GATE_GAP, y: GATE_Y } },
+  { a: { x: CW, y: 466 }, b: { x: CW / 2 + GATE_GAP, y: GATE_Y } },
+];
 const SPINNERS: Spinner[] = [
   { c: { x: CW * 0.28, y: 252 }, len: 72, w: 2.4 },
   { c: { x: CW * 0.72, y: 252 }, len: 72, w: -2.4 },
+  // 관문지기 — 구멍 바로 위에서 돌며 막았다 열었다, 다가온 구슬을 쳐올립니다.
+  { c: { x: CW / 2, y: GATE_Y - 26 }, len: 40, w: 2.2 },
 ];
 const spinSeg = (s: Spinner, t: number): Seg => {
   const a = s.w * t;
@@ -103,6 +112,7 @@ function step(balls: Ball[], dt: number, t: number) {
       if (d < rr && d > 0) resolve(b, dx / d, dy / d, rr - d);
     }
     for (const s of SEGS) hitSeg(b, s);
+    for (const s of GATE) hitSeg(b, s);
     for (const { s, seg } of spins) hitSeg(b, seg, (p) => ({ x: -s.w * (p.y - s.c.y), y: s.w * (p.x - s.c.x) }));
     if (b.x < BALL_R) { b.x = BALL_R; b.vx = Math.abs(b.vx) * BOUNCE; }
     if (b.x > CW - BALL_R) { b.x = CW - BALL_R; b.vx = -Math.abs(b.vx) * BOUNCE; }
@@ -250,7 +260,9 @@ export function MarbleRace({ options, busy, onStart, onDone }: {
             <>
               {pegs}
               {SEGS.map((s, i) => segView(s, `s${i}`, "#d9cfc0", 3.5))}
-              {SPINNERS.map((s, i) => segView(spinSeg(s, simT.current / 1000), `sp${i}`, i ? "#e08a63" : C.brick, 5))}
+              {GATE.map((s, i) => segView(s, `g${i}`, C.brick, 4.5))}
+              <Text style={{ position: "absolute", left: 10, top: (GATE[0].a.y - 20) * k, fontFamily: F.mono, fontSize: 9, letterSpacing: 2, color: "#e08a63" }}>마지막 관문</Text>
+              {SPINNERS.map((s, i) => segView(spinSeg(s, simT.current / 1000), `sp${i}`, ["#b4552d", "#e08a63", "#d9a441"][i], 5))}
               {SPINNERS.map((s, i) => (
                 <View key={`spc${i}`} style={{ position: "absolute", left: s.c.x * k - 3, top: s.c.y * k - 3, width: 6, height: 6, borderRadius: 3, backgroundColor: "#fbf3ec" }} />
               ))}
