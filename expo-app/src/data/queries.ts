@@ -33,13 +33,16 @@ export const usePersonalRows = () => {
   return useBookRows(id, ready);
 };
 
+/** 위시 + 그 그룹(이름 · 출처) 한 번에. */
+const WISH_SELECT = "*, group:wish_groups(id, name, source_url, source_kind, source_title, source_author)";
+
 const useBookWishes = (bookId: string | null, ready: boolean) => {
   const ownerId = useSession()?.user.id;
   return useQuery({
     queryKey: ["wishes", bookId, ownerId],
     enabled: ready && !!bookId && !!ownerId,
     queryFn: async () => {
-      return fetchAll<Wish>((from, to) => supabase.from("wishes").select("*").eq("book_id", bookId!)
+      return fetchAll<Wish>((from, to) => supabase.from("wishes").select(WISH_SELECT).eq("book_id", bookId!)
         .order("plan_date", { ascending: true, nullsFirst: false }).order("saved_at", { ascending: false }).order("id").range(from, to));
     },
   });

@@ -1,21 +1,35 @@
-export type SourceKind = "shorts" | "youtube" | "reels" | "instagram" | "tiktok" | "link";
+import { supabase } from "./supabase";
 
-export const SOURCE_KINDS: SourceKind[] = ["shorts", "youtube", "reels", "instagram", "tiktok", "link"];
+export type SourceKind = "shorts" | "youtube" | "reels" | "instagram" | "tiktok" | "blog" | "link";
+
+export const SOURCE_KINDS: SourceKind[] = ["shorts", "youtube", "reels", "instagram", "tiktok", "blog", "link"];
 
 export const SOURCE_LABEL: Record<SourceKind, string> = {
-  shorts: "쇼츠", youtube: "유튜브", reels: "릴스", instagram: "인스타", tiktok: "틱톡", link: "링크",
+  shorts: "쇼츠", youtube: "유튜브", reels: "릴스", instagram: "인스타 게시물", tiktok: "틱톡", blog: "블로그", link: "링크",
 };
 
-/** 링크 카드 머리글 — 「YOUTUBE 쇼츠」 · 「INSTAGRAM 릴스」 … */
+/** 링크 카드 머리글 — 「YOUTUBE 쇼츠」 · 「INSTAGRAM 릴스」 … 블로그는 호스트별로 headOf 가 고릅니다. */
 export const SOURCE_HEAD: Record<SourceKind, string> = {
-  shorts: "YOUTUBE 쇼츠", youtube: "YOUTUBE", reels: "INSTAGRAM 릴스", instagram: "INSTAGRAM", tiktok: "TIKTOK", link: "LINK",
+  shorts: "YOUTUBE 쇼츠", youtube: "YOUTUBE", reels: "INSTAGRAM 릴스", instagram: "INSTAGRAM 게시물", tiktok: "TIKTOK", blog: "BLOG", link: "LINK",
 };
 
 export const isSourceKind = (v: unknown): v is SourceKind => typeof v === "string" && (SOURCE_KINDS as string[]).includes(v);
 
-/** 유튜브 계열은 ▶, 그 밖은 출처 글자 첫 자(인 · 틱 · 링). */
-export const sourceGlyph = (kind: SourceKind | null | undefined) =>
-  kind === "shorts" || kind === "youtube" || !kind ? "▶" : SOURCE_LABEL[kind][0];
+/** 「OO에서 보기」 · 「OO에서 담음」에 쓰는 짧은 이름 — 인스타 게시물만 「인스타」로 줄입니다. */
+export const sourceShort = (kind: SourceKind) => (kind === "instagram" ? "인스타" : SOURCE_LABEL[kind]);
+
+/** 영상(유튜브 · 릴스 · 틱톡)은 ▶, 블로그 · 인스타 게시물 · 링크는 문서 아이콘(SourceIcon). */
+export const sourceIcon = (kind: SourceKind | null | undefined): "play" | "doc" =>
+  !kind || kind === "shorts" || kind === "youtube" || kind === "reels" || kind === "tiktok" ? "play" : "doc";
+
+const BLOG_HEAD = (host: string) =>
+  host.endsWith("naver.com") || host === "naver.me" ? "NAVER 블로그" : host.endsWith("tistory.com") ? "TISTORY" : host === "brunch.co.kr" ? "BRUNCH" : "BLOG";
+
+/** 링크 카드 머리글 — 블로그는 「NAVER 블로그」 · 「TISTORY」 · 「BRUNCH」. */
+export function headOf(url: string, kind: SourceKind): string {
+  if (kind !== "blog") return SOURCE_HEAD[kind];
+  try { return BLOG_HEAD(new URL(url).hostname.replace(/^(www\.|m\.)/, "")); } catch { return SOURCE_HEAD.blog; }
+}
 
 const TRACKING = /^(si|igsh|igshid|feature|pp|fbclid|gclid|utm_.+)$/i;
 
@@ -26,11 +40,12 @@ function kindOf(u: URL): SourceKind {
   if (host === "youtu.be") return "youtube";
   if (host === "instagram.com") return /^\/reels?\//.test(path) ? "reels" : "instagram";
   if (host === "tiktok.com" || host.endsWith(".tiktok.com")) return "tiktok";
+  if (host === "blog.naver.com" || host === "naver.me" || host.endsWith(".tistory.com") || host === "brunch.co.kr") return "blog";
   return "link";
 }
 
-/** 위시 폼의 「링크」가 받는 종류 — 유튜브 · 인스타만. */
-export const isVideoKind = (k: SourceKind) => k === "shorts" || k === "youtube" || k === "reels" || k === "instagram";
+/** 위시 폼의 「링크」가 받는 종류 — 지금은 모두 받습니다(블로그 · 그 밖의 링크까지). */
+export const isAcceptedKind = (k: SourceKind) => isSourceKind(k);
 
 /**
  * 텍스트에서 첫 URL 을 찾아 종류를 붙입니다. URL 이 없으면 null. 추적용 쿼리(?si=, ?igsh=, utm_*)는 지웁니다.
@@ -66,6 +81,30 @@ export async function fetchYoutubeTitle(url: string, signal?: AbortSignal): Prom
     if (!res.ok) return null;
     const j = (await res.json()) as { title?: string; author_name?: string };
     return j.title ? { title: j.title, author: j.author_name ?? "" } : null;
+  } catch {
+    return null;
+  }
+}
+
+/** 출처 띠 — 「블로그에서 담음 · {제목 앞 16자…} · {작성자}」, 제목이 없으면 짧은 주소. 위시 폼 · 그룹 화면이 같이 씁니다. */
+export function sourceStrip(src: { url: string; kind: SourceKind; title?: string | null; author?: string | null }) {
+  const title = src.title ? (src.title.length > 16 ? `${src.title.slice(0, 16)}…` : src.title) : null;
+  return [`${sourceShort(src.kind)}에서 담음`, ...(title ? [title, src.author] : [shortUrl(src.url)])].filter(Boolean).join(" · ");
+}
+
+export type LinkMeta = { title: string; author: string; finalUrl?: string | null };
+
+/**
+ * 원 게시물의 제목 · 작성자 — 유튜브는 oEmbed(앱에서 바로), 블로그 · 링크는 Edge Function link-meta.
+ * 인스타 · 틱톡은 가져오지 않습니다(HANDOFF-wish-group §4). 실패하면 null — 화면은 짧은 주소로 대신 보여 줍니다.
+ */
+export async function fetchLinkMeta(url: string, kind: SourceKind, signal?: AbortSignal): Promise<LinkMeta | null> {
+  if (kind === "shorts" || kind === "youtube") return fetchYoutubeTitle(url, signal);
+  if (kind !== "blog" && kind !== "link") return null;
+  try {
+    const { data, error } = await supabase.functions.invoke<{ title: string | null; author: string | null; finalUrl: string | null }>("link-meta", { body: { url } });
+    if (signal?.aborted || error || !data?.title) return null;
+    return { title: data.title, author: data.author ?? "", finalUrl: data.finalUrl };
   } catch {
     return null;
   }

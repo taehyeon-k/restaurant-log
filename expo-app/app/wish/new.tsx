@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from "react";
 import { Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinkIcon, PhotoIcon } from "@/components/icons";
+import { SourceIcon } from "@/components/SourceIcon";
 import { Button, Chip, Eyebrow, fieldStyle } from "@/components/ui";
 import { refreshAll } from "@/data/invalidate";
 import { useActiveBook } from "@/data/books";
@@ -17,7 +18,7 @@ import { askWishPermissions } from "@/features/notify/geofence";
 import { forwardGeocode, searchFoodPlaces, type FoodPlace } from "@/lib/geocode";
 import { pickAlbumUris, removePhotoObjects, uploadAlbumPhoto } from "@/lib/photos";
 import { SignedImage } from "@/lib/signedPhoto";
-import { isSourceKind, isVideoKind, parseSourceLink, shortUrl, SOURCE_LABEL, sourceGlyph, type SourceKind } from "@/lib/sourceLink";
+import { isAcceptedKind, isSourceKind, parseSourceLink, sourceStrip, type SourceKind } from "@/lib/sourceLink";
 import { supabase } from "@/lib/supabase";
 import { ALL_CATEGORIES, matchWish } from "@/lib/types";
 import { C, F, SHADOW } from "@/theme";
@@ -32,7 +33,7 @@ export default function WishForm() {
     /** 추천 카드의 「+ 위시에 담기」에서 왔으면 — 저장이 끝난 순간에만 wish_saved 로그(폼을 연 것은 wish_start). */
     rec_session?: string; rec_key?: string; rec_pos?: string;
     /** 링크로 담기(wish/link)에서 고른 가게면 — 출처 띠로 받습니다. */
-    source_url?: string; source_kind?: string;
+    source_url?: string; source_kind?: string; source_title?: string; source_author?: string;
     /** 공유 시트로 받은 글(_layout) — 폼이 열리자마자 링크 붙여넣기처럼 처리합니다. */
     share?: string;
   }>();
@@ -58,8 +59,10 @@ export default function WishForm() {
   const [spot, setSpot] = useState<{ lat: number; lng: number } | null>(
     wish?.lat != null && wish?.lng != null ? { lat: wish.lat, lng: wish.lng } : p.lat && p.lng ? { lat: Number(p.lat), lng: Number(p.lng) } : null
   );
-  const [source, setSource] = useState<{ url: string; kind: SourceKind } | null>(
-    isNew && p.source_url ? { url: p.source_url, kind: isSourceKind(p.source_kind) ? p.source_kind : "link" } : null
+  const [source, setSource] = useState<{ url: string; kind: SourceKind; title?: string | null; author?: string | null } | null>(
+    isNew && p.source_url
+      ? { url: p.source_url, kind: isSourceKind(p.source_kind) ? p.source_kind : "link", title: p.source_title ?? null, author: p.source_author ?? null }
+      : null
   );
   // 캡처 한 장 — 담은 사람만 봅니다. 고른 직후엔 로컬 주소(local), 저장된 것은 버킷 경로(path).
   const [capture, setCapture] = useState<{ path?: string; local?: string } | null>(wish?.capture_path ? { path: wish.capture_path } : null);
@@ -121,14 +124,14 @@ export default function WishForm() {
     setLinkText(text);
     if (!text.trim()) return setLinkError(false);
     const link = parseSourceLink(text);
-    if (!link || !isVideoKind(link.kind)) {
+    if (!link || !isAcceptedKind(link.kind)) {
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
       return setLinkError(true);
     }
     setLinkError(false);
     setLinkOpen(false);
     setLinkText("");
-    router.push({ pathname: "/wish/link", params: { url: link.url, kind: link.kind, from: "form" } });
+    router.push({ pathname: "/wish/link", params: { url: link.url, kind: link.kind, from: "form", ...(note.trim() ? { note: "1" } : {}) } });
   }
 
   async function pasteLink() {
@@ -160,7 +163,7 @@ export default function WishForm() {
     setWhereText(linkPick.address);
     setSpot({ lat: linkPick.lat, lng: linkPick.lng });
     if (linkPick.category && ALL_CATEGORIES.includes(linkPick.category)) setCategory(linkPick.category);
-    setSource({ url: linkPick.url, kind: linkPick.kind });
+    setSource({ url: linkPick.url, kind: linkPick.kind, title: linkPick.title ?? null, author: linkPick.author ?? null });
     setState({ linkPick: null });
   }, [linkPick]);
 
@@ -178,7 +181,7 @@ export default function WishForm() {
       if (dup) {
         // 그 위시에 출처가 비어 있으면 이번 링크로 채웁니다.
         if (source && !dup.source_url) {
-          await supabase.from("wishes").update({ source_url: source.url, source_kind: source.kind }).eq("id", dup.id);
+          await supabase.from("wishes").update({ source_url: source.url, source_kind: source.kind, source_title: source.title ?? null, source_author: source.author ?? null }).eq("id", dup.id);
           await refreshAll(qc);
         }
         setSaving(false);
@@ -200,7 +203,7 @@ export default function WishForm() {
     const payload = {
       name: cleanName, where_text: cleanWhere || null, category: category || null, note: note.trim() || null,
       plan_date: planDate || null, notify, lat: at?.lat ?? null, lng: at?.lng ?? null, capture_path: capturePath,
-      ...(isNew ? { source_url: source?.url ?? null, source_kind: source?.kind ?? null } : {}),
+      ...(isNew ? { source_url: source?.url ?? null, source_kind: source?.kind ?? null, source_title: source?.title ?? null, source_author: source?.author ?? null } : {}),
     };
     let err;
     if (isNew) {
@@ -247,7 +250,7 @@ export default function WishForm() {
             <Pressable onPress={() => setLinkOpen(true)} accessibilityLabel="링크" style={s.dashed}>
               <LinkIcon size={20} stroke={C.brick} strokeWidth={1.8} />
               <Text style={{ flex: 1, fontFamily: F.sansMd, fontSize: 13.5, color: C.ink }}>링크</Text>
-              <Text style={{ fontFamily: F.mono, fontSize: 10.5, color: C.faint }}>릴스 · 쇼츠</Text>
+              <Text style={{ fontFamily: F.mono, fontSize: 10.5, color: C.faint }}>릴스 · 쇼츠 · 블로그</Text>
             </Pressable>
           )}
           {isNew && !source && linkOpen && (
@@ -269,17 +272,15 @@ export default function WishForm() {
                 </Pressable>
               </View>
               {linkError && (
-                <Text style={{ marginTop: 6, marginLeft: 4, fontFamily: F.sans, fontSize: 11.5, color: C.brick }}>유튜브나 인스타그램 링크를 넣어주세요</Text>
+                <Text style={{ marginTop: 6, marginLeft: 4, fontFamily: F.sans, fontSize: 11.5, color: C.brick }}>링크를 찾지 못했어요</Text>
               )}
             </View>
           )}
           {isNew && source && (
             <View style={{ borderRadius: 14, borderWidth: 1, borderColor: "#e0c3b1", backgroundColor: "#f9efe8", paddingVertical: 10, paddingHorizontal: 14, flexDirection: "row", alignItems: "center", gap: 10 }}>
-              <View style={{ width: 26, height: 26, borderRadius: 8, backgroundColor: C.ink, alignItems: "center", justifyContent: "center" }}>
-                <Text style={{ fontFamily: F.sansMd, fontSize: sourceGlyph(source.kind) === "▶" ? 10 : 11, color: "#fff" }}>{sourceGlyph(source.kind)}</Text>
-              </View>
+              <SourceIcon kind={source.kind} size={26} />
               <Text numberOfLines={1} style={{ flex: 1, fontFamily: F.sans, fontSize: 12, color: "#8f4323" }}>
-                {SOURCE_LABEL[source.kind]}에서 담음 · {shortUrl(source.url)}
+                {sourceStrip(source)}
               </Text>
               <Pressable onPress={() => setSource(null)} accessibilityLabel="출처 지우기" hitSlop={14}>
                 <Text style={{ fontSize: 11, color: "#a29a8c" }}>✕</Text>

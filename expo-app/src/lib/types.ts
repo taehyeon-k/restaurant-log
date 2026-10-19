@@ -49,7 +49,7 @@ export type Restaurant = {
   /** 사진만 찍고 본문을 아직 쓰지 않은 기록 — 보관함에만 보입니다 */
   pending: boolean;
   /** 위시에서 온 기록임을 남기는 자취. 위시가 아니었으면 null. */
-  from_wish: { saved_at: string; days: number; planned: boolean; source_kind?: SourceKind | null } | null;
+  from_wish: { saved_at: string; days: number; planned: boolean; source_kind?: SourceKind | null; group_name?: string | null } | null;
 };
 
 /** 가고싶다(위시) — 아직 가지 않은 곳. restaurants 와 달리 인증·별점·사진이 없습니다. */
@@ -72,6 +72,23 @@ export type Wish = {
   source_kind?: SourceKind | null;
   /** 앨범에서 고른 캡처 한 장(버킷 경로) — 담은 사람만 봅니다. 공유 · 커뮤니티에 내보내지 않습니다. */
   capture_path?: string | null;
+  /** 원 게시물의 제목 · 작성자(유튜브 · 블로그만, HANDOFF-wish-group §4). */
+  source_title?: string | null;
+  source_author?: string | null;
+  /** 링크 하나로 여러 곳을 담았으면 그 그룹 — group_pos 는 그룹 안 순서(1부터). group 은 useWishes 가 같이 읽어 옵니다. */
+  group_id?: string | null;
+  group_pos?: number | null;
+  group?: WishGroup | null;
+};
+
+/** 위시 그룹(wish_groups) — 게시물 하나에 나온 가게 여러 곳. */
+export type WishGroup = {
+  id: string;
+  name: string;
+  source_url: string | null;
+  source_kind: SourceKind | null;
+  source_title: string | null;
+  source_author: string | null;
 };
 
 export const CATEGORIES: Record<Kind, string[]> = {
@@ -236,7 +253,7 @@ export const wishMetInfo = (wish: Wish, visitedAt: string) => {
     0,
     Math.round((new Date(visitedAt).getTime() - new Date(savedDate).getTime()) / 86400000)
   );
-  return { saved_at: savedDate, days, planned: !!wish.plan_date, source_kind: wish.source_kind ?? null };
+  return { saved_at: savedDate, days, planned: !!wish.plan_date, source_kind: wish.source_kind ?? null, group_name: wish.group?.name ?? null };
 };
 
 /** 그 기록의 대표사진 주소. 없으면 null. */

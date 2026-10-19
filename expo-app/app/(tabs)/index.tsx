@@ -77,7 +77,7 @@ export default function MapTab() {
   const router = useRouter();
   const { data: allRows = [] } = useRows();
   const { data: wishes = [] } = useWishes();
-  const { kind, ghost, mapSegment } = useAppState();
+  const { kind, ghost, mapSegment, wishToast, openWishGroup } = useAppState();
 
   // 다른 화면의 「위시에 담기」 등이 지도를 segment=wish 로 열 수 있습니다.
   const { segment } = useLocalSearchParams<{ segment?: string }>();
@@ -122,6 +122,17 @@ export default function MapTab() {
     return sheetSnaps.reduce((best, y, i) => (Math.abs(y - target) < Math.abs(sheetSnaps[best] - target) ? i : best), 0);
   }, [sheetSnaps, layoutH, windowH]);
   const sheetIndex = useRef(sheetStartIndex);
+
+  // 그룹으로 담고 돌아오면(wish/group) — 알림을 잠깐 띄우고, 펼친 그룹이 보이게 시트를 올립니다.
+  useEffect(() => {
+    if (!wishToast) return;
+    const t = setTimeout(() => setState({ wishToast: null }), 2600);
+    return () => clearTimeout(t);
+  }, [wishToast]);
+  useEffect(() => {
+    // 시트가 거의 내려가 있을 때만 — 이미 올려 둔 높이는 그대로.
+    if (openWishGroup && sheetIndex.current <= 3) sheetRef.current?.snapToPosition("55%");
+  }, [openWishGroup]);
 
   // 지도 위 단추들은 시트 윗변을 따라 오르내립니다. 검색줄 위로는 올라가지 않습니다.
   const minTop = insets.top + 8 + 46 + 12;
@@ -721,6 +732,12 @@ export default function MapTab() {
       {!isCouple && <RecapInvite />}
 
       <BookDrawer visible={drawerOpen} onClose={() => setDrawerOpen(false)} />
+
+      {wishToast && (
+        <View pointerEvents="none" style={{ position: "absolute", alignSelf: "center", top: insets.top + 64, borderRadius: 16, backgroundColor: "rgba(23,22,20,.85)", paddingVertical: 10, paddingHorizontal: 16 }}>
+          <Text style={{ fontFamily: F.sans, fontSize: 12.5, color: C.card }}>{wishToast}</Text>
+        </View>
+      )}
     </View>
   );
 }

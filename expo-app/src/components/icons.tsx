@@ -261,3 +261,11 @@ export const PhotoIcon = ({ size = 20, stroke = "#b4552d", strokeWidth = 1.8 }: 
     <Path d="M20.5 15.5l-4.6-4.6a1.2 1.2 0 0 0-1.7 0L6.5 18.6" />
   </Svg>
 );
+
+/** 문서 — 흰 선 둥근 네모 + 가로줄 3개(HANDOFF-wish-group 시안 1). 블로그 · 인스타 게시물 · 링크. */
+export const DocIcon = ({ size = 18, stroke = "#ffffff", strokeWidth = 1.7 }: P) => (
+  <Svg {...base(size, stroke, strokeWidth)}>
+    <Rect x="4.5" y="3.5" width="15" height="17" rx="2.6" />
+    <Path d="M8.3 8.5h7.4M8.3 12h7.4M8.3 15.5h4.6" />
+  </Svg>
+);

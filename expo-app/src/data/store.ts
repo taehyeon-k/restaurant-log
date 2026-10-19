@@ -18,10 +18,21 @@ export type BoardTab = "all" | "free" | "theme" | "food" | "cafe" | "course";
 /** 링크로 담기(wish/link)를 위시 폼에서 열었을 때 고른 가게 + 출처 — 폼이 읽고 비웁니다. */
 export type LinkPick = {
   name: string; address: string; category: string | null; lat: number; lng: number; url: string; kind: SourceKind;
+  title?: string | null; author?: string | null;
+} | null;
+
+/** 「어느 가게인가요」에서 2곳 넘게 고른 것 — 그룹 이름 화면(wish/group)이 읽습니다(HANDOFF-wish-group §5-2). */
+export type GroupDraft = {
+  places: { name: string; address: string; category: string | null; lat: number; lng: number }[];
+  url: string; kind: SourceKind; title: string | null; author: string | null;
 } | null;
 
 type State = {
-  kind: Kind; ghost: Ghost; linkPick: LinkPick;
+  kind: Kind; ghost: Ghost; linkPick: LinkPick; groupDraft: GroupDraft;
+  /** 방금 담은 그룹 — 지도 시트 위시리스트가 펼친 채로 보여 주고 비웁니다. */
+  openWishGroup: string | null;
+  /** 지도 화면에 한 번 띄울 알림(「망원 한 바퀴 · 3곳을 담았어요」). */
+  wishToast: string | null;
   /** 공유 시트로 받은 글(링크가 섞여 있을 수 있음) — 로그인이 끝나면 위시 폼(wish/new?share=)으로 이어갑니다. */
   pendingShare: string | null;
   mapSegment: MapSegment; communityTab: CommunityTab; boardTab: BoardTab;
@@ -47,7 +58,7 @@ export type RecShown = { sessionId: string; key: string; position: number; name:
 export type RecCourse = { id: string; date: string; places: { placeKey: string; name: string }[] };
 export type RecHere = { lat: number; lng: number; name: string | null; fallback: boolean };
 let state: State = {
-  kind: "restaurant", ghost: null, linkPick: null, pendingShare: null,
+  kind: "restaurant", ghost: null, linkPick: null, groupDraft: null, openWishGroup: null, wishToast: null, pendingShare: null,
   mapSegment: "records", communityTab: "friends", boardTab: "all", communitySeenSince: null,
   recFilter: null, recHeading: null, recCourse: null, recHere: null, recPlace: null, recAt: null, recShown: [],
 };

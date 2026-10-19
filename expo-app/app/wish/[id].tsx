@@ -13,7 +13,7 @@ import { setState } from "@/data/store";
 import { removePhotoObjects } from "@/lib/photos";
 import { SignedImage } from "@/lib/signedPhoto";
 import { supabase } from "@/lib/supabase";
-import { SOURCE_LABEL } from "@/lib/sourceLink";
+import { SOURCE_LABEL, sourceShort } from "@/lib/sourceLink";
 import { dottedDate, wishKind } from "@/lib/types";
 import { firstUrl, noteWithoutUrl } from "@/lib/wishes";
 import { C, F, SHADOW } from "@/theme";
@@ -36,12 +36,23 @@ export default function WishSheetRoute() {
   const body = noteWithoutUrl(wish.note, noteUrl);
   // 출처 종류를 아는 위시만 태그 — 메모 URL 만 있는 옛 위시는 태그 없이 「원본 보기」.
   const sourceLabel = wish.source_url && wish.source_kind ? SOURCE_LABEL[wish.source_kind] : null;
+  const viewLabel = wish.source_url && wish.source_kind ? sourceShort(wish.source_kind) : null;
+  // 링크 하나로 담은 그룹이면 「망원 한 바퀴 · 2/3」.
+  const groupSize = wish.group_id ? wishes.filter((w) => w.group_id === wish.group_id).length : 0;
+  const groupLine = wish.group && groupSize > 1 ? `${wish.group.name} · ${wish.group_pos ?? "?"}/${groupSize}` : null;
   // 캡처는 담은 사람에게만 보입니다.
   const capture = wish.capture_path && (!isCouple || wish.user_id === me?.userId) ? wish.capture_path : null;
 
   async function toggleNotify() {
     setBusy(true);
     await supabase.from("wishes").update({ notify: !wish!.notify }).eq("id", wish!.id);
+    setBusy(false);
+    refreshAll(qc);
+  }
+
+  async function leaveGroup() {
+    setBusy(true);
+    await supabase.from("wishes").update({ group_id: null, group_pos: null }).eq("id", wish!.id);
     setBusy(false);
     refreshAll(qc);
   }
@@ -61,7 +72,8 @@ export default function WishSheetRoute() {
           <BookmarkIcon size={15} fill={C.brick} stroke={C.brick} />
           <Text style={{ fontFamily: F.mono, fontSize: 9.5, letterSpacing: 1.8, color: C.brick }}>위시리스트</Text>
         </View>
-        <Text style={{ marginTop: 6, fontFamily: F.serif, fontSize: 22, color: C.ink }}>{wish.name}</Text>
+        {groupLine && <Text numberOfLines={1} style={{ marginTop: 8, fontFamily: F.mono, fontSize: 10, letterSpacing: 0.6, color: C.faint }}>{groupLine}</Text>}
+        <Text style={{ marginTop: groupLine ? 3 : 6, fontFamily: F.serif, fontSize: 22, color: C.ink }}>{wish.name}</Text>
         <Text style={{ marginTop: 4, fontFamily: F.sans, fontSize: 11.5, color: C.faint }}>{[wish.category, wish.where_text].filter(Boolean).join(" · ")}</Text>
         {sourceLabel && (
           <Text style={{ marginTop: 10, alignSelf: "flex-start", borderRadius: 9, backgroundColor: "#efebe2", paddingHorizontal: 10, paddingVertical: 4, fontFamily: F.mono, fontSize: 10.5, color: "#4d4842", overflow: "hidden" }}>
@@ -94,7 +106,7 @@ export default function WishSheetRoute() {
           </Pressable>
           {url && (
             <Pressable onPress={() => Linking.openURL(url)} accessibilityLabel="출처 열기" style={{ height: 44, borderRadius: 22, borderWidth: 1, borderColor: C.line, backgroundColor: C.card, paddingHorizontal: 13, flexDirection: "row", alignItems: "center", gap: 5 }}>
-              <Text style={{ fontFamily: F.sans, fontSize: 12, color: "#4d4842" }}>{sourceLabel ? `${sourceLabel}에서 보기` : "원본 보기"}</Text>
+              <Text style={{ fontFamily: F.sans, fontSize: 12, color: "#4d4842" }}>{viewLabel ? `${viewLabel}에서 보기` : "원본 보기"}</Text>
               <ExternalIcon size={13} stroke="#4d4842" />
             </Pressable>
           )}
@@ -103,6 +115,12 @@ export default function WishSheetRoute() {
         <View style={{ marginTop: 12, flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 4 }}>
           <Pressable onPress={() => router.replace({ pathname: "/wish/new", params: { id: wish.id } })} style={{ padding: 6 }}><Text style={{ fontFamily: F.sans, fontSize: 12, color: C.faint }}>수정</Text></Pressable>
           <Text style={{ color: "#d8d3c8" }}>·</Text>
+          {wish.group_id && (
+            <>
+              <Pressable onPress={leaveGroup} disabled={busy} style={{ padding: 6 }}><Text style={{ fontFamily: F.sans, fontSize: 12, color: C.faint }}>그룹에서 빼기</Text></Pressable>
+              <Text style={{ color: "#d8d3c8" }}>·</Text>
+            </>
+          )}
           <Pressable onPress={remove} disabled={busy} style={{ padding: 6 }}><Text style={{ fontFamily: F.sans, fontSize: 12, color: C.faint }}>삭제</Text></Pressable>
         </View>
       </View>
