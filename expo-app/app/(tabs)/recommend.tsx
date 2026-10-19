@@ -56,6 +56,7 @@ export default function RecommendTab() {
   const [pointSheet, setPointSheet] = useState(false);
   // 지도를 만지는 동안은 화면 세로 스크롤을 멈춥니다 — 지도 끌기 · 확대가 스크롤에 먹히지 않게.
   const [mapTouch, setMapTouch] = useState(false);
+  const scrollRef = useRef<ScrollView>(null);
   const [clock, setClock] = useState(() => new Date());
   useEffect(() => {
     const t = setInterval(() => setClock(new Date()), 30_000);
@@ -183,6 +184,7 @@ export default function RecommendTab() {
       </View>
 
       <ScrollView
+        ref={scrollRef}
         style={{ flex: 1 }}
         contentContainerStyle={{ flexGrow: 1, paddingTop: 14, paddingHorizontal: 22, paddingBottom: TAB_BAR_H + insets.bottom + 18 }}
         showsVerticalScrollIndicator={false}
@@ -205,6 +207,7 @@ export default function RecommendTab() {
             onRefresh={() => result && setShown((s) => [...s, result.picks.map((p) => p.c.key)])}
             onMeal={setMeal}
             onRetry={() => { void nowQ.refetch(); void kakaoNear.refetch(); }}
+            onReveal={() => scrollRef.current?.scrollTo({ y: 0, animated: true })}
           />
         ) : (
           <BrowseMode courses={courses} tours={tours} revisits={revisits} />

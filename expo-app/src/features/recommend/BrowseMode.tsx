@@ -46,9 +46,6 @@ export function BrowseMode({ courses, tours, revisits }: { courses: Course[]; to
           </Text>
         </View>
       )}
-      <Text style={{ fontFamily: F.sans, fontSize: 11, lineHeight: 17, color: C.faint }}>
-        추천 · 코스 · 투어 후보는 인증 데이터로만 고르고, 유료 입점을 받지 않습니다.
-      </Text>
     </View>
   );
 }

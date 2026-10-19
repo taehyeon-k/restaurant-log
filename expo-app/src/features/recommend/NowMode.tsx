@@ -13,6 +13,7 @@ import type { RecFilter } from "@/lib/recommend";
 import { C, F } from "@/theme";
 import { openDirections } from "./api";
 import { logRec, rememberShown, type RecSession } from "./log";
+import { Roulette } from "./Roulette";
 import { HereLegend, HereMarker, NumberMarker, REC } from "./ui";
 
 const MAP_H = 270;
@@ -31,10 +32,10 @@ function regionAround(lat: number, lng: number, radius: number) {
 /**
  * 「지금 뭐 먹지」(§5, 시안 5a) — 필터 줄 + 카드 한 장(위 지도 · 아래 가게 설명 가로 슬라이드).
  * 5곳은 lib/rec/pipeline.ts(hybrid-v3)가 고릅니다: 둘레 후보 → 취향 · 거리 · 시간대 · 위시 · 새로움 점수 → MMR 다양성.
- * 「다시 추천」은 앞서 보여 준 곳을 빼고 다음으로 좋은 5곳을 고릅니다.
+ * 「다시 추천」은 앞서 보여 준 곳을 빼고 다음으로 좋은 5곳을 고릅니다. 그 밑은 룰렛(가게 · 카테고리).
  */
 export function NowMode({
-  here, result, session, loading, error, kakao, filter, slot, pointLabel, onMapTouch, onOpenFilter, onChangeFilter, onRefresh, onMeal, onRetry,
+  here, result, session, loading, error, kakao, filter, slot, pointLabel, onMapTouch, onOpenFilter, onChangeFilter, onRefresh, onMeal, onRetry, onReveal,
 }: {
   here: RecHere | null; result: RecResult | null; session: RecSession | null; loading: boolean; error: boolean;
   /** 카카오 후보를 받았는지 — unavailable 이면 Dinary 기록 · 위시만으로 고른 것. */
@@ -44,6 +45,8 @@ export function NowMode({
   onMapTouch: (touching: boolean) => void;
   onOpenFilter: () => void; onChangeFilter: (f: RecFilter) => void;
   onRefresh: () => void; onMeal: (slot: "lunch" | "dinner") => void; onRetry: () => void;
+  /** 룰렛에서 고른 뒤 — 부모가 카드가 보이게 위로 올립니다. */
+  onReveal: () => void;
 }) {
   const picks = result?.picks ?? [];
   const [index, setIndex] = useState(0);
@@ -152,10 +155,13 @@ export function NowMode({
           <Text style={{ fontFamily: F.sansMd, fontSize: 13, color: C.brick }}>다시 추천</Text>
         </Pressable>
       )}
-      {picks.length > 0 && (
-        <Text style={{ marginTop: 10, textAlign: "center", fontFamily: F.sans, fontSize: 10.5, lineHeight: 16, color: C.faint }}>
-          거리는 직선거리예요. 영업시간 · 메뉴는 가기 전에 카카오맵에서 확인해 주세요.
-        </Text>
+      {!!here && !loading && (
+        <Roulette
+          picks={picks}
+          exclude={filter.exc}
+          onPlace={(i) => { setIndex(i); onReveal(); }}
+          onCategory={(cat) => { onChangeFilter({ inc: [cat], exc: filter.exc.filter((x) => x !== cat) }); onReveal(); }}
+        />
       )}
     </View>
   );
