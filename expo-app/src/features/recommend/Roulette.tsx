@@ -7,6 +7,7 @@ import { REC_CATEGORIES, type RecCategory } from "@/lib/recommend";
 import type { Scored } from "@/lib/rec/score";
 import { C, F } from "@/theme";
 import { Pachinko } from "./Pachinko";
+import { Pinball } from "./Pinball";
 import { REC, SectionHead } from "./ui";
 
 const SIZE = 252;
@@ -38,10 +39,11 @@ const CUSTOM_KEY = "rec.roulette.custom";
 type Tab = "place" | "category" | "custom";
 type Option = { key: string; label: string };
 
-type Mode = "wheel" | "pachinko";
+type Mode = "wheel" | "pachinko" | "pinball";
 const MODES: { id: Mode; label: string }[] = [
   { id: "wheel", label: "룰렛" },
   { id: "pachinko", label: "파친코" },
+  { id: "pinball", label: "핀볼" },
 ];
 
 const TABS: { id: Tab; label: string }[] = [
@@ -71,7 +73,7 @@ function slicePath(a0: number, a1: number, r: number) {
 }
 
 /**
- * 「결정을 하지 못하시겠다면?」 — 돌려서 정하는 룰렛, 또는 공을 떨어뜨리는 파친코(Pachinko.tsx). 추천된 가게 · 카테고리 · 직접 선택 셋 중에서 고르고,
+ * 「결정을 하지 못하시겠다면?」 — 돌려서 정하는 룰렛, 공을 떨어뜨리는 파친코(Pachinko.tsx), 쏘아 올리는 핀볼(Pinball.tsx). 추천된 가게 · 카테고리 · 직접 선택 셋 중에서 고르고,
  * 칸 옆 − 로 빼고, + 로 원하는 가게 · 카테고리 · 메뉴를 적어 넣습니다. 카테고리가 나오면 그 종류로 다시 추천받을 수 있습니다. 직접 입력한 것은 기기에 남깁니다.
  */
 export function Roulette({ picks, exclude, onPlace, onCategory }: {
@@ -171,10 +173,10 @@ export function Roulette({ picks, exclude, onPlace, onCategory }: {
 
   return (
     <View style={{ marginTop: 34 }}>
-      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+      <View>
         <SectionHead title="결정을 하지 못하시겠다면?" />
-        {/* 룰렛 · 파친코 */}
-        <View style={{ flexDirection: "row", gap: 4 }}>
+        {/* 룰렛 · 파친코 · 핀볼 */}
+        <View style={{ marginTop: 10, flexDirection: "row", gap: 6 }}>
           {MODES.map((m) => {
             const on = mode === m.id;
             return (
@@ -184,7 +186,7 @@ export function Roulette({ picks, exclude, onPlace, onCategory }: {
                 onPress={() => { if (!on) { Haptics.selectionAsync(); setMode(m.id); setWon(null); } }}
                 accessibilityRole="tab"
                 accessibilityState={{ selected: on }}
-                style={{ height: 28, borderRadius: 14, paddingHorizontal: 11, justifyContent: "center", borderWidth: 1, borderColor: on ? C.brick : C.lineSoft, backgroundColor: on ? C.brickSoft : "transparent" }}
+                style={{ height: 30, borderRadius: 15, paddingHorizontal: 13, justifyContent: "center", borderWidth: 1, borderColor: on ? C.brick : C.lineSoft, backgroundColor: on ? C.brickSoft : "transparent" }}
               >
                 <Text style={{ fontFamily: on ? F.sansMd : F.sans, fontSize: 11.5, color: on ? C.brick : C.muted }}>{m.label}</Text>
               </Pressable>
@@ -262,7 +264,17 @@ export function Roulette({ picks, exclude, onPlace, onCategory }: {
           </View>
         )}
 
-        {mode === "pachinko" ? (
+        {mode === "pinball" ? (
+          <View style={{ marginTop: 22 }}>
+            <Pinball
+              options={live}
+              tones={fills}
+              busy={spinning}
+              onStart={() => { setWon(null); setSpinning(true); }}
+              onDone={(o) => { setSpinning(false); setWon(o); }}
+            />
+          </View>
+        ) : mode === "pachinko" ? (
           <View style={{ marginTop: 22 }}>
             <Pachinko
               options={live}
@@ -346,7 +358,7 @@ export function Roulette({ picks, exclude, onPlace, onCategory }: {
               )}
             </View>
           ) : (
-            <Text style={{ fontFamily: F.sans, fontSize: 12, color: C.faint }}>{mode === "wheel" ? "가운데를 눌러 돌려 보세요" : "공을 넣어 보세요"}</Text>
+            <Text style={{ fontFamily: F.sans, fontSize: 12, color: C.faint }}>{mode === "wheel" ? "가운데를 눌러 돌려 보세요" : mode === "pachinko" ? "공을 넣어 보세요" : "공을 쏘아 보세요"}</Text>
           )}
         </View>
       </View>
