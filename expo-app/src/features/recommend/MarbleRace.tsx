@@ -261,7 +261,6 @@ export function MarbleRace({ options, busy, onStart, onDone }: {
               {pegs}
               {SEGS.map((s, i) => segView(s, `s${i}`, "#d9cfc0", 3.5))}
               {GATE.map((s, i) => segView(s, `g${i}`, C.brick, 4.5))}
-              <Text style={{ position: "absolute", left: 10, top: (GATE[0].a.y - 20) * k, fontFamily: F.mono, fontSize: 9, letterSpacing: 2, color: "#e08a63" }}>마지막 관문</Text>
               {SPINNERS.map((s, i) => segView(spinSeg(s, simT.current / 1000), `sp${i}`, ["#b4552d", "#e08a63", "#d9a441"][i], 5))}
               {SPINNERS.map((s, i) => (
                 <View key={`spc${i}`} style={{ position: "absolute", left: s.c.x * k - 3, top: s.c.y * k - 3, width: 6, height: 6, borderRadius: 3, backgroundColor: "#fbf3ec" }} />
