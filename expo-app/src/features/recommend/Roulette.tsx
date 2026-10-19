@@ -6,6 +6,7 @@ import Svg, { Circle, G, Line, Path, Text as SvgText } from "react-native-svg";
 import { REC_CATEGORIES, type RecCategory } from "@/lib/recommend";
 import type { Scored } from "@/lib/rec/score";
 import { C, F } from "@/theme";
+import { MarbleRace } from "./MarbleRace";
 import { Pachinko } from "./Pachinko";
 import { Pinball } from "./Pinball";
 import { REC, SectionHead } from "./ui";
@@ -39,11 +40,12 @@ const CUSTOM_KEY = "rec.roulette.custom";
 type Tab = "place" | "category" | "custom";
 type Option = { key: string; label: string };
 
-type Mode = "wheel" | "pachinko" | "pinball";
+type Mode = "wheel" | "pachinko" | "pinball" | "marble";
 const MODES: { id: Mode; label: string }[] = [
   { id: "wheel", label: "룰렛" },
   { id: "pachinko", label: "파친코" },
   { id: "pinball", label: "핀볼" },
+  { id: "marble", label: "구슬 경주" },
 ];
 
 const TABS: { id: Tab; label: string }[] = [
@@ -73,7 +75,7 @@ function slicePath(a0: number, a1: number, r: number) {
 }
 
 /**
- * 「결정을 하지 못하시겠다면?」 — 돌려서 정하는 룰렛, 공을 떨어뜨리는 파친코(Pachinko.tsx), 쏘아 올리는 핀볼(Pinball.tsx). 추천된 가게 · 카테고리 · 직접 선택 셋 중에서 고르고,
+ * 「결정을 하지 못하시겠다면?」 — 돌려서 정하는 룰렛, 공을 떨어뜨리는 파친코(Pachinko.tsx), 쏘아 올리는 핀볼(Pinball.tsx), 먼저 들어오면 이기는 구슬 경주(MarbleRace.tsx). 추천된 가게 · 카테고리 · 직접 선택 셋 중에서 고르고,
  * 칸 옆 − 로 빼고, + 로 원하는 가게 · 카테고리 · 메뉴를 적어 넣습니다. 카테고리가 나오면 그 종류로 다시 추천받을 수 있습니다. 직접 입력한 것은 기기에 남깁니다.
  */
 export function Roulette({ picks, exclude, onPlace, onCategory }: {
@@ -264,7 +266,16 @@ export function Roulette({ picks, exclude, onPlace, onCategory }: {
           </View>
         )}
 
-        {mode === "pinball" ? (
+        {mode === "marble" ? (
+          <View style={{ marginTop: 22 }}>
+            <MarbleRace
+              options={live}
+              busy={spinning}
+              onStart={() => { setWon(null); setSpinning(true); }}
+              onDone={(o) => { setSpinning(false); setWon(o); }}
+            />
+          </View>
+        ) : mode === "pinball" ? (
           <View style={{ marginTop: 22 }}>
             <Pinball
               options={live}
@@ -358,7 +369,7 @@ export function Roulette({ picks, exclude, onPlace, onCategory }: {
               )}
             </View>
           ) : (
-            <Text style={{ fontFamily: F.sans, fontSize: 12, color: C.faint }}>{mode === "wheel" ? "가운데를 눌러 돌려 보세요" : mode === "pachinko" ? "공을 넣어 보세요" : "공을 쏘아 보세요"}</Text>
+            <Text style={{ fontFamily: F.sans, fontSize: 12, color: C.faint }}>{mode === "wheel" ? "가운데를 눌러 돌려 보세요" : mode === "pachinko" ? "공을 넣어 보세요" : mode === "pinball" ? "공을 쏘아 보세요" : "먼저 들어온 구슬이 이겨요"}</Text>
           )}
         </View>
       </View>
