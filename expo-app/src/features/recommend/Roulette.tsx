@@ -6,6 +6,7 @@ import Svg, { Circle, G, Line, Path, Text as SvgText } from "react-native-svg";
 import { REC_CATEGORIES, type RecCategory } from "@/lib/recommend";
 import type { Scored } from "@/lib/rec/score";
 import { C, F } from "@/theme";
+import { Pachinko } from "./Pachinko";
 import { REC, SectionHead } from "./ui";
 
 const SIZE = 252;
@@ -37,6 +38,12 @@ const CUSTOM_KEY = "rec.roulette.custom";
 type Tab = "place" | "category" | "custom";
 type Option = { key: string; label: string };
 
+type Mode = "wheel" | "pachinko";
+const MODES: { id: Mode; label: string }[] = [
+  { id: "wheel", label: "룰렛" },
+  { id: "pachinko", label: "파친코" },
+];
+
 const TABS: { id: Tab; label: string }[] = [
   { id: "place", label: "추천된 가게" },
   { id: "category", label: "카테고리" },
@@ -64,13 +71,14 @@ function slicePath(a0: number, a1: number, r: number) {
 }
 
 /**
- * 「결정을 하지 못하시겠다면?」 — 돌려서 정하는 룰렛. 추천된 가게 · 카테고리 · 직접 선택 셋 중에서 고르고,
+ * 「결정을 하지 못하시겠다면?」 — 돌려서 정하는 룰렛, 또는 공을 떨어뜨리는 파친코(Pachinko.tsx). 추천된 가게 · 카테고리 · 직접 선택 셋 중에서 고르고,
  * 칸 옆 − 로 빼고, + 로 원하는 가게 · 카테고리 · 메뉴를 적어 넣습니다. 카테고리가 나오면 그 종류로 다시 추천받을 수 있습니다. 직접 입력한 것은 기기에 남깁니다.
  */
 export function Roulette({ picks, exclude, onPlace, onCategory }: {
   picks: Scored[]; exclude: readonly string[];
   onPlace: (i: number) => void; onCategory: (cat: RecCategory) => void;
 }) {
+  const [mode, setMode] = useState<Mode>("wheel");
   const [tab, setTab] = useState<Tab>(picks.length >= 2 ? "place" : "category");
   // 탭마다 뺀 칸(removed: 기본 칸의 key)과 더한 칸(added: 적어 넣은 이름). 직접 선택은 더한 칸만 있고 기기에 남깁니다.
   const [removed, setRemoved] = useState<Record<Tab, string[]>>({ place: [], category: [], custom: [] });
@@ -163,7 +171,27 @@ export function Roulette({ picks, exclude, onPlace, onCategory }: {
 
   return (
     <View style={{ marginTop: 34 }}>
-      <SectionHead title="결정을 하지 못하시겠다면?" />
+      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+        <SectionHead title="결정을 하지 못하시겠다면?" />
+        {/* 룰렛 · 파친코 */}
+        <View style={{ flexDirection: "row", gap: 4 }}>
+          {MODES.map((m) => {
+            const on = mode === m.id;
+            return (
+              <Pressable
+                key={m.id}
+                disabled={spinning}
+                onPress={() => { if (!on) { Haptics.selectionAsync(); setMode(m.id); setWon(null); } }}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: on }}
+                style={{ height: 28, borderRadius: 14, paddingHorizontal: 11, justifyContent: "center", borderWidth: 1, borderColor: on ? C.brick : C.lineSoft, backgroundColor: on ? C.brickSoft : "transparent" }}
+              >
+                <Text style={{ fontFamily: on ? F.sansMd : F.sans, fontSize: 11.5, color: on ? C.brick : C.muted }}>{m.label}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
 
       <View style={{ marginTop: 12, borderRadius: 24, borderWidth: 1, borderColor: C.lineSoft, backgroundColor: REC.paper, padding: 16 }}>
         {/* 고를 거리 — 세 칸 전환 */}
@@ -234,6 +262,18 @@ export function Roulette({ picks, exclude, onPlace, onCategory }: {
           </View>
         )}
 
+        {mode === "pachinko" ? (
+          <View style={{ marginTop: 22 }}>
+            <Pachinko
+              options={live}
+              tones={fills}
+              busy={spinning}
+              onStart={() => { setWon(null); setSpinning(true); }}
+              onDone={(o) => { setSpinning(false); setWon(o); }}
+            />
+          </View>
+        ) : (
+        <>
         {/* 바퀴 — 검정 테두리에 작은 점(전구)들, 안쪽은 벽돌 · 살구 · 종이 · 모래 네 톤. 바늘은 위에 고정. */}
         <View style={{ marginTop: 22, alignItems: "center" }}>
           <View style={{ width: SIZE, height: SIZE + 10 }}>
@@ -278,6 +318,8 @@ export function Roulette({ picks, exclude, onPlace, onCategory }: {
             </View>
           </View>
         </View>
+        </>
+        )}
 
         {/* 결과 */}
         <View style={{ marginTop: 18, minHeight: 70, alignItems: "center", justifyContent: "center" }}>
@@ -304,7 +346,7 @@ export function Roulette({ picks, exclude, onPlace, onCategory }: {
               )}
             </View>
           ) : (
-            <Text style={{ fontFamily: F.sans, fontSize: 12, color: C.faint }}>가운데를 눌러 돌려 보세요</Text>
+            <Text style={{ fontFamily: F.sans, fontSize: 12, color: C.faint }}>{mode === "wheel" ? "가운데를 눌러 돌려 보세요" : "공을 넣어 보세요"}</Text>
           )}
         </View>
       </View>
