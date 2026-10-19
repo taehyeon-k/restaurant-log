@@ -48,9 +48,7 @@ export function RecordPickerSheet({
   return (
     <BottomSheetModal visible={visible} onClose={onClose}>
       <Text style={{ fontFamily: F.serif, fontSize: 18, color: C.ink }}>{title}</Text>
-      <Text style={{ marginTop: 4, fontFamily: F.sans, fontSize: 11.5, color: C.faint }}>
-        {max > 1 ? `순서대로 눌러 주세요 · 최대 ${max}곳` : "인증한 기록이면 「✓ 인증」이 함께 보입니다"}
-      </Text>
+      {max > 1 && <Text style={{ marginTop: 4, fontFamily: F.sans, fontSize: 11.5, color: C.faint }}>순서대로 눌러 주세요 · 최대 {max}곳</Text>}
       <FlatList
         style={{ marginTop: 10, maxHeight: 380 }}
         data={records}

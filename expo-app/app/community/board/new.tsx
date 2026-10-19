@@ -27,14 +27,6 @@ const TYPES: PostType[] = ["free", "theme", "food", "cafe", "course"];
 /** 태그 다듬기 — 서버 norm_tags 와 같게(# · 공백 빼고 소문자, 20자). */
 const normTag = (t: string) => t.replace(/[#\s]/g, "").toLowerCase().slice(0, 20);
 
-const PLACEHOLDER: Record<PostType, string> = {
-  free: "제목 — 무엇이든 물어보고 나눠요",
-  theme: "제목 — 이번 주 주제에 답해요",
-  food: "제목 — 이 집을 한 줄로",
-  cafe: "제목 — 이 카페를 한 줄로",
-  course: "제목 — 이 코스를 한 줄로",
-};
-
 type Stop = { r: Restaurant; memo: string };
 
 /**
@@ -225,7 +217,7 @@ export default function BoardCompose() {
           value={title}
           onChangeText={(t) => setTitle(t.slice(0, TITLE_MAX))}
           maxLength={TITLE_MAX}
-          placeholder={PLACEHOLDER[type]}
+          placeholder="제목"
           placeholderTextColor="#a8a196"
           style={{ paddingVertical: 6, fontFamily: F.serif, fontSize: 18, color: C.ink, borderBottomWidth: 1, borderBottomColor: C.lineSoft }}
         />
@@ -234,7 +226,7 @@ export default function BoardCompose() {
           onChangeText={(t) => setBody(t.slice(0, BODY_MAX))}
           maxLength={BODY_MAX}
           multiline
-          placeholder="본문 (비워도 됩니다)"
+          placeholder="본문"
           placeholderTextColor="#a8a196"
           textAlignVertical="top"
           style={{ minHeight: 140, fontFamily: F.serif, fontSize: 13.5, lineHeight: 23, color: C.ink }}
@@ -291,9 +283,6 @@ export default function BoardCompose() {
         )}
 
         {!!error && <Text style={{ fontFamily: F.sans, fontSize: 12, color: C.brick }}>{error}</Text>}
-        <Text style={{ fontFamily: F.sans, fontSize: 11, lineHeight: 17, color: K.inactive }}>
-          DINARY 사용자 모두가 봅니다 · 링크 · 연락처는 넣을 수 없습니다 · 하루 {DAILY}개까지{"\n"}기록을 붙이면 가게 · 별점 · 대표 사진만 올라갑니다(메모 · 메뉴 · 가격은 빠집니다).
-        </Text>
       </ScrollView>
 
       {/* 도구줄 — 내 기록 · 사진 · #태그 · 투표(자유만) */}
@@ -445,7 +434,7 @@ function PollEditor({ options, onOptions, days, onDays, onRemove }: { options: s
     <View style={{ borderRadius: 16, borderWidth: 1, borderColor: K.brickLine, backgroundColor: C.card, padding: 12, gap: 8 }}>
       <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
         <Text style={{ fontFamily: F.mono, fontSize: 10, letterSpacing: 1.4, color: C.brick }}>투표 · 선택지 2~5개</Text>
-        <Pressable onPress={onRemove} hitSlop={8}><Text style={{ fontFamily: F.sans, fontSize: 11.5, color: K.inactive }}>투표 빼기</Text></Pressable>
+        <Pressable onPress={onRemove} hitSlop={8}><Text style={{ fontFamily: F.sans, fontSize: 11.5, color: K.inactive }}>투표 제거</Text></Pressable>
       </View>
       {options.map((o, i) => (
         <View key={i} style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
@@ -466,11 +455,11 @@ function PollEditor({ options, onOptions, days, onDays, onRemove }: { options: s
       ))}
       {options.length < 5 && (
         <Pressable onPress={() => onOptions([...options, ""])} hitSlop={6} style={{ alignSelf: "flex-start" }}>
-          <Text style={{ fontFamily: F.sans, fontSize: 12, color: C.brick }}>+ 선택지 더하기</Text>
+          <Text style={{ fontFamily: F.sans, fontSize: 12, color: C.brick }}>+ 선택지 추가</Text>
         </Pressable>
       )}
       <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-        <Text style={{ fontFamily: F.sans, fontSize: 12, color: C.muted, marginRight: 4 }}>기간</Text>
+        <Text style={{ fontFamily: F.sans, fontSize: 12, color: C.muted, marginRight: 4 }}>투표 기간</Text>
         {POLL_DAYS.map((d) => {
           const on = d === days;
           return (

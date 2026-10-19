@@ -80,7 +80,7 @@ export default function BoardHome() {
 
   const header = (
     <View>
-      <TitleBlock eyebrow="COMMUNITY · BOARD" title="게시판" sub="DINARY 사용자 모두가 봅니다" />
+      <TitleBlock eyebrow="COMMUNITY · BOARD" title="게시판" />
       {searching && (
         <TextInput
           autoFocus
