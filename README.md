@@ -1,3 +1,5 @@
+> **모바일 앱은 [`dinary-org/dinary-app`](https://github.com/dinary-org/dinary-app) 으로 옮겼습니다 (2026-10-19).** 이 저장소의 `expo-app/` 은 더 이상 고치지 않으며, EAS Update 워크플로도 지웠습니다. 남은 웹의 `src/app/api/*` 는 앱이 엣지 함수로 넘어갈 때까지만 유지합니다.
+
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
 ## Getting Started

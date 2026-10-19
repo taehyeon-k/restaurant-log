@@ -1,3 +1,5 @@
+> **이 폴더는 동결되었습니다. 앱은 [`dinary-org/dinary-app`](https://github.com/dinary-org/dinary-app) 에서 개발합니다 (2026-10-19).**
+
 # DINARY — Expo 앱
 
 `Restaurant app mobile design.zip` 핸드오프(1a 내비게이션 + 1d 비주얼)를 옮기는 중인 네이티브 앱입니다.
